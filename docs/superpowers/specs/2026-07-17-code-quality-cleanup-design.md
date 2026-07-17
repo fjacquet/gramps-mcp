@@ -26,8 +26,12 @@ can observe the difference. (Explicit user approval given for this deletion.)
 
 ### 2. Fix documentation/version drift
 
-- `server.py` root endpoint: replace hardcoded `"version": "1.0.0"` with the
-  package version read via `importlib.metadata.version("gramps-mcp")`.
+- Three conflicting versions exist: `pyproject.toml` says 1.1.0, `server.py`
+  hardcodes "1.0.0", `src/gramps_mcp/__init__.py` says "0.1.0". The package is
+  not installed as a distribution (no build-system; run via `python -m
+  src.gramps_mcp.server`), so `importlib.metadata` cannot be the source.
+  Instead: `__init__.py.__version__` becomes the single runtime source,
+  bumped to 1.1.0 to match pyproject; `server.py` imports it.
 - `server.py` root and `/health` endpoints: replace hardcoded `16` tool counts
   with `len(TOOL_REGISTRY)`.
 - Fix docstrings that claim "23 genealogy tools" (server.py module docstring;
@@ -96,14 +100,19 @@ and use it in both places.
   Update the docstring accordingly.
 - `tools/data_management.py` `_extract_entity_data`: `entity_type: str = None`
   becomes `entity_type: Optional[str] = None`.
-- black is broken in the venv (blib2to3 ImportError under Python 3.13):
-  upgrade black to a current release and `uv sync` so `black --check` runs
-  again (pre-commit relies on it).
+- Formatter standardization (decided with the user during planning): black
+  turned out not to be broken (the initial ImportError was transient), but
+  black and ruff-format disagree and neither has been applied tree-wide
+  (ruff format flags 15 files, black 13). Pre-commit enforces ruff-format,
+  while CLAUDE.md said "format with black". Decision: standardize on
+  **ruff format** — remove black from the dev dependency group, update
+  CLAUDE.md accordingly, and run `ruff format` once over `src/` and `tests/`
+  to normalize the tree.
 
 ## Verification
 
 - `uv run ruff check src/` — clean (already clean today; must stay clean).
-- `uv run black --check src/ tests/` — runs and passes.
+- `uv run ruff format --check src/ tests/` — passes.
 - `uv run mypy src/gramps_mcp --ignore-missing-imports` — zero errors.
 - `uv run pytest tests/test_merge.py tests/test_utils.py` — green.
 - Full test suite: integration tests requiring the live server remain
@@ -114,6 +123,7 @@ and use it in both places.
 - The merge extraction touches the code path that mutates real genealogy data.
   Mitigation: the extraction is mechanical, behavior is pinned by unit tests
   written against the current logic before the move.
-- Version lookup via `importlib.metadata` requires the package to be installed
-  (it is, via `uv sync` / the Docker image). Fallback: catch
-  `PackageNotFoundError` and return `"unknown"`.
+- The tree-wide `ruff format` run touches many files in one commit; it is
+  isolated in its own final commit so it never mixes with logic changes.
+- Version still lives in two places (`pyproject.toml` and `__init__.py`);
+  acceptable until the project gains a build-system and real packaging.
