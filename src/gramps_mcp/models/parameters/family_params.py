@@ -42,6 +42,13 @@ class FamilySaveParams(BaseModel):
     child_handles: Optional[List[str]] = Field(
         None, description="List of child handles"
     )
+    child_ref_list: Optional[List[dict]] = Field(
+        None,
+        description=(
+            "List of child references in API shape "
+            "(translated internally from child_handles)"
+        ),
+    )
     event_ref_list: Optional[List[dict]] = Field(
         None, description="List of event references"
     )

@@ -203,6 +203,13 @@ async def create_family_tool(arguments: Dict) -> List[TextContent]:
         # Validate parameters
         params = FamilySaveParams(**arguments)
 
+        # Reason: the real Gramps Web API has no child_handles field - it
+        # expects child_ref_list entries. Translate here so the caller can
+        # keep using the simpler child_handles shape.
+        if params.child_handles:
+            params.child_ref_list = [{"ref": h} for h in params.child_handles]
+            params.child_handles = None
+
         # Get tree_id from settings
         settings = get_settings()
         tree_id = settings.gramps_tree_id

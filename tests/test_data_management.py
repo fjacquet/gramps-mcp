@@ -884,6 +884,37 @@ class TestCreateFamilyTool:
             f"Expected URL description in output but got: {text}"
         )
 
+    @pytest.mark.asyncio
+    async def test_create_family_with_child_handles(self):
+        """Regression test for issue #24: child_handles must translate to
+        child_ref_list so the API actually stores the child link."""
+        import re
+
+        child_result = await create_person_tool(
+            {
+                "primary_name": {
+                    "first_name": "ChildHandles",
+                    "surname_list": [{"surname": "RegressionChild", "primary": True}],
+                },
+                "gender": 0,
+            }
+        )
+        child_text = child_result[0].text
+        assert "Error:" not in child_text, f"Child creation failed: {child_text}"
+        child_handle_match = re.search(r"\[([a-f0-9]+)\]", child_text)
+        assert child_handle_match, f"Could not extract child handle: {child_text}"
+        child_handle = child_handle_match.group(1)
+
+        family_result = await create_family_tool({"child_handles": [child_handle]})
+
+        family_text = family_result[0].text
+        assert "Error:" not in family_text, (
+            f"Expected success but got error: {family_text}"
+        )
+        assert "ChildHandles" in family_text and "RegressionChild" in family_text, (
+            f"Expected child to appear in family details but got: {family_text}"
+        )
+
 
 # Removed validation tests - Pydantic handles input validation automatically
 # These tests focus only on actual Gramps Web API integration
