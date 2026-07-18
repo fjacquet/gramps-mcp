@@ -15,6 +15,7 @@ from src.gramps_mcp.client import GrampsWebAPIClient
 from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.models.parameters.base_params import BaseGetMultipleParams
+from src.gramps_mcp.models.parameters.facts_params import FactsParams, LivingProxy
 
 
 class TestGetPersonCall:
@@ -228,5 +229,26 @@ class TestPutMergeRequirement:
                 f"Expected path {original_path} to be preserved, but got: {updated_data['path']}"
             )
 
+        finally:
+            await client.close()
+
+
+class TestEnumParamSerialization:
+    """Test that enum-typed parameter fields serialize to plain strings."""
+
+    @pytest.mark.asyncio
+    async def test_get_facts_with_default_living_proxy_succeeds(self):
+        """GET_FACTS must not 422 due to LivingProxy enum leaking into the query string."""
+        settings = get_settings()
+        client = GrampsWebAPIClient()
+
+        try:
+            params = FactsParams(living=LivingProxy.INCLUDE_ALL, rank=1)
+            result = await client.make_api_call(
+                api_call=ApiCalls.GET_FACTS,
+                params=params,
+                tree_id=settings.gramps_tree_id,
+            )
+            assert isinstance(result, list)
         finally:
             await client.close()

@@ -231,7 +231,7 @@ class GrampsWebAPIClient:
         json_data = None
 
         if validated_params is not None:
-            params_dict = validated_params.model_dump(exclude_none=True)
+            params_dict = validated_params.model_dump(exclude_none=True, mode="json")
             # POST and PUT operations use JSON body, GET operations use query parameters
             if (
                 api_call.method in ["POST", "PUT"]
