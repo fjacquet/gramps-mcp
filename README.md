@@ -216,20 +216,23 @@ For any other MCP client, use the HTTP transport endpoint:
 
 ```
 src/gramps_mcp/
-|-- server.py           # MCP server with HTTP transport
-|-- tools.py            # Tool registry and exports
-|-- client.py           # Gramps Web API client
-|-- models.py           # Pydantic data models
-|-- auth.py             # JWT authentication
+|-- server.py           # MCP server, tool registry, HTTP/stdio transports
+|-- client.py           # Unified Gramps Web API client
+|-- merge.py            # Pure merge logic for PUT updates
+|-- auth.py             # JWT authentication (singleton)
 |-- config.py           # Configuration management
-|-- tools/              # Modular tool implementations
+|-- utils.py            # Shared helpers
+|-- models/             # Pydantic models
+|   |-- api_calls.py    # API endpoint definitions
+|   |-- api_mapping.py  # API call to parameter model mapping
+|   `-- parameters/     # Parameter models per domain
+|-- tools/              # MCP tool implementations
 |   |-- search_basic.py
 |   |-- search_details.py
 |   |-- data_management.py
-|   |-- tree_management.py
 |   `-- analysis.py
 |-- handlers/           # Data formatting handlers
-`-- client/             # API client modules
+`-- resources/          # MCP resources (GQL docs, usage guide)
 ```
 
 ### Technology Stack

@@ -18,7 +18,7 @@
 MCP server main entry point with HTTP transport.
 
 This module provides the FastAPI application and MCP server setup with
-all 23 genealogy tools for Gramps Web API integration.
+all genealogy tools for Gramps Web API integration.
 """
 
 import asyncio
@@ -32,6 +32,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool
 from pydantic import BaseModel, Field
+
+from . import __version__
 
 # Import all parameter models
 from .models.parameters.citation_params import CitationData
@@ -291,10 +293,10 @@ async def root(request):
     return JSONResponse(
         {
             "service": "Gramps MCP Server",
-            "version": "1.0.0",
+            "version": __version__,
             "description": "MCP server for Gramps Web API genealogy operations",
             "mcp_endpoint": "/mcp",
-            "tools_count": 16,
+            "tools_count": len(TOOL_REGISTRY),
         }
     )
 
@@ -305,7 +307,11 @@ async def health_check(request):
     from starlette.responses import JSONResponse
 
     return JSONResponse(
-        {"status": "healthy", "service": "Gramps MCP Server", "tools": 16}
+        {
+            "status": "healthy",
+            "service": "Gramps MCP Server",
+            "tools": len(TOOL_REGISTRY),
+        }
     )
 
 

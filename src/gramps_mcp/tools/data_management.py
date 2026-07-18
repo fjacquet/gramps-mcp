@@ -17,8 +17,8 @@
 """
 Data management MCP tools for genealogy operations.
 
-This module contains 8 CRUD tools for creating and updating people, families,
-events, places, sources, citations, notes, and media records.
+This module contains 9 CRUD tools for creating and updating people, families,
+events, places, sources, citations, notes, media, and repository records.
 """
 
 import logging
