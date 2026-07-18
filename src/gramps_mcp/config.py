@@ -50,3 +50,19 @@ def get_settings() -> Settings:
         raise ValueError(f"Missing required environment variable: {e}")
     except ValidationError as e:
         raise ValueError(f"Invalid configuration: {e}")
+
+
+def get_api_base_url(settings: Settings) -> str:
+    """
+    Build the Gramps Web API base URL from settings.
+
+    Args:
+        settings (Settings): Application settings.
+
+    Returns:
+        str: Base URL ending in "/api", without a trailing slash.
+    """
+    base_url = str(settings.gramps_api_url).rstrip("/")
+    if not base_url.endswith("/api"):
+        base_url += "/api"
+    return base_url

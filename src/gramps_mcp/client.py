@@ -30,7 +30,7 @@ import httpx
 from pydantic import BaseModel
 
 from .auth import AuthManager
-from .config import get_settings
+from .config import get_api_base_url, get_settings
 from .merge import merge_put_data
 from .models.api_calls import ApiCalls
 from .models.api_mapping import validate_api_call_params
@@ -53,11 +53,7 @@ class GrampsWebAPIClient:
         # Use singleton AuthManager - no new instances created
         self.auth_manager = AuthManager()
 
-        # Construct base API URL
-        base_url = str(self.settings.gramps_api_url).rstrip("/")
-        if not base_url.endswith("/api"):
-            base_url += "/api"
-        self.base_url = base_url
+        self.base_url = get_api_base_url(self.settings)
 
     async def close(self):
         """Close the HTTP client and auth manager."""

@@ -27,7 +27,7 @@ from typing import Optional
 import httpx
 import jwt
 
-from .config import get_settings
+from .config import get_api_base_url, get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +109,9 @@ class AuthManager:
                 logger.info("HTTP client recreated in AuthManager")
 
             # Create new client with current event loop
-            base_url = str(self.settings.gramps_api_url).rstrip("/")
-            if not base_url.endswith("/api"):
-                base_url += "/api"
-
             self._client = httpx.AsyncClient(
-                base_url=base_url, timeout=httpx.Timeout(timeout=30.0, connect=10.0)
+                base_url=get_api_base_url(self.settings),
+                timeout=httpx.Timeout(timeout=30.0, connect=10.0),
             )
             self._loop = current_loop
         return self._client
