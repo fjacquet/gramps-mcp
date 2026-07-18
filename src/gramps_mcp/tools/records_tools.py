@@ -27,8 +27,10 @@ from mcp.types import TextContent
 
 from ..client import GrampsAPIError
 from ..config import get_settings
+from ..handlers.facts_handler import format_facts
 from ..handlers.tag_handler import format_tag, format_tags
 from ..models.api_calls import ApiCalls
+from ..models.parameters.facts_params import FactsParams
 from ..models.parameters.tag_params import TagSaveParams, TagSearchParams
 from .search_basic import with_client
 
@@ -117,3 +119,25 @@ async def manage_tags_tool(client, arguments: Dict) -> List[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "tag management")
+
+
+@with_client
+async def get_facts_tool(client, arguments: Dict) -> List[TextContent]:
+    """
+    Get interesting facts and statistics about the tree.
+    """
+    try:
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        params = FactsParams(**arguments)
+
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_FACTS, params=params, tree_id=tree_id
+        )
+
+        formatted = await format_facts(result, client, tree_id)
+        return [TextContent(type="text", text=formatted)]
+
+    except Exception as e:
+        return _format_error_response(e, "facts retrieval")

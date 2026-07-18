@@ -50,3 +50,22 @@ class TestManageTagsTool:
         result = await manage_tags_tool({"action": "delete"})
         text = result[0].text
         assert "error" in text.lower()
+
+
+from src.gramps_mcp.tools.records_tools import get_facts_tool
+
+
+class TestGetFactsTool:
+    """Test the get_facts_tool against a live Gramps Web server."""
+
+    @pytest.mark.asyncio
+    async def test_get_facts_default(self):
+        result = await get_facts_tool({})
+        text = result[0].text
+        assert "error" not in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_facts_with_rank(self):
+        result = await get_facts_tool({"rank": 2})
+        text = result[0].text
+        assert "error" not in text.lower()

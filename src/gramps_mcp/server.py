@@ -39,6 +39,7 @@ from .config import get_settings
 # Import all parameter models
 from .models.parameters.citation_params import CitationData
 from .models.parameters.event_params import EventSaveParams
+from .models.parameters.facts_params import FactsParams
 from .models.parameters.family_params import FamilySaveParams
 from .models.parameters.media_params import MediaSaveParams
 from .models.parameters.note_params import NoteSaveParams
@@ -71,7 +72,7 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
-from .tools.records_tools import manage_tags_tool
+from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
     get_relationship_tool,
@@ -335,6 +336,11 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
         "schema": ManageTagsParams,
         "handler": manage_tags_tool,
+    },
+    "get_facts": {
+        "description": "Get interesting facts and statistics about the tree",
+        "schema": FactsParams,
+        "handler": get_facts_tool,
     },
 }
 
