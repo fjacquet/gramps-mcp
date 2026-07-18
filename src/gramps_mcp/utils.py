@@ -18,6 +18,8 @@
 Utility functions for gramps_mcp.
 """
 
+from typing import Optional
+
 from markdownify import markdownify as md
 
 from .models.api_calls import ApiCalls
@@ -131,3 +133,25 @@ async def get_gramps_id_from_handle(
     except Exception:
         # If we can't resolve it, just return the handle
         return obj_handle
+
+
+async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> Optional[str]:
+    """
+    Look up a person's handle by gramps_id via a direct GQL search.
+
+    Args:
+        client: GrampsWebAPIClient instance
+        tree_id: Family tree identifier
+        gramps_id: The person's gramps_id (e.g. "I0044")
+
+    Returns:
+        The person's handle if a matching person is found, otherwise None
+    """
+    result = await client.make_api_call(
+        api_call=ApiCalls.GET_PEOPLE,
+        params={"gql": f'gramps_id="{gramps_id}"', "pagesize": 1},
+        tree_id=tree_id,
+    )
+    if result and isinstance(result, list) and len(result) > 0:
+        return result[0].get("handle")
+    return None

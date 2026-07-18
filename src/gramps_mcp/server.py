@@ -70,6 +70,7 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
+from .tools.relationship_tools import get_relationship_tool
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
 
@@ -98,6 +99,21 @@ class AncestorsParams(BaseModel):
             "Max generations to retrieve (default: 5, use higher values "
             "carefully as they can overflow context)"
         ),
+    )
+
+
+class RelationshipQueryParams(BaseModel):
+    person1: str = Field(..., description="Handle or gramps_id of the first person")
+    person2: str = Field(..., description="Handle or gramps_id of the second person")
+    all_relationships: bool = Field(
+        False,
+        description=(
+            "If true, return all possible relationships; if false, only "
+            "the most direct one"
+        ),
+    )
+    depth: Optional[int] = Field(
+        None, ge=1, description="Search depth in generations (API default: 15)"
     )
 
 
@@ -210,6 +226,14 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         "description": "Get recent changes/modifications to the family tree",
         "schema": TransactionHistoryParams,
         "handler": get_recent_changes_tool,
+    },
+    "get_relationship": {
+        "description": (
+            "Calculate the relationship between two people (accepts handle "
+            "or gramps_id for each)"
+        ),
+        "schema": RelationshipQueryParams,
+        "handler": get_relationship_tool,
     },
 }
 
