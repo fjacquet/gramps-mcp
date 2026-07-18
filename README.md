@@ -1,6 +1,7 @@
 # Gramps MCP - AI-Powered Genealogy Research & Management
 
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](./LICENSE) [![Python](https://img.shields.io/badge/Python-3.9+-brightgreen)](https://python.org) [![MCP](https://img.shields.io/badge/MCP-1.2.0+-orange)](https://modelcontextprotocol.io)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](./LICENSE) [![Python](https://img.shields.io/badge/Python-3.10+-brightgreen)](https://python.org) [![MCP](https://img.shields.io/badge/MCP-1.2.0+-orange)](https://modelcontextprotocol.io)
+[![CI](https://github.com/fjacquet/gramps-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/fjacquet/gramps-mcp/actions/workflows/ci.yml) [![Docker Build](https://github.com/fjacquet/gramps-mcp/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/fjacquet/gramps-mcp/actions/workflows/docker-publish.yml) [![codecov](https://codecov.io/gh/fjacquet/gramps-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/fjacquet/gramps-mcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ## Without Gramps MCP
 
@@ -40,6 +41,21 @@ No more manual data entry, no context switching between apps, no generic genealo
 - Connect to your Gramps Web API
 - Install Gramps MCP in your AI assistant
 - Start intelligent genealogy research with natural language
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [MCP Client Configuration](#mcp-client-configuration)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Usage Examples](#usage-examples)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Related Projects](#related-projects)
+- [Contributing](#contributing)
+- [Acknowledgments](#acknowledgments)
 
 ## Features
 
@@ -244,6 +260,20 @@ src/gramps_mcp/
 - **PyJWT**: JWT token authentication
 - **python-dotenv**: Environment configuration
 
+## Development
+
+Requires [uv](https://docs.astral.sh/uv/). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor guide.
+
+```bash
+uv sync --all-extras --dev                               # install dependencies
+uv run ruff check src/                                    # lint
+uv run ruff format --check src/ tests/                    # formatting check
+uv run mypy src/gramps_mcp --ignore-missing-imports        # type check
+uv run pytest tests/test_merge.py tests/test_config.py tests/test_client_merge.py tests/test_utils.py  # offline-safe tests
+```
+
+Most tests in `tests/` require a live Gramps Web server (see [CONTRIBUTING.md](CONTRIBUTING.md)
+for setup); the command above runs only the ones that work offline, matching what CI checks.
 
 ## Usage Examples
 
