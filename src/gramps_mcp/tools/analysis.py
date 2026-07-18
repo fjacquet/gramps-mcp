@@ -126,7 +126,7 @@ async def _wait_for_task_completion(
         GrampsAPIError: If task fails or times out
     """
     start_time = asyncio.get_event_loop().time()
-    sleep_interval = 2  # Start with 2 second intervals
+    sleep_interval: float = 2  # Start with 2 second intervals
     max_sleep = 10  # Maximum sleep interval
 
     while True:

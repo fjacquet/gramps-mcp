@@ -373,9 +373,7 @@ async def find_type_tool(arguments: Dict) -> List[TextContent]:
     max_results = arguments.get("max_results", 20)
 
     # Get the string value from the enum if needed
-    entity_type_str = (
-        entity_type.value if hasattr(entity_type, "value") else entity_type
-    )
+    entity_type_str = getattr(entity_type, "value", entity_type)
 
     # Convert to parameters expected by existing tools
     params = {"gql": gql, "pagesize": max_results}
