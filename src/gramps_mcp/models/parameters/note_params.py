@@ -64,13 +64,17 @@ class NoteSaveParams(BaseModel):
         None,
         description="Note's handle (for updates; omit for new note)",
     )
-    text: str = Field(..., description="Note text content")
+    text: str | dict[str, Any] = Field(..., description="Note text content")
     type: str = Field(..., description="The type of note")
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """Convert to API format with StyledText structure."""
         data = super().model_dump(**kwargs)
-        # Transform text string to StyledText format expected by API
+        # Transform text string to StyledText format expected by API.
+        # Reason: idempotent by design - the FastMCP transport path calls
+        # model_dump() twice (once in server.py's generic dispatch, once
+        # when client.py builds the API request body), so a dict here must
+        # be left untouched rather than re-wrapped or rejected.
         if "text" in data and isinstance(data["text"], str):
             data["text"] = {
                 "_class": "StyledText",

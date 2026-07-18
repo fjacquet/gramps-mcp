@@ -73,6 +73,30 @@ class TestCreateNoteTool:
         else:
             pytest.fail("Could not extract note handle for chaining tests")
 
+    @pytest.mark.asyncio
+    async def test_create_note_via_fastmcp_transport(self):
+        """Regression test for issue #27.
+
+        server.py's create_handler calls arguments.model_dump() on the
+        NoteSaveParams schema instance before create_note_tool ever sees
+        the dict. This must not crash NoteSaveParams(**params) downstream.
+        """
+        from src.gramps_mcp.models.parameters.note_params import NoteSaveParams
+
+        schema_instance = NoteSaveParams(
+            text="Regression test note for FastMCP transport path.",
+            type="Research",
+        )
+        transport_dict = schema_instance.model_dump()
+
+        result = await create_note_tool(transport_dict)
+
+        text = result[0].text
+        assert "Error:" not in text, f"Expected success but got error: {text}"
+        assert "Regression test note for FastMCP transport path." in text, (
+            f"Expected note text in output but got: {text}"
+        )
+
 
 class TestCreateMediaTool:
     """Test create_media_tool functionality - Second in workflow."""
