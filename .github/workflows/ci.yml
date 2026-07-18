@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --all-extras --dev
+
+      - name: Lint with ruff
+        run: uv run ruff check src/
+
+      - name: Check formatting with ruff
+        run: uv run ruff format --check src/ tests/
+
+      - name: Type check with mypy
+        run: uv run mypy src/gramps_mcp --ignore-missing-imports
+
+      - name: Run offline tests with coverage
+        env:
+          GRAMPS_API_URL: "https://gramps.example.com"
+          GRAMPS_USERNAME: "ci"
+          GRAMPS_PASSWORD: "ci"
+          GRAMPS_TREE_ID: "ci"
+        run: uv run pytest --cov=src/gramps_mcp --cov-report=xml tests/test_merge.py tests/test_config.py tests/test_client_merge.py tests/test_utils.py
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
