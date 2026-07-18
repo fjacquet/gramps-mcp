@@ -34,6 +34,7 @@ from mcp.types import Tool
 from pydantic import BaseModel, Field
 
 from . import __version__
+from .config import get_settings
 
 # Import all parameter models
 from .models.parameters.citation_params import CitationData
@@ -357,8 +358,9 @@ if __name__ == "__main__":
     else:
         # Run the FastMCP server with streamable HTTP transport
         # Configure server settings
-        app.settings.host = "0.0.0.0"  # Listen on all interfaces for Docker
-        app.settings.port = 8000
+        settings = get_settings()
+        app.settings.host = settings.gramps_mcp_host
+        app.settings.port = settings.gramps_mcp_port
 
         # Run with streamable-http transport for production use
         app.run(transport="streamable-http")

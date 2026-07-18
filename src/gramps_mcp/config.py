@@ -36,6 +36,14 @@ class Settings(BaseModel):
     gramps_password: str = Field(..., description="Password for Gramps Web API")
     gramps_tree_id: str = Field(..., description="Family tree identifier")
 
+    # MCP HTTP Server Configuration
+    gramps_mcp_host: str = Field(
+        "0.0.0.0", description="Host/interface for the MCP HTTP server to bind to"
+    )
+    gramps_mcp_port: int = Field(
+        8000, description="Port for the MCP HTTP server to listen on"
+    )
+
 
 def get_settings() -> Settings:
     """Get settings from environment variables."""
@@ -45,6 +53,8 @@ def get_settings() -> Settings:
             gramps_username=os.environ["GRAMPS_USERNAME"],
             gramps_password=os.environ["GRAMPS_PASSWORD"],
             gramps_tree_id=os.environ["GRAMPS_TREE_ID"],
+            gramps_mcp_host=os.environ.get("GRAMPS_MCP_HOST", "0.0.0.0"),
+            gramps_mcp_port=int(os.environ.get("GRAMPS_MCP_PORT", "8000")),
         )
     except KeyError as e:
         raise ValueError(f"Missing required environment variable: {e}")

@@ -147,6 +147,10 @@ GRAMPS_API_URL=https://your-gramps-web-domain.com  # Without /api suffix - will 
 GRAMPS_USERNAME=your-gramps-web-username
 GRAMPS_PASSWORD=your-gramps-web-password
 GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
+
+# Optional: HTTP server bind address (defaults shown)
+GRAMPS_MCP_HOST=0.0.0.0
+GRAMPS_MCP_PORT=8000
 ```
 
 ## MCP Client Configuration
