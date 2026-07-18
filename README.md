@@ -59,7 +59,7 @@ No more manual data entry, no context switching between apps, no generic genealo
 
 ## Features
 
-### 16 Genealogy Tools
+### 21 Genealogy Tools
 
 #### Search & Retrieval (3 tools)
 - **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language

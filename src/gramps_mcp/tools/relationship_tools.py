@@ -154,6 +154,11 @@ class _FamiliesTimelineQueryParams(BaseModel):
     pagesize: int = 20
 
 
+def _coalesce(value, default):
+    """Return value unless it is None, in which case return default."""
+    return value if value is not None else default
+
+
 def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
@@ -397,16 +402,16 @@ async def get_timeline_tool(client, arguments: Dict) -> List[TextContent]:
             people_params = PeopleTimelineParams(
                 anchor=anchor,
                 dates=arguments.get("dates"),
-                first=arguments.get("first", True),
-                last=arguments.get("last", True),
+                first=_coalesce(arguments.get("first"), True),
+                last=_coalesce(arguments.get("last"), True),
                 handles=arguments.get("handles"),
                 events=arguments.get("events"),
                 event_classes=arguments.get("event_classes"),
-                ratings=arguments.get("ratings", False),
-                precision=arguments.get("precision", 1),
-                discard_empty=arguments.get("discard_empty", True),
-                page=arguments.get("page", 0),
-                pagesize=arguments.get("pagesize", 20),
+                ratings=_coalesce(arguments.get("ratings"), False),
+                precision=_coalesce(arguments.get("precision"), 1),
+                discard_empty=_coalesce(arguments.get("discard_empty"), True),
+                page=_coalesce(arguments.get("page"), 0),
+                pagesize=_coalesce(arguments.get("pagesize"), 20),
             )
             people_query_params = _PeopleTimelineQueryParams(
                 anchor=people_params.anchor,
@@ -435,10 +440,10 @@ async def get_timeline_tool(client, arguments: Dict) -> List[TextContent]:
                 dates=arguments.get("dates"),
                 events=arguments.get("events"),
                 event_classes=arguments.get("event_classes"),
-                ratings=arguments.get("ratings", False),
-                discard_empty=arguments.get("discard_empty", True),
-                page=arguments.get("page", 0),
-                pagesize=arguments.get("pagesize", 20),
+                ratings=_coalesce(arguments.get("ratings"), False),
+                discard_empty=_coalesce(arguments.get("discard_empty"), True),
+                page=_coalesce(arguments.get("page"), 0),
+                pagesize=_coalesce(arguments.get("pagesize"), 20),
             )
             families_query_params = _FamiliesTimelineQueryParams(
                 handles=families_params.handles,

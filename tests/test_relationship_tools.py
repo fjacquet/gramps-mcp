@@ -7,6 +7,7 @@ details are referenced or asserted on.
 
 import pytest
 
+from src.gramps_mcp.server import TimelineQueryParams
 from src.gramps_mcp.tools.relationship_tools import (
     check_living_tool,
     get_relationship_tool,
@@ -121,5 +122,19 @@ class TestGetTimelineTool:
         result = await get_timeline_tool(
             {"scope": "families", "page": 0, "pagesize": 5}
         )
+        text = result[0].text
+        assert "error" not in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_people_scope_via_fastmcp_transport_path(self):
+        params = TimelineQueryParams(scope="people", pagesize=5)
+        result = await get_timeline_tool(params.model_dump())
+        text = result[0].text
+        assert "error" not in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_families_scope_via_fastmcp_transport_path(self):
+        params = TimelineQueryParams(scope="families", pagesize=5)
+        result = await get_timeline_tool(params.model_dump())
         text = result[0].text
         assert "error" not in text.lower()
