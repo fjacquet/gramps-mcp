@@ -380,7 +380,7 @@ async def get_timeline_tool(client, arguments: Dict) -> List[TextContent]:
                 event_classes=family_params.event_classes,
                 ratings=family_params.ratings,
                 discard_empty=family_params.discard_empty,
-                page=family_params.page,
+                page=family_params.page or None,
                 pagesize=family_params.pagesize,
             )
             result = await client.make_api_call(
@@ -420,7 +420,7 @@ async def get_timeline_tool(client, arguments: Dict) -> List[TextContent]:
                 precision=people_params.precision,
                 discard_empty=people_params.discard_empty,
                 omit_anchor=people_params.omit_anchor,
-                page=arguments.get("page"),
+                page=arguments.get("page") or None,
                 pagesize=people_params.pagesize,
             )
             result = await client.make_api_call(
@@ -447,7 +447,7 @@ async def get_timeline_tool(client, arguments: Dict) -> List[TextContent]:
                 event_classes=families_params.event_classes,
                 ratings=families_params.ratings,
                 discard_empty=families_params.discard_empty,
-                page=arguments.get("page"),
+                page=arguments.get("page") or None,
                 pagesize=families_params.pagesize,
             )
             result = await client.make_api_call(

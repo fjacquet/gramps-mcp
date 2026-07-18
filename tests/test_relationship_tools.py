@@ -101,3 +101,25 @@ class TestGetTimelineTool:
         result = await get_timeline_tool({"scope": "person"})
         text = result[0].text
         assert "error" in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_family_scope_explicit_page_zero(self):
+        result = await get_timeline_tool(
+            {"scope": "family", "target": "F0001", "page": 0}
+        )
+        text = result[0].text
+        assert "error" not in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_people_scope_explicit_page_zero(self):
+        result = await get_timeline_tool({"scope": "people", "page": 0, "pagesize": 5})
+        text = result[0].text
+        assert "error" not in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_families_scope_explicit_page_zero(self):
+        result = await get_timeline_tool(
+            {"scope": "families", "page": 0, "pagesize": 5}
+        )
+        text = result[0].text
+        assert "error" not in text.lower()
