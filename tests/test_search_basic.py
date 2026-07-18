@@ -50,6 +50,32 @@ class TestFindPersonTool:
             assert result_count <= 3, f"Expected max 3 results, got {result_count}"
 
 
+class TestFindTypePagination:
+    """Regression tests for issue #5: find_type page parameter."""
+
+    @pytest.mark.asyncio
+    async def test_find_type_accepts_page_parameter(self):
+        """find_type must accept a page argument without raising."""
+        result = await find_type_tool(
+            {
+                "type": "person",
+                "gql": 'primary_name.first_name ~ "e"',
+                "max_results": 2,
+                "page": 2,
+            }
+        )
+
+        print("\n--- FIND TYPE PAGE 2 RESULT ---")
+        print(result[0].text)
+        print("--- END ---\n")
+
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        assert "error" not in result[0].text.lower(), (
+            f"Error found in response: {result[0].text}"
+        )
+
+
 class TestFindFamilyTool:
     """Test find_type_tool functionality for family with real API."""
 
@@ -310,3 +336,48 @@ class TestFindAnythingTool:
             # Count the number of "• **" entries which indicate individual results
             result_count = result[0].text.count("• **")
             assert result_count <= 3, f"Expected max 3 results, got {result_count}"
+
+
+class TestFindAnythingPagination:
+    """Regression tests for issue #5: find_anything pagesize/page."""
+
+    @pytest.mark.asyncio
+    async def test_find_anything_respects_max_results(self):
+        """max_results must actually limit the number of results shown.
+
+        Uses a broad single-letter query that is expected to match far
+        more than 2 records across a real family tree, to force the limit
+        to matter rather than pass trivially on an already-small result set.
+        """
+        result = await find_anything_tool({"query": "e", "max_results": 2})
+
+        print("\n--- FIND ANYTHING MAX_RESULTS RESULT ---")
+        print(result[0].text)
+        print("--- END ---\n")
+
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        assert "error" not in result[0].text.lower(), (
+            f"Error found in response: {result[0].text}"
+        )
+
+        if "Found" in result[0].text and "No records found" not in result[0].text:
+            result_count = result[0].text.count("• **")
+            assert result_count <= 2, (
+                f"Expected max 2 results, got {result_count}: {result[0].text}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_find_anything_accepts_page_parameter(self):
+        """find_anything must accept a page argument without raising."""
+        result = await find_anything_tool({"query": "e", "max_results": 2, "page": 2})
+
+        print("\n--- FIND ANYTHING PAGE 2 RESULT ---")
+        print(result[0].text)
+        print("--- END ---\n")
+
+        assert len(result) == 1
+        assert isinstance(result[0], TextContent)
+        assert "error" not in result[0].text.lower(), (
+            f"Error found in response: {result[0].text}"
+        )

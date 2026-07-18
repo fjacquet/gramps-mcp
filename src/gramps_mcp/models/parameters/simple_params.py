@@ -51,6 +51,9 @@ class SimpleFindParams(BaseModel):
     type: EntityType = Field(description="Entity type to search")
     gql: str = Field(description="Gramps Query Language filter")
     max_results: int = Field(default=20, description="Maximum results to return")
+    page: Optional[int] = Field(
+        default=None, description="Page number for paging through results"
+    )
 
 
 class SimpleSearchParams(BaseModel):
@@ -58,6 +61,9 @@ class SimpleSearchParams(BaseModel):
 
     query: str = Field(description="Plain text search query")
     max_results: int = Field(default=20, description="Maximum results to return")
+    page: Optional[int] = Field(
+        default=None, description="Page number for paging through results"
+    )
 
 
 class SimpleGetParams(BaseModel):

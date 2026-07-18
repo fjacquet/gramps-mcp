@@ -371,12 +371,13 @@ async def find_type_tool(arguments: Dict) -> List[TextContent]:
     entity_type = arguments.get("type")
     gql = arguments.get("gql")
     max_results = arguments.get("max_results", 20)
+    page = arguments.get("page")
 
     # Get the string value from the enum if needed
     entity_type_str = getattr(entity_type, "value", entity_type)
 
     # Convert to parameters expected by existing tools
-    params = {"gql": gql, "pagesize": max_results}
+    params = {"gql": gql, "pagesize": max_results, "page": page}
 
     # Call the existing tool function directly
     tool_name = f"find_{entity_type_str}_tool"
@@ -394,8 +395,21 @@ async def find_anything_tool(client, arguments: Dict) -> List[TextContent]:
     Full-text search across all entity types.
     """
     try:
-        # Validate parameters
-        params = SearchParams(**arguments)
+        # Validate parameters - built explicitly rather than splatting
+        # arguments, because SimpleSearchParams uses max_results while
+        # SearchParams expects pagesize (splatting silently drops
+        # max_results since Pydantic ignores unknown kwargs by default).
+        # Reason: the ignore comment below suppresses a mypy false positive
+        # - mypy's dataclass_transform support does not recognize
+        # SearchParams' other Optional fields (declared as
+        # Field(None, ...) with a positional default) as having defaults,
+        # so it flags them as missing even though they are optional at
+        # runtime; unrelated to this fix.
+        params = SearchParams(  # type: ignore[call-arg]
+            query=arguments["query"],
+            pagesize=arguments.get("max_results"),
+            page=arguments.get("page"),
+        )
 
         # Get tree_id from settings
         settings = get_settings()
