@@ -112,8 +112,8 @@ class ApiCalls(Enum):
     GET_LIVING_DATES = ("GET", "living/{handle}/dates")
 
     # ANALYSIS operations - Timelines
-    GET_TIMELINES_PEOPLE = ("GET", "timelines/people")
-    GET_TIMELINES_FAMILIES = ("GET", "timelines/families")
+    GET_TIMELINES_PEOPLE = ("GET", "timelines/people/")
+    GET_TIMELINES_FAMILIES = ("GET", "timelines/families/")
 
     # ANALYSIS operations - Facts
     GET_FACTS = ("GET", "facts/")

@@ -70,7 +70,11 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
-from .tools.relationship_tools import check_living_tool, get_relationship_tool
+from .tools.relationship_tools import (
+    check_living_tool,
+    get_relationship_tool,
+    get_timeline_tool,
+)
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
 
@@ -126,6 +130,66 @@ class LivingStatusParams(BaseModel):
     max_sibling_age_difference: Optional[int] = Field(None, ge=0)
     include_dates: bool = Field(
         True, description="Also fetch estimated birth/death dates"
+    )
+
+
+class TimelineQueryParams(BaseModel):
+    scope: str = Field(
+        ...,
+        description=(
+            "One of: 'person', 'family', 'people', 'families' - whose timeline to build"
+        ),
+    )
+    target: Optional[str] = Field(
+        None,
+        description=(
+            "Handle or gramps_id of the person/family (required when scope "
+            "is 'person' or 'family'; optional anchor for scope 'people')"
+        ),
+    )
+    dates: Optional[str] = Field(
+        None, description="Date range filter, e.g. '1900/1/1-1950/1/1'"
+    )
+    handles: Optional[str] = Field(
+        None, description="Comma-delimited handles (scope 'people'/'families' only)"
+    )
+    events: Optional[str] = Field(
+        None, description="Comma-delimited event types to include"
+    )
+    event_classes: Optional[str] = Field(
+        None, description="Comma-delimited event classes to include"
+    )
+    ratings: Optional[bool] = Field(
+        None,
+        description=(
+            "Include citation count and confidence score (not used for scope 'person')"
+        ),
+    )
+    precision: Optional[int] = Field(
+        None, ge=1, le=3, description="Date precision, 1-3 (scope 'people' only)"
+    )
+    discard_empty: Optional[bool] = Field(
+        None, description="Discard undated events (not used for scope 'person')"
+    )
+    first: Optional[bool] = Field(
+        None,
+        description=(
+            "Include events before the anchor's first event "
+            "(scope 'person'/'people' only)"
+        ),
+    )
+    last: Optional[bool] = Field(
+        None,
+        description=(
+            "Include events after the anchor's last event "
+            "(scope 'person'/'people' only)"
+        ),
+    )
+    page: Optional[int] = Field(
+        None, ge=0, description="Page number (not used for scope 'person')"
+    )
+    pagesize: Optional[int] = Field(
+        None, gt=0, description="Items per page (not used for scope 'person')"
     )
 
 
@@ -254,6 +318,14 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
         "schema": LivingStatusParams,
         "handler": check_living_tool,
+    },
+    "get_timeline": {
+        "description": (
+            "Build a chronological timeline for a person, family, or group "
+            "(scope: person/family/people/families)"
+        ),
+        "schema": TimelineQueryParams,
+        "handler": get_timeline_tool,
     },
 }
 

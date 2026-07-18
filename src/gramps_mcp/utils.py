@@ -155,3 +155,25 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> Optiona
     if result and isinstance(result, list) and len(result) > 0:
         return result[0].get("handle")
     return None
+
+
+async def resolve_family_handle(client, tree_id: str, gramps_id: str) -> Optional[str]:
+    """
+    Look up a family's handle by gramps_id via a direct GQL search.
+
+    Args:
+        client: GrampsWebAPIClient instance
+        tree_id: Family tree identifier
+        gramps_id: The family's gramps_id (e.g. "F0012")
+
+    Returns:
+        The family's handle if a matching family is found, otherwise None
+    """
+    result = await client.make_api_call(
+        api_call=ApiCalls.GET_FAMILIES,
+        params={"gql": f'gramps_id="{gramps_id}"', "pagesize": 1},
+        tree_id=tree_id,
+    )
+    if result and isinstance(result, list) and len(result) > 0:
+        return result[0].get("handle")
+    return None
