@@ -281,8 +281,9 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
         )
         note_type = note_data.get("type", "")
         note_id = note_data.get("gramps_id", "")
-        note_text = note_data.get("text", "")[:50]
-        if len(note_data.get("text", "")) > 50:
+        note_full_text = note_data.get("text", {}).get("string", "")
+        note_text = note_full_text[:50]
+        if len(note_full_text) > 50:
             note_text += "..."
         result += f"- {note_type}: {note_text} ({note_id})\n"
 

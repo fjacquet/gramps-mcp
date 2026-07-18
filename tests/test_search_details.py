@@ -10,11 +10,18 @@ import pytest
 from dotenv import load_dotenv
 from mcp.types import TextContent
 
+from src.gramps_mcp.tools.data_management import create_note_tool, create_person_tool
 from src.gramps_mcp.tools.search_basic import find_type_tool
-from src.gramps_mcp.tools.search_details import get_type_tool
+from src.gramps_mcp.tools.search_details import get_person_tool, get_type_tool
 
 # Load environment variables
 load_dotenv()
+
+
+def _extract_handle(text: str) -> str:
+    match = re.search(r"\[([a-f0-9]+)\]", text)
+    assert match, f"Could not extract handle from: {text}"
+    return match.group(1)
 
 
 def extract_gramps_id_from_search(search_text: str):
@@ -218,3 +225,44 @@ async def test_get_family_tool():
             pytest.skip("Family F0001 not found in search results")
     else:
         pytest.skip("Family F0001 not found in tree")
+
+
+class TestGetPersonToolWithNote:
+    """Regression test for upstream issue #29/#30."""
+
+    @pytest.mark.asyncio
+    async def test_get_person_with_attached_note_does_not_crash(self):
+        """A person with an attached note must format without error."""
+        note_result = await create_note_tool(
+            {
+                "text": "Detail handler regression note for issue 29/30.",
+                "type": "Research",
+            }
+        )
+        note_text = note_result[0].text
+        assert "Error:" not in note_text, f"Note creation failed: {note_text}"
+        note_handle = _extract_handle(note_text)
+
+        person_result = await create_person_tool(
+            {
+                "primary_name": {
+                    "first_name": "NoteRegression",
+                    "surname_list": [{"surname": "TestPerson", "primary": True}],
+                },
+                "gender": 1,
+                "note_list": [note_handle],
+            }
+        )
+        person_text = person_result[0].text
+        assert "Error:" not in person_text, f"Person creation failed: {person_text}"
+        person_handle = _extract_handle(person_text)
+
+        detail_result = await get_person_tool({"person_handle": person_handle})
+        detail_text = detail_result[0].text
+
+        assert "Error:" not in detail_text, (
+            f"get_person_tool crashed on attached note: {detail_text}"
+        )
+        assert "Detail handler regression note for issue 29/30." in detail_text, (
+            f"Expected real note text in output but got: {detail_text}"
+        )

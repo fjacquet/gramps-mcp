@@ -214,8 +214,9 @@ async def format_family_detail(client, tree_id: str, handle: str) -> str:
                 )
                 note_type = note_data.get("type", "")
                 note_id = note_data.get("gramps_id", "")
-                note_text = note_data.get("text", "")[:50]  # First 50 chars
-                if len(note_data.get("text", "")) > 50:
+                note_full_text = note_data.get("text", {}).get("string", "")
+                note_text = note_full_text[:50]  # First 50 chars
+                if len(note_full_text) > 50:
                     note_text += "..."
                 result += f"- {note_type}: {note_text} ({note_id})\n"
             except Exception:
