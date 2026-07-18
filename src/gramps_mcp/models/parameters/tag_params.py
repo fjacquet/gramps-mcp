@@ -25,7 +25,7 @@ API calls supported in this category:
 - DELETE_TAG: Delete the tag
 """
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -50,3 +50,26 @@ class TagSaveParams(BaseModel):
     color: Optional[str] = Field(None, description="Tag color")
     priority: Optional[int] = Field(None, description="Tag priority")
     change: Optional[str] = Field(None, description="Change timestamp")
+
+
+class ManageTagsParams(BaseModel):
+    """Parameters for the consolidated manage_tags tool (list/get/create-or-update)."""
+
+    action: Literal["list", "get", "create"] = Field(
+        ..., description="Which operation to perform"
+    )
+    handle: Optional[str] = Field(
+        None,
+        description=(
+            "Tag handle (required for 'get'; provide for update, omit for "
+            "a new tag on 'create')"
+        ),
+    )
+    name: Optional[str] = Field(None, description="Tag name (required for 'create')")
+    color: Optional[str] = Field(None, description="Tag color")
+    priority: Optional[int] = Field(None, description="Tag priority")
+    page: Optional[int] = Field(None, ge=0, description="Page number (for 'list')")
+    pagesize: Optional[int] = Field(
+        None, ge=1, le=100, description="Results per page (for 'list')"
+    )
+    sort: Optional[List[str]] = Field(None, description="Sort order (for 'list')")

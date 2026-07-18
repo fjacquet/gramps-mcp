@@ -51,6 +51,7 @@ from .models.parameters.simple_params import (
     SimpleSearchParams,
 )
 from .models.parameters.source_params import SourceSaveParams
+from .models.parameters.tag_params import ManageTagsParams
 from .models.parameters.transactions_params import TransactionHistoryParams
 
 # Import all tool functions
@@ -70,6 +71,7 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
+from .tools.records_tools import manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
     get_relationship_tool,
@@ -326,6 +328,13 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
         "schema": TimelineQueryParams,
         "handler": get_timeline_tool,
+    },
+    "manage_tags": {
+        "description": (
+            "List, get, or create/update tags (action: list/get/create - no delete)"
+        ),
+        "schema": ManageTagsParams,
+        "handler": manage_tags_tool,
     },
 }
 
