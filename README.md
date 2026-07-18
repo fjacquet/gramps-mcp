@@ -83,6 +83,13 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **get_ancestors** - Find all ancestors of a person
 - **recent_changes** - Track recent modifications to your data
 
+#### Extended Analysis Tools (5 tools)
+- **get_relationship** - Calculate how two people are related
+- **check_living** - Check living status and estimated birth/death dates
+- **get_timeline** - Build a chronological timeline for a person, family, or group
+- **manage_tags** - List, get, or create/update tags
+- **get_facts** - Get interesting facts and statistics about the tree
+
 ## Installation
 
 ### Requirements
@@ -250,7 +257,9 @@ src/gramps_mcp/
 |   |-- search_basic.py
 |   |-- search_details.py
 |   |-- data_management.py
-|   `-- analysis.py
+|   |-- analysis.py
+|   |-- relationship_tools.py
+|   `-- records_tools.py
 |-- handlers/           # Data formatting handlers
 `-- resources/          # MCP resources (GQL docs, usage guide)
 ```
