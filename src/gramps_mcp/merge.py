@@ -91,9 +91,7 @@ def _merge_list(existing_items: List, new_items: List) -> List:
 
     if isinstance(sample_existing, str) and isinstance(sample_new, str):
         existing_set = set(existing_items)
-        return existing_items + [
-            item for item in new_items if item not in existing_set
-        ]
+        return existing_items + [item for item in new_items if item not in existing_set]
 
     # Reason: mixed/unknown item types - concatenation is the safe fallback
     return existing_items + new_items

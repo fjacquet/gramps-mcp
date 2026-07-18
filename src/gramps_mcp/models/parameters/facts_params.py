@@ -92,8 +92,7 @@ class FactsParams(BaseModel):
         1,
         ge=1,
         description=(
-            "Determines how many objects should be returned for ranked "
-            "statistics items"
+            "Determines how many objects should be returned for ranked statistics items"
         ),
     )
 

@@ -164,7 +164,7 @@ async def _format_save_response(
         else:
             # Fallback for unknown types
             formatted_details = (
-                f"• **{entity_type.title()} {gramps_id}** " f"(Handle: `{handle}`)\n\n"
+                f"• **{entity_type.title()} {gramps_id}** (Handle: `{handle}`)\n\n"
             )
 
         # Add success prefix to the formatted details

@@ -31,7 +31,7 @@
 
 ### Style & Conventions
 - **Use Python** as the primary language.
-- **Follow PEP8**, use type hints, format with `black`, and lint with `ruff`.
+- **Follow PEP8**, use type hints, format with `ruff format`, and lint with `ruff`.
 - **Use `pydantic` for data validation**.
 - Use `httpx` for async HTTP client (no FastAPI needed for MCP servers).
 - Use `MCP Python SDK` for MCP server implementation.

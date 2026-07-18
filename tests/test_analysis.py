@@ -28,10 +28,10 @@ INVALID_GRAMPS_ID = "INVALID99999"
 def extract_handle_from_search(search_text: str):
     """Extract handle from search result text."""
     import re
-    
+
     # Format: Name (gender) - gramps_id - [handle]
     handle_match = re.search(r"\[([a-f0-9]+)\]", search_text)
-    
+
     if handle_match:
         return handle_match.group(1)
     return None
@@ -40,10 +40,10 @@ def extract_handle_from_search(search_text: str):
 def extract_gramps_id_from_search(search_text: str):
     """Extract gramps_id from search result text."""
     import re
-    
+
     # Format: Name (gender) - gramps_id - [handle]
     id_match = re.search(r"\([FM]\) - ([^-]+) - \[", search_text)
-    
+
     if id_match:
         return id_match.group(1).strip()
     return None
@@ -59,7 +59,9 @@ class TestGetDescendantsTool:
         # First search for a person with children to get a valid handle for descendants test
         from src.gramps_mcp.tools.search_basic import find_person_tool
 
-        search_result = await find_person_tool({"query": "*", "pagesize": TEST_PAGESIZE})
+        search_result = await find_person_tool(
+            {"query": "*", "pagesize": TEST_PAGESIZE}
+        )
 
         # If we found a person, extract their gramps_id and use it directly
         if "[" in search_result[0].text and "]" in search_result[0].text:
@@ -70,7 +72,7 @@ class TestGetDescendantsTool:
                 result_explicit = await get_descendants_tool(
                     {"gramps_id": gramps_id, "max_generations": TEST_MAX_GENERATIONS}
                 )
-                
+
                 # Test with default max_generations (should be 5)
                 result_default = await get_descendants_tool({"gramps_id": gramps_id})
 
@@ -84,12 +86,12 @@ class TestGetDescendantsTool:
                 print(f"Person gramps_id used: {gramps_id}")
                 print(f"Max generations: {TEST_MAX_GENERATIONS}")
                 print(f"Total lines: {len(text_explicit.split('\n'))}")
-                
+
                 # Test default result
                 assert isinstance(result_default, list)
                 assert len(result_default) == 1
                 assert isinstance(result_default[0], TextContent)
-                
+
                 text_default = result_default[0].text
                 print("\n=== DESCENDANTS TEST OUTPUT (DEFAULT) ===")
                 print(f"Person gramps_id used: {gramps_id}")
@@ -141,12 +143,12 @@ class TestGetAncestorsTool:
 
         # Use specific person I0001 for ancestor testing (known to have ancestors)
         gramps_id = "I0001"
-        
+
         # Test with explicit max_generations
         result_explicit = await get_ancestors_tool(
             {"gramps_id": gramps_id, "max_generations": TEST_MAX_GENERATIONS}
         )
-        
+
         # Test with default max_generations (should be 5)
         result_default = await get_ancestors_tool({"gramps_id": gramps_id})
 
@@ -160,12 +162,12 @@ class TestGetAncestorsTool:
         print(f"Person gramps_id used: {gramps_id}")
         print(f"Max generations: {TEST_MAX_GENERATIONS}")
         print(f"Total lines: {len(text_explicit.split('\n'))}")
-        
+
         # Test default result
         assert isinstance(result_default, list)
         assert len(result_default) == 1
         assert isinstance(result_default[0], TextContent)
-        
+
         text_default = result_default[0].text
         print("\n=== ANCESTORS TEST OUTPUT (DEFAULT) ===")
         print(f"Person gramps_id used: {gramps_id}")
@@ -216,7 +218,9 @@ class TestGetRecentChangesTool:
 
         # Count the number of transaction entries (each starts with "• **")
         transaction_count = text.count("• **")
-        assert 1 <= transaction_count <= 10, f"Expected 1-10 transactions but got {transaction_count}"
+        assert 1 <= transaction_count <= 10, (
+            f"Expected 1-10 transactions but got {transaction_count}"
+        )
 
         # Should show gramps_id instead of handle
         if "Objects changed:" in text:
@@ -255,11 +259,9 @@ class TestGetTreeInfoTool:
 
         # Should contain actual counts
         assert "People:" in text or "people_count" in text.lower()
-        
+
         # Should show media storage in MB format
         assert "MB" in text
 
 
 # Note: AnalysisClient tests removed as we now use unified GrampsWebAPIClient
-
-

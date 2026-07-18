@@ -33,15 +33,13 @@ logger = logging.getLogger(__name__)
 @overload
 async def format_event(
     client, tree_id: str, handle: str, event_label: None = None
-) -> str:
-    ...
+) -> str: ...
 
 
 @overload
 async def format_event(
     client, tree_id: str, handle: str, event_label: str
-) -> Optional[str]:
-    ...
+) -> Optional[str]: ...
 
 
 async def format_event(
