@@ -30,8 +30,10 @@ from pydantic import BaseModel
 
 from ..client import GrampsAPIError
 from ..config import get_settings
+from ..handlers.living_handler import format_living_status
 from ..handlers.relationship_handler import format_relationship, format_relationships
 from ..models.api_calls import ApiCalls
+from ..models.parameters.living_params import LivingParams
 from ..models.parameters.relations_params import RelationParams
 from ..utils import resolve_person_handle
 from .search_basic import with_client
@@ -55,6 +57,25 @@ class _RelationsQueryParams(BaseModel):
     """
 
     depth: Optional[int] = None
+
+
+class _LivingQueryParams(BaseModel):
+    """
+    Query-string-only parameters for the Gramps Web living endpoints.
+
+    The living endpoints (``living/{handle}`` and ``living/{handle}/dates``)
+    take handle as a URL path segment and only accept
+    average_generation_gap/max_age_probably_alive/max_sibling_age_difference
+    as query parameters; the API rejects unknown query fields. LivingParams
+    bundles handle with those fields for input validation, but handing that
+    full model to the client would also serialize handle into the query
+    string. This model carries just the query-eligible fields through to
+    the request.
+    """
+
+    average_generation_gap: Optional[int] = None
+    max_age_probably_alive: Optional[int] = None
+    max_sibling_age_difference: Optional[int] = None
 
 
 def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
@@ -140,3 +161,56 @@ async def get_relationship_tool(client, arguments: Dict) -> List[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "relationship calculation")
+
+
+@with_client
+async def check_living_tool(client, arguments: Dict) -> List[TextContent]:
+    """
+    Check whether a person is living and get estimated birth/death dates.
+    """
+    try:
+        person = arguments.get("person")
+        include_dates = arguments.get("include_dates", True)
+
+        if not person:
+            raise ValueError("person is required")
+
+        settings = get_settings()
+        tree_id = settings.gramps_tree_id
+
+        handle = await _resolve_person(client, tree_id, person)
+
+        params = LivingParams(
+            handle=handle,
+            average_generation_gap=arguments.get("average_generation_gap"),
+            max_age_probably_alive=arguments.get("max_age_probably_alive"),
+            max_sibling_age_difference=arguments.get("max_sibling_age_difference"),
+        )
+
+        query_params = _LivingQueryParams(
+            average_generation_gap=params.average_generation_gap,
+            max_age_probably_alive=params.max_age_probably_alive,
+            max_sibling_age_difference=params.max_sibling_age_difference,
+        )
+
+        living_result = await client.make_api_call(
+            api_call=ApiCalls.GET_LIVING,
+            params=query_params,
+            tree_id=tree_id,
+            handle=handle,
+        )
+
+        dates_result = None
+        if include_dates:
+            dates_result = await client.make_api_call(
+                api_call=ApiCalls.GET_LIVING_DATES,
+                params=query_params,
+                tree_id=tree_id,
+                handle=handle,
+            )
+
+        formatted = format_living_status(living_result, dates_result)
+        return [TextContent(type="text", text=formatted)]
+
+    except Exception as e:
+        return _format_error_response(e, "living status check")

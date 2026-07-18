@@ -70,7 +70,7 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
-from .tools.relationship_tools import get_relationship_tool
+from .tools.relationship_tools import check_living_tool, get_relationship_tool
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
 
@@ -114,6 +114,18 @@ class RelationshipQueryParams(BaseModel):
     )
     depth: Optional[int] = Field(
         None, ge=1, description="Search depth in generations (API default: 15)"
+    )
+
+
+class LivingStatusParams(BaseModel):
+    person: str = Field(
+        ..., description="Handle or gramps_id of the person to evaluate"
+    )
+    average_generation_gap: Optional[int] = Field(None, ge=1)
+    max_age_probably_alive: Optional[int] = Field(None, ge=1)
+    max_sibling_age_difference: Optional[int] = Field(None, ge=0)
+    include_dates: bool = Field(
+        True, description="Also fetch estimated birth/death dates"
     )
 
 
@@ -234,6 +246,14 @@ TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
         ),
         "schema": RelationshipQueryParams,
         "handler": get_relationship_tool,
+    },
+    "check_living": {
+        "description": (
+            "Check whether a person is living and get estimated birth/death "
+            "dates (accepts handle or gramps_id)"
+        ),
+        "schema": LivingStatusParams,
+        "handler": check_living_tool,
     },
 }
 

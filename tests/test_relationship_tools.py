@@ -7,7 +7,10 @@ details are referenced or asserted on.
 
 import pytest
 
-from src.gramps_mcp.tools.relationship_tools import get_relationship_tool
+from src.gramps_mcp.tools.relationship_tools import (
+    check_living_tool,
+    get_relationship_tool,
+)
 
 
 class TestGetRelationshipTool:
@@ -31,5 +34,29 @@ class TestGetRelationshipTool:
     @pytest.mark.asyncio
     async def test_missing_person_argument_returns_error(self):
         result = await get_relationship_tool({"person1": "I0001"})
+        text = result[0].text
+        assert "error" in text.lower()
+
+
+class TestCheckLivingTool:
+    """Test the check_living_tool against a live Gramps Web server."""
+
+    @pytest.mark.asyncio
+    async def test_check_living_by_gramps_id(self):
+        result = await check_living_tool({"person": "I0001"})
+        text = result[0].text
+        assert "error" not in text.lower()
+        assert "**Living:**" in text
+
+    @pytest.mark.asyncio
+    async def test_check_living_without_dates(self):
+        result = await check_living_tool({"person": "I0001", "include_dates": False})
+        text = result[0].text
+        assert "error" not in text.lower()
+        assert "**Living:**" in text
+
+    @pytest.mark.asyncio
+    async def test_missing_person_argument_returns_error(self):
+        result = await check_living_tool({})
         text = result[0].text
         assert "error" in text.lower()
