@@ -22,7 +22,7 @@ events, places, sources, citations, notes, and media records.
 """
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from mcp.types import TextContent
 
@@ -62,7 +62,7 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
     return [TextContent(type="text", text=f"Error: {error_msg}")]
 
 
-def _extract_entity_data(result, entity_type: str = None):
+def _extract_entity_data(result, entity_type: Optional[str] = None):
     """Extract entity data from API response, handling different formats."""
     if not result:
         return None

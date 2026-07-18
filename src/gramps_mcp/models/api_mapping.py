@@ -182,7 +182,7 @@ def get_param_model(api_call: ApiCalls) -> Optional[Type[BaseModel]]:
     return API_CALL_PARAMS.get(api_call)
 
 
-def validate_api_call_params(api_call: ApiCalls, params: dict) -> BaseModel:
+def validate_api_call_params(api_call: ApiCalls, params: dict) -> Optional[BaseModel]:
     """
     Validate parameters for a given API call using its parameter model.
 
@@ -191,7 +191,8 @@ def validate_api_call_params(api_call: ApiCalls, params: dict) -> BaseModel:
         params: Dictionary of parameters to validate
 
     Returns:
-        Validated parameter model instance
+        Validated parameter model instance, or None if the API call takes
+        no parameters and none were provided
 
     Raises:
         ValueError: If no parameter model is defined for the API call
