@@ -84,10 +84,12 @@ every later task builds on a client that actually supports enum-typed
 fields correctly.
 
 **Files:**
+
 - Modify: `src/gramps_mcp/client.py` (inside `make_api_call`)
 - Test: `tests/test_client.py` (add one test class)
 
 **Interfaces:**
+
 - Consumes: nothing from other tasks.
 - Produces: `GrampsWebAPIClient.make_api_call` now serializes any
   Pydantic-enum-typed field to its plain string `.value` before sending it
@@ -195,6 +197,7 @@ uv run git commit -m "fix: serialize enum parameter fields to plain strings in A
 ### Task 2: Shared handle resolver + `get_relationship` tool
 
 **Files:**
+
 - Modify: `src/gramps_mcp/utils.py` (add `resolve_person_handle`)
 - Create: `src/gramps_mcp/tools/relationship_tools.py`
 - Create: `src/gramps_mcp/handlers/relationship_handler.py`
@@ -202,6 +205,7 @@ uv run git commit -m "fix: serialize enum parameter fields to plain strings in A
 - Test: `tests/test_relationship_tools.py`
 
 **Interfaces:**
+
 - Consumes: `RelationParams` (`src/gramps_mcp/models/parameters/relations_params.py`,
   fields `handle1: str`, `handle2: str`, `depth: Optional[int]` — already
   exists, already mapped to both `ApiCalls.GET_RELATIONS` and
@@ -656,12 +660,14 @@ uv run git commit -m "feat: add get_relationship tool for relationship calculati
 ### Task 3: `check_living` tool
 
 **Files:**
+
 - Modify: `src/gramps_mcp/tools/relationship_tools.py` (add `check_living_tool`)
 - Create: `src/gramps_mcp/handlers/living_handler.py`
 - Modify: `src/gramps_mcp/server.py` (imports + `TOOL_REGISTRY`)
 - Modify: `tests/test_relationship_tools.py` (add a test class)
 
 **Interfaces:**
+
 - Consumes: `_resolve_person`, `_format_error_response`, `GRAMPS_ID_PATTERN`
   (all from `tools/relationship_tools.py`, added in Task 2); `LivingParams`
   (`src/gramps_mcp/models/parameters/living_params.py`, fields
@@ -968,6 +974,7 @@ uv run git commit -m "feat: add check_living tool for living-status checks"
 ### Task 4: Family handle resolver + `get_timeline` tool
 
 **Files:**
+
 - Modify: `src/gramps_mcp/utils.py` (add `resolve_family_handle`)
 - Modify: `src/gramps_mcp/tools/relationship_tools.py` (add `get_timeline_tool`)
 - Create: `src/gramps_mcp/handlers/timeline_handler.py`
@@ -975,6 +982,7 @@ uv run git commit -m "feat: add check_living tool for living-status checks"
 - Modify: `tests/test_relationship_tools.py` (add a test class)
 
 **Interfaces:**
+
 - Consumes: `_resolve_person`, `_format_error_response` (from Task 2);
   `PersonTimelineParams` (`src/gramps_mcp/models/parameters/people_params.py`,
   fields `dates`, `first`, `last`, `ancestors`, `offspring`, `events`,
@@ -1484,6 +1492,7 @@ uv run git commit -m "feat: add get_timeline tool for person/family/group timeli
 ### Task 5: `manage_tags` tool
 
 **Files:**
+
 - Modify: `src/gramps_mcp/models/parameters/tag_params.py` (add `ManageTagsParams`)
 - Create: `src/gramps_mcp/tools/records_tools.py`
 - Create: `src/gramps_mcp/handlers/tag_handler.py`
@@ -1491,6 +1500,7 @@ uv run git commit -m "feat: add get_timeline tool for person/family/group timeli
 - Test: `tests/test_records_tools.py`
 
 **Interfaces:**
+
 - Consumes: `TagSearchParams`, `TagSaveParams` (both already exist in
   `tag_params.py`, already mapped to `ApiCalls.GET_TAGS`/`POST_TAGS`/`PUT_TAG`;
   `ApiCalls.GET_TAG` needs no params model, already mapped to `None`).
@@ -1917,12 +1927,14 @@ uv run git commit -m "feat: add manage_tags tool for tag list/get/create-or-upda
 ### Task 6: `get_facts` tool
 
 **Files:**
+
 - Modify: `src/gramps_mcp/tools/records_tools.py` (add `get_facts_tool`)
 - Create: `src/gramps_mcp/handlers/facts_handler.py`
 - Modify: `src/gramps_mcp/server.py` (imports + `TOOL_REGISTRY`)
 - Modify: `tests/test_records_tools.py` (add a test class)
 
 **Interfaces:**
+
 - Consumes: the Task 1 enum-serialization fix (this tool is the reason that
   fix exists); `FactsParams` (`src/gramps_mcp/models/parameters/facts_params.py`,
   fields `gramps_id`, `handle`, `living: LivingProxy`, `person`, `private`,
@@ -2198,9 +2210,11 @@ uv run git commit -m "feat: add get_facts tool for tree statistics"
 ### Task 7: README updates and final verification
 
 **Files:**
+
 - Modify: `README.md` (Features section + Architecture tree)
 
 **Interfaces:**
+
 - Consumes: the final `TOOL_REGISTRY` state (21 tools) from Tasks 1-6.
 - Produces: nothing — final task in the plan.
 

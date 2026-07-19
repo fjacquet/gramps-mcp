@@ -22,11 +22,13 @@
 ### Task 1: Fix note text StyledText slice crash in detail handlers (upstream #29/#30)
 
 **Files:**
+
 - Modify: `src/gramps_mcp/handlers/person_detail_handler.py:276-287`
 - Modify: `src/gramps_mcp/handlers/family_detail_handler.py:206-222`
 - Test: Create `tests/test_search_details.py`
 
 **Interfaces:**
+
 - Consumes: `format_person_detail(client, tree_id, handle) -> str` (existing, `person_detail_handler.py`), `format_family_detail(client, tree_id, handle) -> str` (existing, `family_detail_handler.py`), `get_person_tool(arguments: Dict) -> List[TextContent]` and `get_family_tool(arguments: Dict) -> List[TextContent]` (existing, `tools/search_details.py`), `create_person_tool`, `create_family_tool`, `create_note_tool` (existing, `tools/data_management.py`).
 - Produces: no new public interfaces — this task only fixes an internal formatting bug.
 
@@ -178,10 +180,12 @@ uv run git commit -m "fix: read note text as StyledText dict in detail handlers 
 ### Task 2: Fix create_note double-validation crash over FastMCP transport (#27)
 
 **Files:**
+
 - Modify: `src/gramps_mcp/models/parameters/note_params.py:60-79`
 - Test: `tests/test_data_management.py` (add to `TestCreateNoteTool`)
 
 **Interfaces:**
+
 - Consumes: `NoteSaveParams` (existing, `models/parameters/note_params.py`), `create_note_tool(arguments: Dict) -> List[TextContent]` (existing, `tools/data_management.py`).
 - Produces: no new public interfaces — `NoteSaveParams.text` type widens from `str` to `str | dict[str, Any]`; nothing downstream depends on it being exactly `str`.
 
@@ -281,11 +285,13 @@ uv run git commit -m "fix: make NoteSaveParams.model_dump() idempotent for FastM
 ### Task 3: Translate create_family's child_handles into child_ref_list (#24)
 
 **Files:**
+
 - Modify: `src/gramps_mcp/models/parameters/family_params.py:34-54`
 - Modify: `src/gramps_mcp/tools/data_management.py:198-241` (`create_family_tool`)
 - Test: `tests/test_data_management.py` (add to `TestCreateFamilyTool`)
 
 **Interfaces:**
+
 - Consumes: `FamilySaveParams` (existing, `models/parameters/family_params.py`), `create_family_tool(arguments: Dict) -> List[TextContent]` (existing, `tools/data_management.py`), `format_family` (existing, `handlers/family_handler.py`, already reads `child_ref_list` from the API response — used implicitly by `_format_save_response`).
 - Produces: `FamilySaveParams.child_ref_list: Optional[List[dict]]` — new field, same shape as the existing `event_ref_list`.
 
@@ -385,11 +391,13 @@ uv run git commit -m "fix: translate create_family child_handles into child_ref_
 ### Task 4: Fix pagination gaps in find_type and find_anything (#5)
 
 **Files:**
+
 - Modify: `src/gramps_mcp/models/parameters/simple_params.py:48-60`
 - Modify: `src/gramps_mcp/tools/search_basic.py:369-388` (`find_type_tool`), `:392-398` (`find_anything_tool`)
 - Test: `tests/test_search_basic.py` (add new test classes)
 
 **Interfaces:**
+
 - Consumes: `SimpleFindParams`, `SimpleSearchParams` (existing, `models/parameters/simple_params.py`), `find_type_tool`, `find_anything_tool` (existing, `tools/search_basic.py`), `SearchParams` (existing, `models/parameters/search_params.py`, already has `page`/`pagesize`), `BaseGetMultipleParams` (existing, already has `page`/`pagesize`, used by the entity-specific `find_*_tool`s that `find_type_tool` delegates to).
 - Produces: `SimpleFindParams.page: Optional[int]`, `SimpleSearchParams.page: Optional[int]` — new fields.
 

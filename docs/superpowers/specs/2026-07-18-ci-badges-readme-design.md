@@ -13,6 +13,7 @@ badge itself is stale ("3.9+" vs. the actual `requires-python = ">=3.10"` in
 adds a badge row, and makes two small targeted README additions.
 
 Decided with the user during brainstorming:
+
 - CI runs only the four offline-safe test files (no live Gramps Web server in
   CI) — `tests/test_merge.py`, `tests/test_config.py`,
   `tests/test_client_merge.py`, `tests/test_utils.py`.
@@ -69,6 +70,7 @@ the existing `pytest`, `pytest-asyncio`, etc.).
 ### 3. Codecov setup (manual, user-performed)
 
 Documented as a follow-up step in the implementation report, not automatable:
+
 1. Sign in to codecov.io with the GitHub account that owns the fork.
 2. Add the `fjacquet/gramps-mcp` repository.
 3. Copy the repository upload token.
@@ -128,6 +130,7 @@ uv run pytest tests/test_merge.py tests/test_config.py tests/test_client_merge.p
 Most tests in `tests/` require a live Gramps Web server (see
 [CONTRIBUTING.md](CONTRIBUTING.md)); the command above runs only the ones
 that work offline, matching what CI checks.
+
 ```
 
 ## Verification

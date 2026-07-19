@@ -23,6 +23,7 @@ Spec: `docs/superpowers/specs/2026-07-18-configurable-host-port-design.md`
 ### Task 1: Configurable host/port end to end
 
 **Files:**
+
 - Modify: `src/gramps_mcp/config.py` (`Settings` class, `get_settings()`)
 - Modify: `src/gramps_mcp/server.py:359-361`
 - Modify: `tests/test_config.py` (add 3 new test functions)
@@ -30,6 +31,7 @@ Spec: `docs/superpowers/specs/2026-07-18-configurable-host-port-design.md`
 - Modify: `README.md` (the "Environment Configuration" section, lines 140-150)
 
 **Interfaces:**
+
 - Consumes: nothing from other work.
 - Produces: `Settings.gramps_mcp_host: str`, `Settings.gramps_mcp_port: int` — read by `server.py`'s `if __name__ == "__main__":` block. Nothing else in the codebase consumes these.
 
@@ -267,11 +269,13 @@ GRAMPS_USERNAME=your-gramps-web-username
 GRAMPS_PASSWORD=your-gramps-web-password
 GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
 ```
+
 ```
 
 Replace it with:
 
 ```
+
 Create a `.env` file with your Gramps Web settings:
 
 ```bash
@@ -285,6 +289,7 @@ GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
 GRAMPS_MCP_HOST=0.0.0.0
 GRAMPS_MCP_PORT=8000
 ```
+
 ```
 
 - [ ] **Step 9: Manual spot-check (not part of automated tests)**

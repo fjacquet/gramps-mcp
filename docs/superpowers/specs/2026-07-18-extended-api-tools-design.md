@@ -21,6 +21,7 @@ All endpoint shapes below are taken directly from the vendored OpenAPI spec
 at `grampsweb-docs/apispec.yaml`, not from memory.
 
 Decided with the user during brainstorming:
+
 - **Tool granularity: consolidated (5 tools, not ~12).** Matches the
   project's existing convention (`create_person` handles create+update,
   `find_type` unifies 8 entity types) of few, parameter-rich tools over many
@@ -109,6 +110,7 @@ class RelationshipQueryParams(BaseModel):
 `{relationship_string, common_ancestors: [handle, ...]}`) when true.
 
 New `handlers/relationship_handler.py`:
+
 - `format_relationship(data: Dict) -> str` for the single case — renders the
   `relationship_string`, and generation distances only when
   `distance_common_origin`/`distance_common_other` are not `-1` (per the
@@ -136,6 +138,7 @@ class ManageTagsParams(BaseModel):
 ```
 
 `tools/records_tools.py::manage_tags_tool` branches on `action`:
+
 - `"list"`: builds `TagSearchParams(page=..., pagesize=..., sort=...)`, calls
   `ApiCalls.GET_TAGS` (returns `array of Tag`).
 - `"get"`: requires `handle`; calls `ApiCalls.GET_TAG` (no params model —
@@ -148,6 +151,7 @@ class ManageTagsParams(BaseModel):
   `create_person_tool` et al. in `tools/data_management.py`.
 
 New `handlers/tag_handler.py`:
+
 - `format_tag(data: Dict) -> str` — single tag: name, color, priority.
 - `format_tags(data: List[Dict]) -> str` — bullet list for the list action.
 
@@ -162,6 +166,7 @@ validates arguments directly into `FactsParams` and calls `ApiCalls.GET_FACTS`
 `objects: [RecordFactObject, ...]`).
 
 New `handlers/facts_handler.py`:
+
 - `format_facts(data: List[Dict], client, tree_id) -> str` — one bullet per
   fact (`description`), with associated object handles resolved to
   `gramps_id` via `get_gramps_id_from_handle` where the object's class is
@@ -191,6 +196,7 @@ schema: `living: bool`), and additionally calls `ApiCalls.GET_LIVING_DATES`
 `include_dates` is true.
 
 New `handlers/living_handler.py`:
+
 - `format_living_status(living: Dict, dates: Optional[Dict]) -> str` —
   renders the living boolean plainly, and the estimated dates + explanation
   when provided.
@@ -217,6 +223,7 @@ class TimelineQueryParams(BaseModel):
 
 `tools/relationship_tools.py::get_timeline_tool` maps `scope` to one of 4
 existing (API-call, param-model) pairs:
+
 - `"person"`: resolves `handle`/`gramps_id` via `resolve_person_handle`,
   builds `PersonTimelineParams` (from `people_params.py`), calls
   `ApiCalls.GET_PERSON_TIMELINE`.
@@ -238,6 +245,7 @@ defensively accept either a single object or a list, matching the existing
 `_extract_entity_data`-style code.
 
 New `handlers/timeline_handler.py`:
+
 - `format_timeline(data: Union[Dict, List[Dict]]) -> str` — normalizes to a
   list, then renders a chronological bullet list: date, description/label,
   age, and confidence/citation count when present.

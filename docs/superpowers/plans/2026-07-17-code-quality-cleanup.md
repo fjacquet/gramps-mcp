@@ -50,18 +50,22 @@ Spec: `docs/superpowers/specs/2026-07-17-code-quality-cleanup-design.md`
 The `tools/` **package** shadows the `tools.py` **module**: Python resolves `from .tools import ...` to the package, so the module has been unreachable since the initial commit. The user gave explicit approval for this deletion.
 
 **Files:**
+
 - Delete: `src/gramps_mcp/tools.py`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces: nothing — later tasks rely only on the `tools/` package, which is untouched.
 
 - [ ] **Step 1: Prove the module is shadowed (evidence before deletion)**
 
 Run:
+
 ```bash
 uv run python -c "import src.gramps_mcp.tools as t; print(t.__file__)"
 ```
+
 Expected output ends with `src/gramps_mcp/tools/__init__.py` (the package), NOT `tools.py`. If it prints `tools.py`, STOP — the premise is wrong; do not delete.
 
 - [ ] **Step 2: Delete the file**
@@ -75,6 +79,7 @@ git rm src/gramps_mcp/tools.py
 ```bash
 uv run python -c "from src.gramps_mcp.tools import create_person_tool, find_anything_tool; import src.gramps_mcp.server; print('ok')"
 ```
+
 Expected: `ok` (an `INFO` log line about tool registration may appear first).
 
 - [ ] **Step 4: Run offline tests**
@@ -82,6 +87,7 @@ Expected: `ok` (an `INFO` log line about tool registration may appear first).
 ```bash
 uv run pytest tests/test_client_merge.py tests/test_utils.py -q
 ```
+
 Expected: all pass (5 passed as of writing).
 
 - [ ] **Step 5: Commit**
@@ -97,11 +103,13 @@ uv run git commit -m "refactor: remove dead tools.py module shadowed by tools pa
 `GrampsWebAPIClient.make_api_call` contains ~70 inline lines that merge user changes into the existing record before a PUT (Gramps Web PUT replaces the whole object). This is the code path that mutates real genealogy data and it has no isolated unit tests. Extract it verbatim into a pure function. The existing `tests/test_client_merge.py` (runs offline) pins the end-to-end behavior through `make_api_call` — it must pass unchanged before AND after.
 
 **Files:**
+
 - Create: `tests/test_merge.py`
 - Create: `src/gramps_mcp/merge.py`
 - Modify: `src/gramps_mcp/client.py` (imports block near line 32; PUT-merge block currently at lines 247–319)
 
 **Interfaces:**
+
 - Consumes: nothing from other tasks.
 - Produces: `merge_put_data(existing: Dict, changes: Dict) -> Dict` in `src/gramps_mcp/merge.py`. No other task consumes it, but Task 5's README tree mentions `merge.py`.
 
@@ -193,6 +201,7 @@ class TestMergePutData:
 ```bash
 uv run pytest tests/test_merge.py -q
 ```
+
 Expected: collection error — `ModuleNotFoundError: No module named 'src.gramps_mcp.merge'`.
 
 - [ ] **Step 3: Create `src/gramps_mcp/merge.py`**
@@ -290,6 +299,7 @@ def _merge_list(existing_items: List, new_items: List) -> List:
 ```bash
 uv run pytest tests/test_merge.py -q
 ```
+
 Expected: 10 passed.
 
 - [ ] **Step 5: Switch `client.py` to the pure function**
@@ -317,7 +327,9 @@ Then replace the entire inline merge block. The current code (lines 247–319) i
                     # Merge existing data with changes
                     merged_data = existing.copy()
 ```
+
 ...continuing through the nested deduplication logic down to:
+
 ```python
                         else:
                             merged_data[key] = value
@@ -347,6 +359,7 @@ Everything after (`# Make the API request` and the final `_make_request` call) s
 uv run pytest tests/test_merge.py tests/test_client_merge.py tests/test_utils.py -q
 uv run ruff check src/
 ```
+
 Expected: all tests pass (`test_client_merge.py` passing unchanged proves the extraction is behavior-identical); ruff clean.
 
 - [ ] **Step 7: Commit**
@@ -363,12 +376,14 @@ uv run git commit -m "refactor: extract PUT merge logic into pure merge module w
 The `rstrip("/") + "/api"` construction exists in both `auth.py` (in the `AuthManager.client` property) and `client.py` (`__init__`). Extract one helper into `config.py`.
 
 **Files:**
+
 - Create: `tests/test_config.py`
 - Modify: `src/gramps_mcp/config.py` (append helper at end of file)
 - Modify: `src/gramps_mcp/client.py:49-59` (`__init__`) and its `from .config import get_settings` import
 - Modify: `src/gramps_mcp/auth.py:110-119` (`client` property) and its `from .config import get_settings` import
 
 **Interfaces:**
+
 - Consumes: nothing from other tasks.
 - Produces: `get_api_base_url(settings: Settings) -> str` in `src/gramps_mcp/config.py`, returning the API base URL ending in `/api` with no trailing slash.
 
@@ -413,6 +428,7 @@ def test_keeps_existing_api_suffix():
 ```bash
 uv run pytest tests/test_config.py -q
 ```
+
 Expected: `ImportError: cannot import name 'get_api_base_url'`.
 
 - [ ] **Step 3: Implement the helper**
@@ -441,6 +457,7 @@ def get_api_base_url(settings: Settings) -> str:
 ```bash
 uv run pytest tests/test_config.py -q
 ```
+
 Expected: 3 passed.
 
 - [ ] **Step 5: Use the helper in `client.py` and `auth.py`**
@@ -502,6 +519,7 @@ with:
 uv run pytest tests/test_config.py tests/test_merge.py tests/test_client_merge.py tests/test_utils.py -q
 uv run ruff check src/
 ```
+
 Expected: all pass; ruff clean.
 
 - [ ] **Step 7: Commit**
@@ -516,10 +534,12 @@ uv run git commit -m "refactor: deduplicate API base URL construction into confi
 ### Task 4: Fix the two mypy errors
 
 **Files:**
+
 - Modify: `src/gramps_mcp/models/api_mapping.py:185` (`validate_api_call_params` signature and docstring)
 - Modify: `src/gramps_mcp/tools/data_management.py:65` (`_extract_entity_data` signature) and its `from typing import Dict, List` import
 
 **Interfaces:**
+
 - Consumes: nothing from other tasks.
 - Produces: no signature changes visible to other tasks (annotation-only).
 
@@ -528,6 +548,7 @@ uv run git commit -m "refactor: deduplicate API base URL construction into confi
 ```bash
 uv run mypy src/gramps_mcp --ignore-missing-imports
 ```
+
 Expected: exactly 2 errors — `api_mapping.py` L208 `[return-value]` (returns `None`, declared `BaseModel`) and `data_management.py` L65 `[assignment]` (implicit Optional).
 
 - [ ] **Step 2: Fix `validate_api_call_params`**
@@ -575,6 +596,7 @@ uv run mypy src/gramps_mcp --ignore-missing-imports
 uv run pytest tests/test_config.py tests/test_merge.py tests/test_client_merge.py tests/test_utils.py -q
 uv run ruff check src/
 ```
+
 Expected: `Success: no issues found`; all tests pass; ruff clean.
 
 - [ ] **Step 5: Commit**
@@ -591,12 +613,14 @@ uv run git commit -m "fix: correct type annotations flagged by mypy"
 Three conflicting versions exist (pyproject 1.1.0, server.py "1.0.0", `__init__.py` "0.1.0"). The package is not installed as a distribution (no build-system), so `importlib.metadata` cannot work — `__init__.py.__version__` becomes the single runtime source. Tool counts and docstrings also drifted.
 
 **Files:**
+
 - Modify: `src/gramps_mcp/__init__.py` (version bump)
 - Modify: `src/gramps_mcp/server.py` (module docstring line 21, root endpoint ~line 286-299, health endpoint ~line 302-309)
 - Modify: `src/gramps_mcp/tools/data_management.py` (module docstring, lines 17-23)
 - Modify: `README.md` (Architecture section, lines 213-233)
 
 **Interfaces:**
+
 - Consumes: `merge.py` must exist (Task 2) for the README tree to be accurate.
 - Produces: `src.gramps_mcp.__version__ == "1.1.0"`.
 
@@ -717,6 +741,7 @@ grep -rn "23 genealogy\|tools_count.*16\|\"tools\": 16\|1\.0\.0" src/gramps_mcp 
 uv run pytest tests/test_config.py tests/test_merge.py tests/test_client_merge.py tests/test_utils.py -q
 uv run ruff check src/
 ```
+
 Expected: first command prints `1.1.0 16`; grep finds nothing; tests pass; ruff clean.
 
 - [ ] **Step 6: Commit**
@@ -733,11 +758,13 @@ uv run git commit -m "docs: fix version and tool-count drift in server, README, 
 Decision made with the user: pre-commit already enforces ruff-format; black disagrees with it and neither has been applied tree-wide (ruff format flags ~15 files). Standardize on ruff format, remove black, update CLAUDE.md. This task is LAST so the big mechanical diff never mixes with logic changes.
 
 **Files:**
+
 - Modify: `pyproject.toml` + `uv.lock` (via `uv remove`)
 - Modify: `CLAUDE.md` (line 34, "Style & Conventions")
 - Modify: ~15 files under `src/` and `tests/` (formatting only, done by ruff)
 
 **Interfaces:**
+
 - Consumes: all previous tasks committed (formats their final state).
 - Produces: nothing consumed later.
 
@@ -746,6 +773,7 @@ Decision made with the user: pre-commit already enforces ruff-format; black disa
 ```bash
 uv remove --dev black
 ```
+
 Expected: pyproject `[dependency-groups] dev` no longer lists black; lock updated; sync succeeds.
 
 - [ ] **Step 2: Update CLAUDE.md**
@@ -767,6 +795,7 @@ to:
 ```bash
 uv run ruff format src/ tests/
 ```
+
 Expected: reports ~15 files reformatted (count may differ slightly after earlier tasks).
 
 - [ ] **Step 4: Verify everything still passes**
@@ -777,6 +806,7 @@ uv run ruff check src/
 uv run mypy src/gramps_mcp --ignore-missing-imports
 uv run pytest tests/test_config.py tests/test_merge.py tests/test_client_merge.py tests/test_utils.py -q
 ```
+
 Expected: format check clean, ruff clean, mypy `Success: no issues found`, all tests pass.
 
 - [ ] **Step 5: Commit**
@@ -787,6 +817,7 @@ Stage the formatted files explicitly (never `git add -A` — the user's `docker-
 git add pyproject.toml uv.lock CLAUDE.md src/ tests/
 git status --short
 ```
+
 Check `git status` output: `docker-compose.yml` and `docker/` must still show as unstaged/untracked. Then:
 
 ```bash
