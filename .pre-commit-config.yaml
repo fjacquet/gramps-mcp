@@ -1,6 +1,9 @@
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.4
+    # Reason: must track the ruff version in pyproject.toml's dev group.
+    # Ruff 0.9 changed assert-message formatting, so an older hook reformats
+    # files that CI's newer `ruff format --check` then rejects.
+    rev: v0.13.0
     hooks:
       - id: ruff
         args: [--fix]

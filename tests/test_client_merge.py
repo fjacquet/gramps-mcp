@@ -6,8 +6,10 @@ with new event references, the existing event_ref_list should be merged with the
 new events, not replaced.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from src.gramps_mcp.client import GrampsWebAPIClient
 from src.gramps_mcp.models.api_calls import ApiCalls
 
@@ -78,7 +80,7 @@ class TestClientMergeLogic:
             ]
 
             # Make the API call
-            result = await client.make_api_call(
+            await client.make_api_call(
                 api_call=ApiCalls.PUT_PERSON,
                 params=update_data,
                 tree_id="test_tree",
@@ -136,7 +138,7 @@ class TestClientMergeLogic:
                 put_json_data.get("primary_name")["surname_list"][0]["surname"]
                 == "Smith-Jones"
             ), "Should update surname"
-            assert put_json_data.get("private") == True, "Should update private field"
+            assert put_json_data.get("private") is True, "Should update private field"
 
             # Test 3: Fields not in update should be PRESERVED
             assert put_json_data.get("gramps_id") == "I0001", (
@@ -189,7 +191,7 @@ class TestClientMergeLogic:
             mock_request.side_effect = [existing_person, {"success": True}]
 
             # Make the API call
-            result = await client.make_api_call(
+            await client.make_api_call(
                 api_call=ApiCalls.PUT_PERSON,
                 params=update_data,
                 tree_id="test_tree",
@@ -258,7 +260,7 @@ class TestClientMergeLogic:
         with patch.object(client, "_make_request") as mock_request:
             mock_request.side_effect = [existing_person, {"success": True}]
 
-            result = await client.make_api_call(
+            await client.make_api_call(
                 api_call=ApiCalls.PUT_PERSON,
                 params=update_data,
                 tree_id="test_tree",

@@ -85,7 +85,7 @@ class TestGetDescendantsTool:
                 print("\n=== DESCENDANTS TEST OUTPUT (EXPLICIT) ===")
                 print(f"Person gramps_id used: {gramps_id}")
                 print(f"Max generations: {TEST_MAX_GENERATIONS}")
-                print(f"Total lines: {len(text_explicit.split('\n'))}")
+                print(f"Total lines: {len(text_explicit.splitlines())}")
 
                 # Test default result
                 assert isinstance(result_default, list)
@@ -95,8 +95,8 @@ class TestGetDescendantsTool:
                 text_default = result_default[0].text
                 print("\n=== DESCENDANTS TEST OUTPUT (DEFAULT) ===")
                 print(f"Person gramps_id used: {gramps_id}")
-                print(f"Max generations: DEFAULT (should be 5)")
-                print(f"Total lines: {len(text_default.split('\n'))}")
+                print("Max generations: DEFAULT (should be 5)")
+                print(f"Total lines: {len(text_default.splitlines())}")
                 print("=" * 50)
 
                 # Both should contain actual descendants data
@@ -161,7 +161,7 @@ class TestGetAncestorsTool:
         print("\n=== ANCESTORS TEST OUTPUT (EXPLICIT) ===")
         print(f"Person gramps_id used: {gramps_id}")
         print(f"Max generations: {TEST_MAX_GENERATIONS}")
-        print(f"Total lines: {len(text_explicit.split('\n'))}")
+        print(f"Total lines: {len(text_explicit.splitlines())}")
 
         # Test default result
         assert isinstance(result_default, list)
@@ -171,8 +171,8 @@ class TestGetAncestorsTool:
         text_default = result_default[0].text
         print("\n=== ANCESTORS TEST OUTPUT (DEFAULT) ===")
         print(f"Person gramps_id used: {gramps_id}")
-        print(f"Max generations: DEFAULT (should be 5)")
-        print(f"Total lines: {len(text_default.split('\n'))}")
+        print("Max generations: DEFAULT (should be 5)")
+        print(f"Total lines: {len(text_default.splitlines())}")
         print("=" * 50)
 
         # Both should contain actual ancestors data

@@ -25,7 +25,7 @@ jobs:
         run: uv sync --locked --all-extras --dev
 
       - name: Lint with ruff
-        run: uv run ruff check src/
+        run: uv run ruff check src/ tests/
 
       - name: Check formatting with ruff
         run: uv run ruff format --check src/ tests/
