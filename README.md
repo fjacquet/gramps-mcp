@@ -1,6 +1,6 @@
 # Gramps MCP - AI-Powered Genealogy Research & Management
 
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](./LICENSE) [![Python](https://img.shields.io/badge/Python-3.10+-brightgreen)](https://python.org) [![MCP](https://img.shields.io/badge/MCP-1.2.0+-orange)](https://modelcontextprotocol.io)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](./LICENSE) [![Python](https://img.shields.io/badge/Python-3.12+-brightgreen)](https://python.org) [![MCP](https://img.shields.io/badge/MCP-1.2.0+-orange)](https://modelcontextprotocol.io)
 [![CI](https://github.com/fjacquet/gramps-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/fjacquet/gramps-mcp/actions/workflows/ci.yml) [![Docker Build](https://github.com/fjacquet/gramps-mcp/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/fjacquet/gramps-mcp/actions/workflows/docker-publish.yml) [![codecov](https://codecov.io/gh/fjacquet/gramps-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/fjacquet/gramps-mcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ## Without Gramps MCP
