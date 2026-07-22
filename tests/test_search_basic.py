@@ -8,7 +8,6 @@ search_sources, search_media, and search_all tools.
 import asyncio
 import re
 import uuid
-from typing import List
 
 import pytest
 from dotenv import load_dotenv
@@ -355,7 +354,7 @@ class TestFindAnythingPagination:
     """
 
     @staticmethod
-    async def _create_marker_notes(marker: str, count: int) -> List[str]:
+    async def _create_marker_notes(marker: str, count: int) -> list[str]:
         """Create fixture notes embedding distinct per-note markers.
 
         Args:
@@ -384,7 +383,7 @@ class TestFindAnythingPagination:
     @staticmethod
     async def _find_anything_until(
         query: str, expected_min: int, **kwargs
-    ) -> List[TextContent]:
+    ) -> list[TextContent]:
         """Poll find_anything_tool until the reported total count is reached.
 
         Full-text search indexing can lag slightly behind object creation
@@ -403,7 +402,7 @@ class TestFindAnythingPagination:
             List[TextContent]: The last response received, whether or not
                 expected_min was reached within the retry budget.
         """
-        result: List[TextContent] = []
+        result: list[TextContent] = []
         for _attempt in range(5):
             result = await find_anything_tool({"query": query, **kwargs})
             match = re.search(r"Found (\d+) records", result[0].text)

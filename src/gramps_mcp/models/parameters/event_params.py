@@ -26,7 +26,7 @@ API calls supported in this category:
 - GET_EVENT_SPAN: Get elapsed time span between two events
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ from .base_params import BaseGetMultipleParams
 class EventSearchParams(BaseGetMultipleParams):
     """Parameters for searching multiple events."""
 
-    dates: Optional[str] = Field(
+    dates: str | None = Field(
         None, description="Date filter (y/m/d, -y/m/d, y/m/d-y/m/d, y/m/d-)"
     )
 
@@ -44,11 +44,11 @@ class EventSearchParams(BaseGetMultipleParams):
 class EventSaveParams(BaseModel):
     """Parameters for creating or updating an event."""
 
-    handle: Optional[str] = Field(
+    handle: str | None = Field(
         None, description="Event's handle (for updates; omit for new event)"
     )
     type: str = Field(description="Event type (Birth, Death, Marriage, etc.)")
-    date: Optional[Dict[str, Any]] = Field(
+    date: dict[str, Any] | None = Field(
         None,
         description=(
             "Event date object with dateval array [day, month, year, False], "
@@ -57,10 +57,10 @@ class EventSaveParams(BaseModel):
             "6=textonly, 7=from, 8=to)"
         ),
     )
-    description: Optional[str] = Field(None, description="Event description")
-    place: Optional[str] = Field(None, description="Place handle where event occurred")
-    citation_list: List[str] = Field(..., description="List of citation handles")
-    note_list: Optional[List[str]] = Field(None, description="List of note handles")
+    description: str | None = Field(None, description="Event description")
+    place: str | None = Field(None, description="Place handle where event occurred")
+    citation_list: list[str] = Field(..., description="List of citation handles")
+    note_list: list[str] | None = Field(None, description="List of note handles")
 
 
 class EventSpanParams(BaseModel):
@@ -68,7 +68,7 @@ class EventSpanParams(BaseModel):
 
     handle1: str = Field(description="The unique identifier for the first event")
     handle2: str = Field(description="The unique identifier for the second event")
-    as_age: Optional[bool] = Field(None, description="Return result as an age")
-    precision: Optional[int] = Field(
+    as_age: bool | None = Field(None, description="Return result as an age")
+    precision: int | None = Field(
         None, ge=1, le=3, description="Number of significant levels (1-3)"
     )

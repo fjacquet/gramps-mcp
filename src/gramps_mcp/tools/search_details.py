@@ -22,7 +22,6 @@ person and family information using direct API calls.
 """
 
 import logging
-from typing import Dict, List
 
 from mcp.types import TextContent
 
@@ -35,7 +34,7 @@ from .search_basic import with_client
 logger = logging.getLogger(__name__)
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
+def _format_error_response(error: Exception, operation: str) -> list[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
@@ -47,7 +46,7 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
 
 
 @with_client
-async def get_person_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_person_tool(client, arguments: dict) -> list[TextContent]:
     """
     Get comprehensive person information using direct API calls.
     """
@@ -71,7 +70,7 @@ async def get_person_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def get_family_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_family_tool(client, arguments: dict) -> list[TextContent]:
     """
     Get detailed family information using direct API calls.
     """
@@ -94,7 +93,7 @@ async def get_family_tool(client, arguments: Dict) -> List[TextContent]:
         return _format_error_response(e, "family details retrieval")
 
 
-async def get_type_tool(arguments: Dict) -> List[TextContent]:
+async def get_type_tool(arguments: dict) -> list[TextContent]:
     """Universal get tool for person and family details."""
     entity_type = arguments.get("type")
     handle = arguments.get("handle")

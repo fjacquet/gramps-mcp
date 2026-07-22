@@ -21,10 +21,8 @@ Formats chronological event lists from person, family, and group timeline
 endpoints.
 """
 
-from typing import Dict, List, Union
 
-
-def format_timeline(data: Union[Dict, List[Dict]]) -> str:
+def format_timeline(data: dict | list[dict]) -> str:
     """
     Format timeline event data into a chronological markdown list.
 

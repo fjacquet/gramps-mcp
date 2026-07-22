@@ -25,7 +25,7 @@ API calls supported in this category:
 - DELETE_SOURCE: Delete the source
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import Field, field_validator
 
@@ -117,8 +117,8 @@ class SourceSaveParams(BaseDataModel):
     """
 
     title: str = Field(..., description="Source title", min_length=1)
-    reporef_list: Optional[List[Dict[str, Any]]] = Field(
+    reporef_list: list[dict[str, Any]] | None = Field(
         None, description="List of repository references for this source"
     )
-    author: Optional[str] = Field(None, description="Source author")
-    pubinfo: Optional[str] = Field(None, description="Publication information")
+    author: str | None = Field(None, description="Source author")
+    pubinfo: str | None = Field(None, description="Publication information")

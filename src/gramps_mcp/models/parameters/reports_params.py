@@ -18,8 +18,6 @@
 Parameters for reports endpoints.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -35,7 +33,7 @@ class ReportGetParams(BaseModel):
         Dict[str, Any]: Report information
     """
 
-    include_help: Optional[bool] = Field(
+    include_help: bool | None = Field(
         None, description="Whether to include report options help"
     )
 
@@ -52,4 +50,4 @@ class ReportFileParams(BaseModel):
         Any: Report file content
     """
 
-    options: Optional[str] = Field(None, description="Report options in JSON format")
+    options: str | None = Field(None, description="Report options in JSON format")

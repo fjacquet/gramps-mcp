@@ -22,8 +22,6 @@ API calls supported in this category:
 - GET_RELATIONS_ALL: Get descriptions for all possible relationships between two people
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -36,6 +34,6 @@ class RelationParams(BaseModel):
     handle2: str = Field(
         ..., min_length=1, description="The handle of the second person"
     )
-    depth: Optional[int] = Field(
+    depth: int | None = Field(
         None, ge=1, description="Depth for the search, default is 15 generations"
     )

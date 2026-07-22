@@ -24,10 +24,8 @@ as a pure, side-effect-free function so it can be unit-tested without a live
 server.
 """
 
-from typing import Dict, List
 
-
-def merge_put_data(existing: Dict, changes: Dict) -> Dict:
+def merge_put_data(existing: dict, changes: dict) -> dict:
     """
     Merge requested changes into an existing record for a PUT update.
 
@@ -51,7 +49,7 @@ def merge_put_data(existing: Dict, changes: Dict) -> Dict:
     return merged
 
 
-def _merge_list(existing_items: List, new_items: List) -> List:
+def _merge_list(existing_items: list, new_items: list) -> list:
     """
     Merge two lists, deduplicating when the item type supports it.
 

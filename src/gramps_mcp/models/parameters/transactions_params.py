@@ -18,8 +18,6 @@
 Parameters for transactions endpoints.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -46,29 +44,29 @@ class TransactionHistoryParams(BaseModel):
         Dict[str, Any]: List of transaction history
     """
 
-    old: Optional[bool] = Field(
+    old: bool | None = Field(
         None, description="Whether to include the raw object data before the change"
     )
-    new: Optional[bool] = Field(
+    new: bool | None = Field(
         None, description="Whether to include the raw object data after the change"
     )
-    page: Optional[int] = Field(
+    page: int | None = Field(
         None, description="Page number representing a subset of results to be returned"
     )
-    pagesize: Optional[int] = Field(
+    pagesize: int | None = Field(
         None, description="The number of items that constitute a page"
     )
-    sort: Optional[str] = Field(
+    sort: str | None = Field(
         None,
         description="Sort the transactions. Can be 'id' to sort ascending, "
         "'-id' to sort descending",
     )
-    before: Optional[float] = Field(
+    before: float | None = Field(
         None,
         description="Unix timestamp. Only return transactions committed before "
         "this time",
     )
-    after: Optional[float] = Field(
+    after: float | None = Field(
         None,
         description="Unix timestamp. Only return transactions committed after "
         "this time",
@@ -91,9 +89,9 @@ class TransactionHistoryByIdParams(BaseModel):
     transaction_id: int = Field(
         ..., description="ID of the transaction to get details for"
     )
-    old: Optional[bool] = Field(
+    old: bool | None = Field(
         None, description="Whether to include the raw object data before the change"
     )
-    new: Optional[bool] = Field(
+    new: bool | None = Field(
         None, description="Whether to include the raw object data after the change"
     )

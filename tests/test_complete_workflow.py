@@ -13,7 +13,7 @@ This test follows the example workflow: Processing a Marriage Record
 """
 
 import re
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -260,7 +260,7 @@ class TestCompleteWorkflow:
         print("Media: file path, title, date")
         print("Date structures: regular, about, before, after with quality indicators")
 
-    async def _step_1_repository_creation(self, workflow_data: Dict[str, Any]):
+    async def _step_1_repository_creation(self, workflow_data: dict[str, Any]):
         """Step 1: Repository Creation following usage guide."""
 
         # First: Use find_repository to search for existing repository
@@ -306,7 +306,7 @@ class TestCompleteWorkflow:
             assert handle_match, f"No handle found in: {create_text}"
             workflow_data["repository_handle"] = handle_match.group(1)
 
-    async def _step_2_source_creation(self, workflow_data: Dict[str, Any]):
+    async def _step_2_source_creation(self, workflow_data: dict[str, Any]):
         """Step 2: Source Document Creation following usage guide."""
 
         # First: Use find_source to search for existing source document
@@ -344,7 +344,7 @@ class TestCompleteWorkflow:
             assert handle_match, f"No handle found in: {create_text}"
             workflow_data["source_handle"] = handle_match.group(1)
 
-    async def _step_3_citation_creation(self, workflow_data: Dict[str, Any]):
+    async def _step_3_citation_creation(self, workflow_data: dict[str, Any]):
         """Step 3: Citation Creation following usage guide."""
 
         # First create note and media for citation if needed
@@ -407,7 +407,7 @@ class TestCompleteWorkflow:
             assert handle_match, f"No handle found in: {create_text}"
             workflow_data["citation_handle"] = handle_match.group(1)
 
-    async def _step_4_event_creation(self, workflow_data: Dict[str, Any]):
+    async def _step_4_event_creation(self, workflow_data: dict[str, Any]):
         """Step 4: Event Creation with place and date following usage guide."""
 
         # Create place hierarchy first (if event has place)
@@ -457,7 +457,7 @@ class TestCompleteWorkflow:
             assert event_handle, f"No handle found in: {create_text}"
             workflow_data["event_handle"] = event_handle
 
-    async def _step_5_person_creation(self, workflow_data: Dict[str, Any]):
+    async def _step_5_person_creation(self, workflow_data: dict[str, Any]):
         """Step 5: Person Creation and Event Linking following usage guide."""
 
         # Create/Find John Smith (groom) with complete attributes
@@ -472,7 +472,7 @@ class TestCompleteWorkflow:
         )
         workflow_data["mary_handle"] = mary_handle
 
-    async def _step_6_family_creation(self, workflow_data: Dict[str, Any]):
+    async def _step_6_family_creation(self, workflow_data: dict[str, Any]):
         """Step 6: Family Unit Creation following usage guide."""
 
         # First: Use find_family to search for existing family
@@ -653,7 +653,7 @@ class TestCompleteWorkflow:
             assert handle_match, f"No handle found in: {create_text}"
             return handle_match.group(1)
 
-    async def _create_place_hierarchy(self, workflow_data: Dict[str, Any]):
+    async def _create_place_hierarchy(self, workflow_data: dict[str, Any]):
         """
         Create place hierarchy following usage guide requirements.
 
@@ -761,7 +761,7 @@ class TestCompleteWorkflow:
         return handle_match.group(1)
 
     async def _create_test_media(
-        self, file_path: str, title: str, date_info: Dict[str, Any]
+        self, file_path: str, title: str, date_info: dict[str, Any]
     ) -> str:
         """
         Create a test media item for demonstration purposes.

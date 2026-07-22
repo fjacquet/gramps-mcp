@@ -21,7 +21,7 @@ Provides clean, direct formatting of event data from handles.
 """
 
 import logging
-from typing import Optional, overload
+from typing import overload
 
 from ..models.api_calls import ApiCalls
 from .date_handler import format_date
@@ -39,12 +39,12 @@ async def format_event(
 @overload
 async def format_event(
     client, tree_id: str, handle: str, event_label: str
-) -> Optional[str]: ...
+) -> str | None: ...
 
 
 async def format_event(
-    client, tree_id: str, handle: str, event_label: Optional[str] = None
-) -> Optional[str]:
+    client, tree_id: str, handle: str, event_label: str | None = None
+) -> str | None:
     """
     Format event data with type, date, place, and participants.
 

@@ -25,7 +25,7 @@ API calls supported in this category:
 - DELETE_CITATION: Delete the citation
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import Field
 
@@ -35,7 +35,7 @@ from .base_params import BaseDataModel, BaseGetMultipleParams
 class GetCitationsParams(BaseGetMultipleParams):
     """Parameters for GET /citations endpoint."""
 
-    dates: Optional[str] = Field(
+    dates: str | None = Field(
         None, description="A date filter that operates on the citation date."
     )
 
@@ -43,7 +43,7 @@ class GetCitationsParams(BaseGetMultipleParams):
 class CitationData(BaseDataModel):
     """Model for creating or updating a citation via POST/PUT endpoints."""
 
-    date: Optional[Dict[str, Any]] = Field(
+    date: dict[str, Any] | None = Field(
         None,
         description=(
             "Date object with dateval array [day, month, year, False], "
@@ -52,5 +52,5 @@ class CitationData(BaseDataModel):
             "6=textonly, 7=from, 8=to)"
         ),
     )
-    page: Optional[str] = Field(None, description="Page or location within the source")
+    page: str | None = Field(None, description="Page or location within the source")
     source_handle: str = Field(..., description="Handle of the source being cited")

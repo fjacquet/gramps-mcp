@@ -18,8 +18,6 @@
 Utility functions for gramps_mcp.
 """
 
-from typing import Optional
-
 from markdownify import markdownify as md
 
 from .models.api_calls import ApiCalls
@@ -135,7 +133,7 @@ async def get_gramps_id_from_handle(
         return obj_handle
 
 
-async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> Optional[str]:
+async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | None:
     """
     Look up a person's handle by gramps_id via a direct GQL search.
 
@@ -157,7 +155,7 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> Optiona
     return None
 
 
-async def resolve_family_handle(client, tree_id: str, gramps_id: str) -> Optional[str]:
+async def resolve_family_handle(client, tree_id: str, gramps_id: str) -> str | None:
     """
     Look up a family's handle by gramps_id via a direct GQL search.
 

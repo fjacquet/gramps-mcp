@@ -20,12 +20,10 @@ Facts data handler for Gramps MCP operations.
 Formats "interesting facts" statistics about the tree.
 """
 
-from typing import Dict, List
-
 from ..utils import get_gramps_id_from_handle
 
 
-async def format_facts(data: List[Dict], client, tree_id: str) -> str:
+async def format_facts(data: list[dict], client, tree_id: str) -> str:
     """
     Format a list of RecordFact entries.
 
