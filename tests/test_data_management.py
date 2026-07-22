@@ -637,7 +637,8 @@ class TestCreatePersonTool:
             {"text": "Test note for Issue #9 update test", "type": "General"}
         )
         note_handle_match = re.search(r"\[([a-f0-9]+)\]", note_result[0].text)
-        note_handle = note_handle_match.group(1) if note_handle_match else None
+        if not note_handle_match:
+            pytest.fail("Could not extract note handle")
 
         # Step 3: Create a simple source
         source_result = await create_source_tool({"title": "Test Source for Issue 9"})

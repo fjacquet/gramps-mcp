@@ -8,14 +8,14 @@ These tests require a working Gramps Web API instance with valid credentials.
 import pytest
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
-
 from src.gramps_mcp.client import GrampsWebAPIClient
 from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.models.parameters.base_params import BaseGetMultipleParams
 from src.gramps_mcp.models.parameters.facts_params import FactsParams, LivingProxy
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class TestGetPersonCall:
@@ -54,7 +54,7 @@ class TestGetPersonCall:
             print(f"Person URL: {person_url}")
 
             try:
-                person_direct = await client._make_request("GET", person_url)
+                await client._make_request("GET", person_url)
                 print("SUCCESS: Direct person fetch worked!")
             except Exception as e:
                 print(f"FAILED: Direct person fetch: {e}")

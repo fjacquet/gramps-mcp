@@ -7,6 +7,7 @@ specified in gramps-usage-guide.md - no more, no less, with correct required/opt
 
 import pytest
 from pydantic import ValidationError
+
 from src.gramps_mcp.models.parameters.citation_params import CitationData
 from src.gramps_mcp.models.parameters.event_params import EventSaveParams
 from src.gramps_mcp.models.parameters.family_params import FamilySaveParams
@@ -15,14 +16,14 @@ from src.gramps_mcp.models.parameters.note_params import NoteSaveParams
 from src.gramps_mcp.models.parameters.people_params import PersonData
 from src.gramps_mcp.models.parameters.place_params import PlaceSaveParams
 from src.gramps_mcp.models.parameters.repository_params import RepositoryData
-from src.gramps_mcp.models.parameters.source_params import SourceSaveParams
 from src.gramps_mcp.models.parameters.simple_params import (
-    SimpleFindParams,
-    SimpleSearchParams,
-    SimpleGetParams,
     EntityType,
     GetEntityType,
+    SimpleFindParams,
+    SimpleGetParams,
+    SimpleSearchParams,
 )
+from src.gramps_mcp.models.parameters.source_params import SourceSaveParams
 
 
 class TestParameterAlignment:
@@ -290,8 +291,6 @@ class TestParameterAlignment:
         fields = model.model_fields
 
         # No required fields according to guide - all family fields are optional
-        required_fields = set()
-
         # Check no fields are required (except handle for updates)
         actual_required = {
             name for name, field in fields.items() if field.is_required()
@@ -304,10 +303,13 @@ class TestParameterAlignment:
         )
 
         # Check that essential family linking fields are present
+        # Reason: child_ref_list is the API-shaped counterpart of child_handles;
+        # create_family translates the latter into the former (issue #24).
         family_linking_fields = {
             "father_handle",
             "mother_handle",
             "child_handles",
+            "child_ref_list",
             "event_ref_list",
         }
         for field_name in family_linking_fields:
@@ -534,15 +536,13 @@ class TestParameterAlignment:
             "repository",
             "note",
         }
-        assert entity_types == expected_types, (
-            f"EntityType should have all entity types"
-        )
+        assert entity_types == expected_types, "EntityType should have all entity types"
 
         # Test GetEntityType enum exists and has only person/family
         get_types = {e.value for e in GetEntityType}
         expected_get_types = {"person", "family"}
         assert get_types == expected_get_types, (
-            f"GetEntityType should only have person and family"
+            "GetEntityType should only have person and family"
         )
 
     def test_person_event_reference_validation(self):

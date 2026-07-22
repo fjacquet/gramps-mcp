@@ -22,11 +22,15 @@ exclude = [
     "__pycache__/",
     "*.egg-info/",
     ".venv/",
-    "tests/"
 ]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Reason: tests print long diagnostic strings and assertion messages that ruff
+# format cannot wrap; enforcing line length there is churn without benefit.
+"tests/*" = ["E501"]
 
 [dependency-groups]
 dev = [

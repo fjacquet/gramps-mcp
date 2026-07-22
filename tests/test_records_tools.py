@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from src.gramps_mcp.tools.records_tools import manage_tags_tool
+from src.gramps_mcp.tools.records_tools import get_facts_tool, manage_tags_tool
 
 
 class TestManageTagsTool:
@@ -50,9 +50,6 @@ class TestManageTagsTool:
         result = await manage_tags_tool({"action": "delete"})
         text = result[0].text
         assert "error" in text.lower()
-
-
-from src.gramps_mcp.tools.records_tools import get_facts_tool
 
 
 class TestGetFactsTool:
