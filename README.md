@@ -109,8 +109,8 @@ No more manual data entry, no context switching between apps, no generic genealo
 
 ```bash
 # Download the configuration
-curl -O https://raw.githubusercontent.com/cabout-me/gramps-mcp/main/docker-compose.yml
-curl -O https://raw.githubusercontent.com/cabout-me/gramps-mcp/main/.env.example
+curl -O https://raw.githubusercontent.com/fjacquet/gramps-mcp/main/docker-compose.yml
+curl -O https://raw.githubusercontent.com/fjacquet/gramps-mcp/main/.env.example
 cp .env.example .env
 # Edit .env with your Gramps Web API credentials
 
@@ -202,7 +202,7 @@ uvx mcpo --port 8000 -- uv run python -m src.gramps_mcp.server stdio
 
 **With Docker:**
 ```bash
-uvx mcpo --port 8000 -- docker exec -i gramps-mcp-gramps-mcp-1 uv run python -m src.gramps_mcp.server stdio
+uvx mcpo --port 8000 -- docker exec -i gramps-mcp-gramps-mcp-1 python -m src.gramps_mcp.server stdio
 ```
 
 ### Claude Code
@@ -377,9 +377,9 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ### Community & Support
 
-- **Bug Reports & Feature Requests**: [GitHub Issues](https://github.com/cabout/gramps-mcp/issues)
-- **Questions & Discussions**: [GitHub Discussions](https://github.com/cabout/gramps-mcp/discussions)
-- **Documentation**: [Project Wiki](https://github.com/cabout/gramps-mcp/wiki)
+- **Bug Reports & Feature Requests**: [GitHub Issues](https://github.com/fjacquet/gramps-mcp/issues)
+- **Questions & Discussions**: [GitHub Discussions](https://github.com/fjacquet/gramps-mcp/discussions)
+- **Documentation**: [Project Wiki](https://github.com/fjacquet/gramps-mcp/wiki)
 
 ## Acknowledgments
 

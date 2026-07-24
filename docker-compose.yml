@@ -1,6 +1,6 @@
 services:
   gramps-mcp:
-    image: ghcr.io/cabout-me/gramps-mcp:latest
+    image: ghcr.io/fjacquet/gramps-mcp:latest
     ports:
       - "8000:8000"
     env_file:

@@ -161,9 +161,9 @@ uv run python -m src.gramps_mcp.server stdio
 
 Docker images are automatically published to GitHub Container Registry via GitHub Actions:
 
-- **Latest stable**: `ghcr.io/cabout-me/gramps-mcp:latest`
-- **Specific versions**: `ghcr.io/cabout-me/gramps-mcp:v1.0.0`
-- **Development**: `ghcr.io/cabout-me/gramps-mcp:main`
+- **Latest stable**: `ghcr.io/fjacquet/gramps-mcp:latest`
+- **Specific versions**: `ghcr.io/fjacquet/gramps-mcp:v1.0.0`
+- **Development**: `ghcr.io/fjacquet/gramps-mcp:main`
 
 Images are built for multiple architectures:
 - `linux/amd64` (Intel/AMD processors)
@@ -172,8 +172,8 @@ Images are built for multiple architectures:
 ### Image Publishing
 
 Images are automatically built and published when:
-- **Push to main branch** → `ghcr.io/cabout-me/gramps-mcp:main`
-- **Release tags** → `ghcr.io/cabout-me/gramps-mcp:v1.2.3` and `ghcr.io/cabout-me/gramps-mcp:latest`
+- **Push to main branch** → `ghcr.io/fjacquet/gramps-mcp:main`
+- **Release tags** → `ghcr.io/fjacquet/gramps-mcp:v1.2.3` and `ghcr.io/fjacquet/gramps-mcp:latest`
 
 The GitHub Actions workflow handles multi-architecture builds, proper tagging, and registry authentication automatically.
 

@@ -3,11 +3,11 @@ FROM python:3.12-slim
 # Add OCI labels
 LABEL org.opencontainers.image.title="Gramps MCP"
 LABEL org.opencontainers.image.description="AI-Powered Genealogy Research & Management - MCP server for Gramps Web API"
-LABEL org.opencontainers.image.url="https://github.com/cabout-me/gramps-mcp"
-LABEL org.opencontainers.image.source="https://github.com/cabout-me/gramps-mcp"
-LABEL org.opencontainers.image.documentation="https://github.com/cabout-me/gramps-mcp/blob/main/README.md"
+LABEL org.opencontainers.image.url="https://github.com/fjacquet/gramps-mcp"
+LABEL org.opencontainers.image.source="https://github.com/fjacquet/gramps-mcp"
+LABEL org.opencontainers.image.documentation="https://github.com/fjacquet/gramps-mcp/blob/main/README.md"
 LABEL org.opencontainers.image.licenses="AGPL-3.0"
-LABEL org.opencontainers.image.vendor="cabout.me"
+LABEL org.opencontainers.image.vendor="fjacquet"
 
 WORKDIR /app
 
@@ -27,6 +27,11 @@ RUN uv sync --frozen --no-dev
 # Copy the application code
 COPY src/ src/
 
+# Reason: run the interpreter from the pre-built venv directly. Using `uv run`
+# here would re-resolve and re-sync dependencies (including the dev group) on
+# every container start, requiring network access at runtime.
+ENV PATH="/app/.venv/bin:$PATH"
+
 # Create a non-root user
 RUN useradd -m -u 1000 gramps && chown -R gramps:gramps /app
 USER gramps
@@ -39,4 +44,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the MCP server
-CMD ["uv", "run", "python", "-m", "src.gramps_mcp.server"]
+CMD ["python", "-m", "src.gramps_mcp.server"]
