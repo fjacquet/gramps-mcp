@@ -9,3 +9,8 @@ __pycache__
 .claude/
 coverage.xml
 .coverage
+
+# Local all-in-one stacks (Gramps Web + MCP on one host) - not shipped
+docker-compose-pgsql.yml
+docker-compose-sqllite.yml
+docker/
