@@ -21,8 +21,6 @@ This module maps ApiCalls enum values to their corresponding parameter models
 for validation and type safety in the unified API call system.
 """
 
-from typing import Dict, Optional, Type
-
 from pydantic import BaseModel
 
 from .api_calls import ApiCalls
@@ -64,7 +62,7 @@ from .parameters.transactions_params import (
 from .parameters.types_params import TypesParams
 
 # Mapping of API calls to their parameter models
-API_CALL_PARAMS: Dict[ApiCalls, Optional[Type[BaseModel]]] = {
+API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     # PEOPLE operations
     ApiCalls.GET_PEOPLE: BaseGetMultipleParams,
     ApiCalls.POST_PEOPLE: PersonData,
@@ -169,7 +167,7 @@ API_CALL_PARAMS: Dict[ApiCalls, Optional[Type[BaseModel]]] = {
 }
 
 
-def get_param_model(api_call: ApiCalls) -> Optional[Type[BaseModel]]:
+def get_param_model(api_call: ApiCalls) -> type[BaseModel] | None:
     """
     Get the parameter model class for a given API call.
 
@@ -182,7 +180,7 @@ def get_param_model(api_call: ApiCalls) -> Optional[Type[BaseModel]]:
     return API_CALL_PARAMS.get(api_call)
 
 
-def validate_api_call_params(api_call: ApiCalls, params: dict) -> Optional[BaseModel]:
+def validate_api_call_params(api_call: ApiCalls, params: dict) -> BaseModel | None:
     """
     Validate parameters for a given API call using its parameter model.
 

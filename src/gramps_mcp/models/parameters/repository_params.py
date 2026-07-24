@@ -25,7 +25,7 @@ API calls supported in this category:
 - DELETE_REPOSITORY: Delete the repository
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import Field, field_validator
 
@@ -94,6 +94,6 @@ class RepositoryData(BaseDataModel):
     type: str = Field(
         ..., description="Repository type (e.g., 'Archive', 'Library', 'Church', etc.)"
     )
-    urls: Optional[List[Dict[str, Any]]] = Field(
+    urls: list[dict[str, Any]] | None = Field(
         None, description="List of URLs associated with the repository"
     )

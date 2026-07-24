@@ -25,7 +25,7 @@ API calls supported in this category:
 - DELETE_TAG: Delete the tag
 """
 
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,23 +33,23 @@ from pydantic import BaseModel, Field
 class TagSearchParams(BaseModel):
     """Parameters for searching tags."""
 
-    page: Optional[int] = Field(None, description="Page number for pagination", ge=0)
-    pagesize: Optional[int] = Field(
+    page: int | None = Field(None, description="Page number for pagination", ge=0)
+    pagesize: int | None = Field(
         None, description="Number of results per page", ge=1, le=100
     )
-    sort: Optional[List[str]] = Field(None, description="Sort order for results")
+    sort: list[str] | None = Field(None, description="Sort order for results")
 
 
 class TagSaveParams(BaseModel):
     """Parameters for creating or updating a tag."""
 
-    handle: Optional[str] = Field(
+    handle: str | None = Field(
         None, description="Tag's handle (for updates; omit for new tag)"
     )
     name: str = Field(description="Tag name", min_length=1)
-    color: Optional[str] = Field(None, description="Tag color")
-    priority: Optional[int] = Field(None, description="Tag priority")
-    change: Optional[str] = Field(None, description="Change timestamp")
+    color: str | None = Field(None, description="Tag color")
+    priority: int | None = Field(None, description="Tag priority")
+    change: str | None = Field(None, description="Change timestamp")
 
 
 class ManageTagsParams(BaseModel):
@@ -58,18 +58,18 @@ class ManageTagsParams(BaseModel):
     action: Literal["list", "get", "create"] = Field(
         ..., description="Which operation to perform"
     )
-    handle: Optional[str] = Field(
+    handle: str | None = Field(
         None,
         description=(
             "Tag handle (required for 'get'; provide for update, omit for "
             "a new tag on 'create')"
         ),
     )
-    name: Optional[str] = Field(None, description="Tag name (required for 'create')")
-    color: Optional[str] = Field(None, description="Tag color")
-    priority: Optional[int] = Field(None, description="Tag priority")
-    page: Optional[int] = Field(None, ge=0, description="Page number (for 'list')")
-    pagesize: Optional[int] = Field(
+    name: str | None = Field(None, description="Tag name (required for 'create')")
+    color: str | None = Field(None, description="Tag color")
+    priority: int | None = Field(None, description="Tag priority")
+    page: int | None = Field(None, ge=0, description="Page number (for 'list')")
+    pagesize: int | None = Field(
         None, ge=1, le=100, description="Results per page (for 'list')"
     )
-    sort: Optional[List[str]] = Field(None, description="Sort order (for 'list')")
+    sort: list[str] | None = Field(None, description="Sort order (for 'list')")

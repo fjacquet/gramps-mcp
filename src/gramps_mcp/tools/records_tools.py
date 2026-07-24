@@ -21,7 +21,6 @@ This module contains tools for managing tags and retrieving tree facts.
 """
 
 import logging
-from typing import Dict, List
 
 from mcp.types import TextContent
 
@@ -37,7 +36,7 @@ from .search_basic import with_client
 logger = logging.getLogger(__name__)
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
+def _format_error_response(error: Exception, operation: str) -> list[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
@@ -49,7 +48,7 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
 
 
 @with_client
-async def manage_tags_tool(client, arguments: Dict) -> List[TextContent]:
+async def manage_tags_tool(client, arguments: dict) -> list[TextContent]:
     """
     List, get, or create/update tags.
     """
@@ -122,7 +121,7 @@ async def manage_tags_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def get_facts_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_facts_tool(client, arguments: dict) -> list[TextContent]:
     """
     Get interesting facts and statistics about the tree.
     """

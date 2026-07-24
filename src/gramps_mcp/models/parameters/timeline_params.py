@@ -18,8 +18,6 @@
 Timeline parameter models for the Gramps Web API.
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -43,13 +41,13 @@ class PeopleTimelineParams(BaseModel):
         pagesize: Number of items per page.
     """
 
-    anchor: Optional[str] = None
-    dates: Optional[str] = None
+    anchor: str | None = None
+    dates: str | None = None
     first: bool = True
     last: bool = True
-    handles: Optional[str] = None
-    events: Optional[str] = None
-    event_classes: Optional[str] = None
+    handles: str | None = None
+    events: str | None = None
+    event_classes: str | None = None
     ratings: bool = False
     precision: int = Field(default=1, ge=1, le=3)
     discard_empty: bool = True
@@ -73,10 +71,10 @@ class FamiliesTimelineParams(BaseModel):
         pagesize: Number of items per page.
     """
 
-    handles: Optional[str] = None
-    dates: Optional[str] = None
-    events: Optional[str] = None
-    event_classes: Optional[str] = None
+    handles: str | None = None
+    dates: str | None = None
+    events: str | None = None
+    event_classes: str | None = None
     ratings: bool = False
     discard_empty: bool = True
     page: int = Field(default=0, ge=0)

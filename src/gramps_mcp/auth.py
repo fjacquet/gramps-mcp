@@ -21,7 +21,7 @@ JWT Authentication handling for Gramps Web API.
 import asyncio
 import logging
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 
 import httpx
@@ -54,8 +54,8 @@ class AuthManager:
             return
 
         self.settings = get_settings()
-        self._access_token: Optional[str] = None
-        self._token_expires_at: Optional[datetime] = None
+        self._access_token: str | None = None
+        self._token_expires_at: datetime | None = None
         self._client = None
         self._loop = None
 
@@ -143,17 +143,11 @@ class AuthManager:
                 )
                 exp = payload.get("exp")
                 if exp:
-                    self._token_expires_at = datetime.fromtimestamp(
-                        exp, tz=timezone.utc
-                    )
+                    self._token_expires_at = datetime.fromtimestamp(exp, tz=UTC)
                 else:
-                    self._token_expires_at = datetime.now(timezone.utc) + timedelta(
-                        minutes=15
-                    )
+                    self._token_expires_at = datetime.now(UTC) + timedelta(minutes=15)
             except Exception:
-                self._token_expires_at = datetime.now(timezone.utc) + timedelta(
-                    minutes=15
-                )
+                self._token_expires_at = datetime.now(UTC) + timedelta(minutes=15)
 
             logger.info("Successfully authenticated with Gramps Web API")
             return self._access_token
@@ -179,7 +173,7 @@ class AuthManager:
             return await self.authenticate()
 
         # Check if token is expired
-        if datetime.now(timezone.utc) >= self._token_expires_at:
+        if datetime.now(UTC) >= self._token_expires_at:
             return await self.authenticate()
 
         return self._access_token

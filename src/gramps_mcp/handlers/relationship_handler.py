@@ -20,12 +20,10 @@ Relationship data handler for Gramps MCP operations.
 Formats direct and all-possible relationship results between two people.
 """
 
-from typing import Dict, List
-
 from ..utils import get_gramps_id_from_handle
 
 
-def format_relationship(data: Dict) -> str:
+def format_relationship(data: dict) -> str:
     """
     Format a single most-direct relationship result.
 
@@ -55,7 +53,7 @@ def format_relationship(data: Dict) -> str:
     return result
 
 
-async def format_relationships(data: List[Dict], client, tree_id: str) -> str:
+async def format_relationships(data: list[dict], client, tree_id: str) -> str:
     """
     Format all-possible-relationships results.
 

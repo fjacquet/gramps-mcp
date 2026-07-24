@@ -18,7 +18,7 @@
 Base parameter classes for common patterns across Gramps API operations.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -52,28 +52,28 @@ EXTEND_CHOICES = [
 class BaseGetMultipleParams(BaseModel):
     """Common parameters for GET operations that return multiple objects."""
 
-    gramps_id: Optional[str] = Field(
+    gramps_id: str | None = Field(
         None, description="An alternate user managed identifier"
     )
-    page: Optional[int] = Field(
+    page: int | None = Field(
         None, description="Page number representing a subset of results"
     )
-    pagesize: Optional[int] = Field(
+    pagesize: int | None = Field(
         None, description="The number of items that constitute a page"
     )
-    sort: Optional[str] = Field(
+    sort: str | None = Field(
         None, description="Comma delimited list of keys to sort the result set by"
     )
-    gql: Optional[str] = Field(
+    gql: str | None = Field(
         None, description="A Gramps QL query string that is used to filter the objects"
     )
-    backlinks: Optional[bool] = Field(
+    backlinks: bool | None = Field(
         None, description="Include handles to objects referring to the object"
     )
-    extend: Optional[str] = Field(
+    extend: str | None = Field(
         None, description="Enables the return of extended record information"
     )
-    profile: Optional[str] = Field(
+    profile: str | None = Field(
         None,
         description="Enables the return of summarized information about the object",
     )
@@ -108,13 +108,13 @@ class BaseGetMultipleParams(BaseModel):
 class BaseGetSingleParams(BaseModel):
     """Common parameters for GET operations that return a single object."""
 
-    backlinks: Optional[bool] = Field(
+    backlinks: bool | None = Field(
         None, description="Include handles to objects referring to the object"
     )
-    extend: Optional[str] = Field(
+    extend: str | None = Field(
         None, description="Enables the return of extended record information"
     )
-    profile: Optional[str] = Field(
+    profile: str | None = Field(
         None,
         description="Enables the return of summarized information about the object",
     )
@@ -149,22 +149,20 @@ class BaseGetSingleParams(BaseModel):
 class BaseDataModel(BaseModel):
     """Base class for data models used in POST/PUT operations."""
 
-    handle: Optional[str] = Field(None, description="Object's unique handle identifier")
-    gramps_id: Optional[str] = Field(
+    handle: str | None = Field(None, description="Object's unique handle identifier")
+    gramps_id: str | None = Field(
         None, description="An alternate user managed identifier"
     )
-    note_list: Optional[List[str]] = Field(
-        None, description="List of handles for notes"
-    )
-    media_list: Optional[List[Dict[str, Any]]] = Field(
+    note_list: list[str] | None = Field(None, description="List of handles for notes")
+    media_list: list[dict[str, Any]] | None = Field(
         None, description="List of references to media"
     )
-    attribute_list: Optional[List[Dict[str, Any]]] = Field(
+    attribute_list: list[dict[str, Any]] | None = Field(
         None, description="List of attributes"
     )
-    tag_list: Optional[List[str]] = Field(None, description="List of handles to tags")
-    private: Optional[bool] = Field(None, description="Whether the object is private")
-    change: Optional[int] = Field(
+    tag_list: list[str] | None = Field(None, description="List of handles to tags")
+    private: bool | None = Field(None, description="Whether the object is private")
+    change: int | None = Field(
         None, description="Time in epoch format the record was last modified"
     )
 

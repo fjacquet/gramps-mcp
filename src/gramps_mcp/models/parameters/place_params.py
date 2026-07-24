@@ -25,8 +25,6 @@ API calls supported in this category:
 - DELETE_PLACE: Delete the place
 """
 
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
 
 from .base_params import BaseGetMultipleParams, BaseGetSingleParams
@@ -47,29 +45,25 @@ class PlaceDetailsParams(BaseGetSingleParams):
 class PlaceSaveParams(BaseModel):
     """Parameters for creating or updating a place."""
 
-    handle: Optional[str] = Field(
+    handle: str | None = Field(
         None, min_length=8, description="Place handle (for updates; omit for new place)"
     )
-    gramps_id: Optional[str] = Field(
-        None, description="Alternate user managed identifier"
-    )
-    name: Optional[dict] = Field(
-        None, description="Place name object with 'value' field"
-    )
-    code: Optional[str] = Field(None, description="Place code")
-    alt_loc: Optional[List[dict]] = Field(None, description="Alternative locations")
+    gramps_id: str | None = Field(None, description="Alternate user managed identifier")
+    name: dict | None = Field(None, description="Place name object with 'value' field")
+    code: str | None = Field(None, description="Place code")
+    alt_loc: list[dict] | None = Field(None, description="Alternative locations")
     place_type: str = Field(..., description="Place type")
-    placeref_list: Optional[List[dict]] = Field(
+    placeref_list: list[dict] | None = Field(
         None, description="List of place references"
     )
-    alt_names: Optional[List[str]] = Field(None, description="Alternative names")
-    lat: Optional[str] = Field(None, description="Latitude coordinate")
-    long: Optional[str] = Field(None, description="Longitude coordinate")
-    urls: Optional[List[dict]] = Field(None, description="Associated URLs")
-    media_list: Optional[List[str]] = Field(None, description="List of media handles")
-    citation_list: Optional[List[str]] = Field(
+    alt_names: list[str] | None = Field(None, description="Alternative names")
+    lat: str | None = Field(None, description="Latitude coordinate")
+    long: str | None = Field(None, description="Longitude coordinate")
+    urls: list[dict] | None = Field(None, description="Associated URLs")
+    media_list: list[str] | None = Field(None, description="List of media handles")
+    citation_list: list[str] | None = Field(
         None, description="List of citation handles"
     )
-    note_list: Optional[List[str]] = Field(None, description="List of note handles")
-    tag_list: Optional[List[str]] = Field(None, description="List of tag handles")
-    private: Optional[bool] = Field(None, description="Mark as private")
+    note_list: list[str] | None = Field(None, description="List of note handles")
+    tag_list: list[str] | None = Field(None, description="List of tag handles")
+    private: bool | None = Field(None, description="Mark as private")

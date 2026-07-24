@@ -22,7 +22,6 @@ events, places, sources, citations, notes, media, and repository records.
 """
 
 import logging
-from typing import Dict, List, Optional
 
 from mcp.types import TextContent
 
@@ -51,7 +50,7 @@ from ..models.parameters.source_params import SourceSaveParams
 logger = logging.getLogger(__name__)
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
+def _format_error_response(error: Exception, operation: str) -> list[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
@@ -62,7 +61,7 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
     return [TextContent(type="text", text=f"Error: {error_msg}")]
 
 
-def _extract_entity_data(result, entity_type: Optional[str] = None):
+def _extract_entity_data(result, entity_type: str | None = None):
     """Extract entity data from API response, handling different formats."""
     if not result:
         return None
@@ -86,7 +85,7 @@ def _extract_entity_data(result, entity_type: Optional[str] = None):
 
 async def _handle_crud_operation(
     params, entity_type: str, post_api_call, put_api_call, param_class
-) -> List[TextContent]:
+) -> list[TextContent]:
     """Common helper for create/update operations."""
     try:
         # Validate parameters
@@ -132,7 +131,7 @@ async def _handle_crud_operation(
 
 async def _format_save_response(
     client: GrampsWebAPIClient,
-    entity_data: Dict,
+    entity_data: dict,
     entity_type: str,
     operation: str,
     tree_id: str,
@@ -186,7 +185,7 @@ async def _format_save_response(
 # ============================================================================
 
 
-async def create_person_tool(arguments: Dict) -> List[TextContent]:
+async def create_person_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update person information including family links and event associations.
     """
@@ -195,7 +194,7 @@ async def create_person_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_family_tool(arguments: Dict) -> List[TextContent]:
+async def create_family_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update family unit including member relationships.
     """
@@ -248,7 +247,7 @@ async def create_family_tool(arguments: Dict) -> List[TextContent]:
         return _format_error_response(e, "family save")
 
 
-async def create_event_tool(arguments: Dict) -> List[TextContent]:
+async def create_event_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update life event including person/place associations.
     """
@@ -257,7 +256,7 @@ async def create_event_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_place_tool(arguments: Dict) -> List[TextContent]:
+async def create_place_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update geographic location.
     """
@@ -266,7 +265,7 @@ async def create_place_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_source_tool(arguments: Dict) -> List[TextContent]:
+async def create_source_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update source document.
     """
@@ -279,7 +278,7 @@ async def create_source_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_citation_tool(arguments: Dict) -> List[TextContent]:
+async def create_citation_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update citation including object associations.
     """
@@ -292,7 +291,7 @@ async def create_citation_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_note_tool(arguments: Dict) -> List[TextContent]:
+async def create_note_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update textual note including object associations.
     """
@@ -301,7 +300,7 @@ async def create_note_tool(arguments: Dict) -> List[TextContent]:
     )
 
 
-async def create_media_tool(arguments: Dict) -> List[TextContent]:
+async def create_media_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update media files including object associations.
     """
@@ -387,7 +386,7 @@ async def create_media_tool(arguments: Dict) -> List[TextContent]:
         return _format_error_response(e, "media save")
 
 
-async def create_repository_tool(arguments: Dict) -> List[TextContent]:
+async def create_repository_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update repository information.
     """

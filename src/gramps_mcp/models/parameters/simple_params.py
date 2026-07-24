@@ -19,7 +19,6 @@ Simplified parameter models for reduced token usage.
 """
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -51,7 +50,7 @@ class SimpleFindParams(BaseModel):
     type: EntityType = Field(description="Entity type to search")
     gql: str = Field(description="Gramps Query Language filter")
     max_results: int = Field(default=20, description="Maximum results to return")
-    page: Optional[int] = Field(
+    page: int | None = Field(
         default=None, description="Page number for paging through results"
     )
 
@@ -61,7 +60,7 @@ class SimpleSearchParams(BaseModel):
 
     query: str = Field(description="Plain text search query")
     max_results: int = Field(default=20, description="Maximum results to return")
-    page: Optional[int] = Field(
+    page: int | None = Field(
         default=None, description="Page number for paging through results"
     )
 
@@ -70,7 +69,7 @@ class SimpleGetParams(BaseModel):
     """Simplified parameters for getting entity details."""
 
     type: GetEntityType = Field(description="Entity type (person or family)")
-    handle: Optional[str] = Field(default=None, description="Entity handle")
-    gramps_id: Optional[str] = Field(
+    handle: str | None = Field(default=None, description="Entity handle")
+    gramps_id: str | None = Field(
         default=None, description="Gramps ID (e.g., I0001 or F0001)"
     )

@@ -25,7 +25,7 @@ import asyncio
 import logging
 import os
 import sys
-from typing import Any, Dict, Optional
+from typing import Any
 
 from mcp.server import Server
 from mcp.server.fastmcp import FastMCP
@@ -89,7 +89,7 @@ class TreeInfoParams(BaseModel):
 
 class DescendantsParams(BaseModel):
     gramps_id: str = Field(..., description="Person ID")
-    max_generations: Optional[int] = Field(
+    max_generations: int | None = Field(
         5,
         description=(
             "Max generations to retrieve (default: 5, use higher values "
@@ -100,7 +100,7 @@ class DescendantsParams(BaseModel):
 
 class AncestorsParams(BaseModel):
     gramps_id: str = Field(..., description="Person ID")
-    max_generations: Optional[int] = Field(
+    max_generations: int | None = Field(
         5,
         description=(
             "Max generations to retrieve (default: 5, use higher values "
@@ -119,7 +119,7 @@ class RelationshipQueryParams(BaseModel):
             "the most direct one"
         ),
     )
-    depth: Optional[int] = Field(
+    depth: int | None = Field(
         None, ge=1, description="Search depth in generations (API default: 15)"
     )
 
@@ -128,9 +128,9 @@ class LivingStatusParams(BaseModel):
     person: str = Field(
         ..., description="Handle or gramps_id of the person to evaluate"
     )
-    average_generation_gap: Optional[int] = Field(None, ge=1)
-    max_age_probably_alive: Optional[int] = Field(None, ge=1)
-    max_sibling_age_difference: Optional[int] = Field(None, ge=0)
+    average_generation_gap: int | None = Field(None, ge=1)
+    max_age_probably_alive: int | None = Field(None, ge=1)
+    max_sibling_age_difference: int | None = Field(None, ge=0)
     include_dates: bool = Field(
         True, description="Also fetch estimated birth/death dates"
     )
@@ -143,55 +143,55 @@ class TimelineQueryParams(BaseModel):
             "One of: 'person', 'family', 'people', 'families' - whose timeline to build"
         ),
     )
-    target: Optional[str] = Field(
+    target: str | None = Field(
         None,
         description=(
             "Handle or gramps_id of the person/family (required when scope "
             "is 'person' or 'family'; optional anchor for scope 'people')"
         ),
     )
-    dates: Optional[str] = Field(
+    dates: str | None = Field(
         None, description="Date range filter, e.g. '1900/1/1-1950/1/1'"
     )
-    handles: Optional[str] = Field(
+    handles: str | None = Field(
         None, description="Comma-delimited handles (scope 'people'/'families' only)"
     )
-    events: Optional[str] = Field(
+    events: str | None = Field(
         None, description="Comma-delimited event types to include"
     )
-    event_classes: Optional[str] = Field(
+    event_classes: str | None = Field(
         None, description="Comma-delimited event classes to include"
     )
-    ratings: Optional[bool] = Field(
+    ratings: bool | None = Field(
         None,
         description=(
             "Include citation count and confidence score (not used for scope 'person')"
         ),
     )
-    precision: Optional[int] = Field(
+    precision: int | None = Field(
         None, ge=1, le=3, description="Date precision, 1-3 (scope 'people' only)"
     )
-    discard_empty: Optional[bool] = Field(
+    discard_empty: bool | None = Field(
         None, description="Discard undated events (not used for scope 'person')"
     )
-    first: Optional[bool] = Field(
+    first: bool | None = Field(
         None,
         description=(
             "Include events before the anchor's first event "
             "(scope 'person'/'people' only)"
         ),
     )
-    last: Optional[bool] = Field(
+    last: bool | None = Field(
         None,
         description=(
             "Include events after the anchor's last event "
             "(scope 'person'/'people' only)"
         ),
     )
-    page: Optional[int] = Field(
+    page: int | None = Field(
         None, ge=0, description="Page number (not used for scope 'person')"
     )
-    pagesize: Optional[int] = Field(
+    pagesize: int | None = Field(
         None, gt=0, description="Items per page (not used for scope 'person')"
     )
 
@@ -202,7 +202,7 @@ logger = logging.getLogger(__name__)
 
 
 # Tool registry - single source of truth for all tools
-TOOL_REGISTRY: Dict[str, Dict[str, Any]] = {
+TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     # Search & Retrieval Tools
     "find_type": {
         "description": (
@@ -390,7 +390,7 @@ def load_resource(filename: str) -> str:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         resource_path = os.path.join(current_dir, "resources", filename)
 
-        with open(resource_path, "r", encoding="utf-8") as f:
+        with open(resource_path, encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         return f"Resource file '{filename}' not found."

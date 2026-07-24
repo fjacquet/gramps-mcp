@@ -24,7 +24,6 @@ tree statistics, ancestor/descendant discovery, and recent changes tracking.
 import asyncio
 import json
 import logging
-from typing import Dict, List
 
 from mcp.types import TextContent
 
@@ -38,7 +37,7 @@ from .search_basic import with_client
 logger = logging.getLogger(__name__)
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
+def _format_error_response(error: Exception, operation: str) -> list[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
@@ -50,7 +49,7 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
 
 
 async def _format_recent_changes(
-    transactions: List[Dict], client: GrampsWebAPIClient, tree_id: str
+    transactions: list[dict], client: GrampsWebAPIClient, tree_id: str
 ) -> str:
     """Format transaction history results."""
     if not transactions:
@@ -109,7 +108,7 @@ async def _format_recent_changes(
 
 async def _wait_for_task_completion(
     client: GrampsWebAPIClient, task_id: str, tree_id: str, timeout: int = 60
-) -> Dict:
+) -> dict:
     """
     Wait for an async task to complete by polling its status.
 
@@ -180,7 +179,7 @@ async def _wait_for_task_completion(
 
 
 @with_client
-async def get_descendants_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_descendants_tool(client, arguments: dict) -> list[TextContent]:
     """
     Find all descendants of a person.
     """
@@ -273,7 +272,7 @@ async def get_descendants_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def get_ancestors_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_ancestors_tool(client, arguments: dict) -> list[TextContent]:
     """
     Find all ancestors of a person.
     """
@@ -366,7 +365,7 @@ async def get_ancestors_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def get_recent_changes_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_recent_changes_tool(client, arguments: dict) -> list[TextContent]:
     """
     Get recent changes/modifications to the family tree.
     """
@@ -396,7 +395,7 @@ async def get_recent_changes_tool(client, arguments: Dict) -> List[TextContent]:
         return _format_error_response(e, "recent changes retrieval")
 
 
-def _format_tree_info(tree_info: Dict) -> str:
+def _format_tree_info(tree_info: dict) -> str:
     """Format tree information for display."""
     tree_id = tree_info.get("id", "N/A")
     name = tree_info.get("name", "Unnamed Tree")
@@ -428,7 +427,7 @@ def _format_tree_info(tree_info: Dict) -> str:
 
 
 @with_client
-async def get_tree_info_tool(client, _arguments: Dict) -> List[TextContent]:
+async def get_tree_info_tool(client, _arguments: dict) -> list[TextContent]:
     """
     Get information about a specific tree including statistics.
 

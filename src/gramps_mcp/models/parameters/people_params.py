@@ -27,7 +27,7 @@ API calls supported in this category:
 - GET_PERSON_DNA_MATCHES: Get DNA matches for a specific person
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -44,22 +44,22 @@ class EventReference(BaseModel):
 class PersonData(BaseDataModel):
     """Model for creating or updating a person in Gramps API."""
 
-    primary_name: Dict[str, Any] = Field(
+    primary_name: dict[str, Any] = Field(
         ..., description="Person's primary name object with first_name and surname_list"
     )
     gender: int = Field(
         ..., ge=0, le=2, description="Gender (0=Female, 1=Male, 2=Unknown)"
     )
-    event_ref_list: Optional[List[EventReference]] = Field(
+    event_ref_list: list[EventReference] | None = Field(
         None, description="List of references to events the person participated in"
     )
-    family_list: Optional[List[str]] = Field(
+    family_list: list[str] | None = Field(
         None, description="List of handles for families the person was a parent of"
     )
-    parent_family_list: Optional[List[str]] = Field(
+    parent_family_list: list[str] | None = Field(
         None, description="List of handles for families of the person's parents"
     )
-    urls: Optional[List[Dict[str, Any]]] = Field(
+    urls: list[dict[str, Any]] | None = Field(
         None, description="List of URLs associated with the person"
     )
 
@@ -67,57 +67,57 @@ class PersonData(BaseDataModel):
 class PersonTimelineParams(BaseModel):
     """Parameters for getting a person's timeline from Gramps API."""
 
-    dates: Optional[str] = Field(
+    dates: str | None = Field(
         None,
         description=(
             "Date range to bound the timeline (e.g., -y/m/d, y/m/d-y/m/d, y/m/d-)"
         ),
     )
-    first: Optional[bool] = Field(
+    first: bool | None = Field(
         None, description="Discard events dated prior to the first event for the person"
     )
-    last: Optional[bool] = Field(
+    last: bool | None = Field(
         None, description="Discard events dated after the last event for the person"
     )
-    ancestors: Optional[int] = Field(
+    ancestors: int | None = Field(
         None, ge=0, description="Number of generations of ancestors to consider"
     )
-    offspring: Optional[int] = Field(
+    offspring: int | None = Field(
         None, ge=0, description="Number of generations of offspring to consider"
     )
-    events: Optional[str] = Field(
+    events: str | None = Field(
         None, description="Comma delimited list of specific events to include"
     )
-    event_classes: Optional[str] = Field(
+    event_classes: str | None = Field(
         None, description="Comma delimited list of event classes to include"
     )
-    relatives: Optional[str] = Field(
+    relatives: str | None = Field(
         None, description="Comma delimited list of relationship types to consider"
     )
-    relative_events: Optional[str] = Field(
+    relative_events: str | None = Field(
         None, description="Comma delimited list of events for relatives"
     )
-    relative_event_classes: Optional[str] = Field(
+    relative_event_classes: str | None = Field(
         None, description="Comma delimited list of event classes for relatives"
     )
-    ratings: Optional[bool] = Field(
+    ratings: bool | None = Field(
         None, description="Include citation count and highest confidence score"
     )
-    precision: Optional[int] = Field(
+    precision: int | None = Field(
         None,
         ge=1,
         le=3,
         description="Number of significant levels for date representation",
     )
-    discard_empty: Optional[bool] = Field(None, description="Discard undated events")
-    omit_anchor: Optional[bool] = Field(
+    discard_empty: bool | None = Field(None, description="Discard undated events")
+    omit_anchor: bool | None = Field(
         None, description="Omit person info for events pertaining to that person"
     )
-    page: Optional[int] = Field(None, ge=0, description="Page number for pagination")
-    pagesize: Optional[int] = Field(None, ge=1, description="Number of items per page")
+    page: int | None = Field(None, ge=0, description="Page number for pagination")
+    pagesize: int | None = Field(None, ge=1, description="Number of items per page")
 
 
 class PersonDnaMatchesParams(BaseModel):
     """Parameters for getting DNA matches for a person from Gramps API."""
 
-    raw: Optional[bool] = Field(None, description="Include raw data for the matches")
+    raw: bool | None = Field(None, description="Include raw data for the matches")

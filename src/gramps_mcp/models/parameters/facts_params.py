@@ -22,7 +22,6 @@ API calls supported in this category:
 """
 
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -49,7 +48,7 @@ class PersonFilter(str, Enum):
 class FactsParams(BaseModel):
     """Parameters for getting interesting facts about records in the tree."""
 
-    gramps_id: Optional[str] = Field(
+    gramps_id: str | None = Field(
         None,
         description=(
             "The Gramps identifier of the person to whom a built in person "
@@ -57,7 +56,7 @@ class FactsParams(BaseModel):
         ),
     )
 
-    handle: Optional[str] = Field(
+    handle: str | None = Field(
         None,
         description=(
             "The handle identifying the person to whom a built in person "
@@ -74,7 +73,7 @@ class FactsParams(BaseModel):
         ),
     )
 
-    person: Optional[str] = Field(
+    person: str | None = Field(
         None,
         description=(
             "If provided the name of a built in or a custom filter to apply. "

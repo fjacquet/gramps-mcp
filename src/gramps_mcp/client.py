@@ -23,7 +23,6 @@ for all Gramps Web API operations through the make_api_call method.
 
 import logging
 import re
-from typing import Dict, Optional, Union
 from urllib.parse import urljoin
 
 import httpx
@@ -59,7 +58,7 @@ class GrampsWebAPIClient:
         """Close the HTTP client and auth manager."""
         await self.auth_manager.close()
 
-    async def _get_headers(self) -> Dict[str, str]:
+    async def _get_headers(self) -> dict[str, str]:
         """Get authentication headers for API requests."""
         # Use the auth manager's method to get headers with valid token
         await self.auth_manager.get_token()
@@ -76,8 +75,8 @@ class GrampsWebAPIClient:
         self,
         method: str,
         url: str,
-        params: Optional[Dict] = None,
-        json_data: Optional[Dict] = None,
+        params: dict | None = None,
+        json_data: dict | None = None,
         retry_auth: bool = True,
         return_headers: bool = False,
     ):
@@ -152,7 +151,7 @@ class GrampsWebAPIClient:
             return f"Request failed with status {status_code}"
 
     def _build_url_with_substitution(
-        self, tree_id: str, endpoint: str, url_params: Dict
+        self, tree_id: str, endpoint: str, url_params: dict
     ) -> str:
         """
         Build URL with parameter substitution for dynamic endpoints.
@@ -186,7 +185,7 @@ class GrampsWebAPIClient:
     async def make_api_call(
         self,
         api_call: ApiCalls,
-        params: Optional[Union[Dict, BaseModel]] = None,
+        params: dict | BaseModel | None = None,
         tree_id: str = "default",
         with_headers: bool = False,
         **url_params,

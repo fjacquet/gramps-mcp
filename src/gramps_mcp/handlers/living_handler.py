@@ -20,10 +20,8 @@ Living status data handler for Gramps MCP operations.
 Formats living-status and estimated-dates results for a person.
 """
 
-from typing import Dict, Optional
 
-
-def format_living_status(living: Dict, dates: Optional[Dict]) -> str:
+def format_living_status(living: dict, dates: dict | None) -> str:
     """
     Format living-status data, optionally including estimated dates.
 

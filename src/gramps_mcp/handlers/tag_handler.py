@@ -20,10 +20,8 @@ Tag data handler for Gramps MCP operations.
 Formats single-tag and tag-list results.
 """
 
-from typing import Dict, List
 
-
-def format_tag(data: Dict) -> str:
+def format_tag(data: dict) -> str:
     """
     Format a single tag record.
 
@@ -50,7 +48,7 @@ def format_tag(data: Dict) -> str:
     return result
 
 
-def format_tags(data: List[Dict]) -> str:
+def format_tags(data: list[dict]) -> str:
     """
     Format a list of tag records.
 

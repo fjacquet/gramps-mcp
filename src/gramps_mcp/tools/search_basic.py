@@ -23,7 +23,7 @@ places, sources, citations, media, and full-text search across all entity types.
 
 import functools
 import logging
-from typing import Callable, Dict, List
+from collections.abc import Callable
 
 from mcp.types import TextContent
 
@@ -77,7 +77,7 @@ def with_client(func: Callable) -> Callable:
     return wrapper
 
 
-async def format_search_result_by_type(client, item: Dict) -> str:
+async def format_search_result_by_type(client, item: dict) -> str:
     """
     Format search result using appropriate handler based on object type.
 
@@ -135,12 +135,12 @@ async def format_search_result_by_type(client, item: Dict) -> str:
 
 async def _search_entities(
     client,
-    arguments: Dict,
+    arguments: dict,
     params_class,
     api_call: ApiCalls,
     entity_type: str,
     format_handler,
-) -> List[TextContent]:
+) -> list[TextContent]:
     """
     Generic search function for all entity types.
 
@@ -215,7 +215,7 @@ async def _search_entities(
         return _format_error_response(e, f"{entity_type} search")
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
+def _format_error_response(error: Exception, operation: str) -> list[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
@@ -232,7 +232,7 @@ def _format_error_response(error: Exception, operation: str) -> List[TextContent
 
 
 @with_client
-async def find_person_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_person_tool(client, arguments: dict) -> list[TextContent]:
     """
     Search for people by name, ID, or other criteria.
 
@@ -249,7 +249,7 @@ async def find_person_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_family_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_family_tool(client, arguments: dict) -> list[TextContent]:
     """
     Search for families (family units).
 
@@ -266,7 +266,7 @@ async def find_family_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_event_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_event_tool(client, arguments: dict) -> list[TextContent]:
     """
     Search for life events (births, deaths, marriages).
     """
@@ -281,7 +281,7 @@ async def find_event_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_place_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_place_tool(client, arguments: dict) -> list[TextContent]:
     """
     Find geographic locations and places.
     """
@@ -296,7 +296,7 @@ async def find_place_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_source_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_source_tool(client, arguments: dict) -> list[TextContent]:
     """
     Search for source materials and documents.
     """
@@ -311,7 +311,7 @@ async def find_source_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_repository_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_repository_tool(client, arguments: dict) -> list[TextContent]:
     """
     Search for repositories (archives, libraries, churches, etc.).
     """
@@ -326,7 +326,7 @@ async def find_repository_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_media_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_media_tool(client, arguments: dict) -> list[TextContent]:
     """
     Find photos, documents, and media files.
     """
@@ -341,7 +341,7 @@ async def find_media_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_citation_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_citation_tool(client, arguments: dict) -> list[TextContent]:
     """
     Search for citations and references, showing source details, URLs, and
     repository info.
@@ -357,7 +357,7 @@ async def find_citation_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_note_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_note_tool(client, arguments: dict) -> list[TextContent]:
     """
     Search for notes and research notes.
     """
@@ -366,7 +366,7 @@ async def find_note_tool(client, arguments: Dict) -> List[TextContent]:
     )
 
 
-async def find_type_tool(arguments: Dict) -> List[TextContent]:
+async def find_type_tool(arguments: dict) -> list[TextContent]:
     """Universal type-based search tool."""
     entity_type = arguments.get("type")
     gql = arguments.get("gql")
@@ -390,7 +390,7 @@ async def find_type_tool(arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def find_anything_tool(client, arguments: Dict) -> List[TextContent]:
+async def find_anything_tool(client, arguments: dict) -> list[TextContent]:
     """
     Full-text search across all entity types.
     """

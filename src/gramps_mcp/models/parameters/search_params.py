@@ -21,8 +21,6 @@ API calls supported in this category:
 - GET_SEARCH: Perform a full-text search on multiple objects
 """
 
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -34,29 +32,29 @@ class SearchParams(BaseModel):
     """
 
     query: str = Field(..., description="The search string")
-    page: Optional[int] = Field(
+    page: int | None = Field(
         None,
         description=(
             "The page number representing the subset of search results to be returned"
         ),
     )
-    pagesize: Optional[int] = Field(
+    pagesize: int | None = Field(
         None, description="The number of search results that constitute a page"
     )
-    type: Optional[str] = Field(
+    type: str | None = Field(
         None, description="A comma delimited list of object types to include"
     )
-    sort: Optional[str] = Field(
+    sort: str | None = Field(
         None, description="A comma delimited list of keys to sort the result set by"
     )
-    profile: Optional[str] = Field(
+    profile: str | None = Field(
         None,
         description=(
             "Enables the return of summarized information about a person, family, "
             "or event"
         ),
     )
-    semantic: Optional[bool] = Field(
+    semantic: bool | None = Field(
         None,
         description=(
             "Indicates whether semantic search should be used rather than "

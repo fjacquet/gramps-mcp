@@ -23,7 +23,6 @@ checking living status, and building timelines.
 
 import logging
 import re
-from typing import Dict, List, Optional
 
 from mcp.types import TextContent
 from pydantic import BaseModel
@@ -63,7 +62,7 @@ class _RelationsQueryParams(BaseModel):
     query-eligible field through to the request.
     """
 
-    depth: Optional[int] = None
+    depth: int | None = None
 
 
 class _LivingQueryParams(BaseModel):
@@ -80,9 +79,9 @@ class _LivingQueryParams(BaseModel):
     the request.
     """
 
-    average_generation_gap: Optional[int] = None
-    max_age_probably_alive: Optional[int] = None
-    max_sibling_age_difference: Optional[int] = None
+    average_generation_gap: int | None = None
+    max_age_probably_alive: int | None = None
+    max_sibling_age_difference: int | None = None
 
 
 class _FamilyTimelineQueryParams(BaseModel):
@@ -97,13 +96,13 @@ class _FamilyTimelineQueryParams(BaseModel):
     model carries just the query-eligible fields through to the request.
     """
 
-    dates: Optional[str] = None
-    events: Optional[str] = None
-    event_classes: Optional[str] = None
-    ratings: Optional[bool] = None
-    discard_empty: Optional[bool] = None
-    page: Optional[int] = None
-    pagesize: Optional[int] = None
+    dates: str | None = None
+    events: str | None = None
+    event_classes: str | None = None
+    ratings: bool | None = None
+    discard_empty: bool | None = None
+    page: int | None = None
+    pagesize: int | None = None
 
 
 class _PeopleTimelineQueryParams(BaseModel):
@@ -119,18 +118,18 @@ class _PeopleTimelineQueryParams(BaseModel):
     avoiding the 422.
     """
 
-    anchor: Optional[str] = None
-    dates: Optional[str] = None
+    anchor: str | None = None
+    dates: str | None = None
     first: bool = True
     last: bool = True
-    handles: Optional[str] = None
-    events: Optional[str] = None
-    event_classes: Optional[str] = None
+    handles: str | None = None
+    events: str | None = None
+    event_classes: str | None = None
     ratings: bool = False
     precision: int = 1
     discard_empty: bool = True
     omit_anchor: bool = True
-    page: Optional[int] = None
+    page: int | None = None
     pagesize: int = 20
 
 
@@ -144,13 +143,13 @@ class _FamiliesTimelineQueryParams(BaseModel):
     the query unless explicitly requested.
     """
 
-    handles: Optional[str] = None
-    dates: Optional[str] = None
-    events: Optional[str] = None
-    event_classes: Optional[str] = None
+    handles: str | None = None
+    dates: str | None = None
+    events: str | None = None
+    event_classes: str | None = None
     ratings: bool = False
     discard_empty: bool = True
-    page: Optional[int] = None
+    page: int | None = None
     pagesize: int = 20
 
 
@@ -159,7 +158,7 @@ def _coalesce(value, default):
     return value if value is not None else default
 
 
-def _format_error_response(error: Exception, operation: str) -> List[TextContent]:
+def _format_error_response(error: Exception, operation: str) -> list[TextContent]:
     """Format error into user-friendly MCP response."""
     if isinstance(error, GrampsAPIError):
         error_msg = str(error)
@@ -227,7 +226,7 @@ async def _resolve_family(client, tree_id: str, value: str) -> str:
 
 
 @with_client
-async def get_relationship_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_relationship_tool(client, arguments: dict) -> list[TextContent]:
     """
     Calculate the relationship between two people.
     """
@@ -272,7 +271,7 @@ async def get_relationship_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def check_living_tool(client, arguments: Dict) -> List[TextContent]:
+async def check_living_tool(client, arguments: dict) -> list[TextContent]:
     """
     Check whether a person is living and get estimated birth/death dates.
     """
@@ -325,7 +324,7 @@ async def check_living_tool(client, arguments: Dict) -> List[TextContent]:
 
 
 @with_client
-async def get_timeline_tool(client, arguments: Dict) -> List[TextContent]:
+async def get_timeline_tool(client, arguments: dict) -> list[TextContent]:
     """
     Build a chronological timeline for a person, family, or group.
     """

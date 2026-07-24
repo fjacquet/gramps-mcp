@@ -27,7 +27,7 @@ API calls supported in this category:
 - PUT_MEDIA_FILE: Update an existing media object's file
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -37,8 +37,8 @@ from .base_params import BaseGetMultipleParams
 class MediaSearchParams(BaseGetMultipleParams):
     """Parameters for searching media items."""
 
-    dates: Optional[str] = Field(None, description="Date filter for media items")
-    filemissing: Optional[bool] = Field(
+    dates: str | None = Field(None, description="Date filter for media items")
+    filemissing: bool | None = Field(
         None, description="Only return media where file is missing"
     )
 
@@ -47,7 +47,7 @@ class MediaFileParams(BaseModel):
     """Parameters for media file operations."""
 
     handle: str = Field(..., min_length=8, description="Media handle identifier")
-    uploadmissing: Optional[bool] = Field(
+    uploadmissing: bool | None = Field(
         None, description="Upload missing file to existing media object"
     )
 
@@ -55,18 +55,18 @@ class MediaFileParams(BaseModel):
 class MediaSaveParams(BaseModel):
     """Parameters for creating or updating a media item."""
 
-    handle: Optional[str] = Field(None, description="Media handle for updates")
+    handle: str | None = Field(None, description="Media handle for updates")
     desc: str = Field(..., description="Media description")
-    path: Optional[str] = Field(
+    path: str | None = Field(
         None, min_length=1, description="File path or URL to media"
     )
-    description: Optional[str] = Field(None, description="Media description")
-    mime: Optional[str] = Field(None, description="MIME type of the media file")
-    citation_list: Optional[List[str]] = Field(
+    description: str | None = Field(None, description="Media description")
+    mime: str | None = Field(None, description="MIME type of the media file")
+    citation_list: list[str] | None = Field(
         None, description="List of citation handles"
     )
-    note_list: Optional[List[str]] = Field(None, description="List of note handles")
-    date: Optional[Dict[str, Any]] = Field(
+    note_list: list[str] | None = Field(None, description="List of note handles")
+    date: dict[str, Any] | None = Field(
         None,
         description=(
             "Date object with dateval array [day, month, year, False], quality "
