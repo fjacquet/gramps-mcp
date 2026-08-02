@@ -376,13 +376,19 @@ async def handle_list_tools(
 
 async def handle_call_tool(ctx: Any, params: CallToolRequestParams) -> CallToolResult:
     """Handle tool calls."""
-    if params.name in TOOL_REGISTRY:
+    if params.name not in TOOL_REGISTRY:
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"Unknown tool: {params.name}")],
+            is_error=True,
+        )
+    try:
         content = await TOOL_REGISTRY[params.name]["handler"](params.arguments or {})
         return CallToolResult(content=content, is_error=False)
-    return CallToolResult(
-        content=[TextContent(type="text", text=f"Unknown tool: {params.name}")],
-        is_error=True,
-    )
+    except Exception as e:
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"Tool error: {e}")],
+            is_error=True,
+        )
 
 
 async def run_stdio_server():

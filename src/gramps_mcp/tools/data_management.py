@@ -340,12 +340,10 @@ async def create_media_tool(arguments: dict) -> list[TextContent]:
     Create or update media files including object associations.
     """
     try:
-        # Extract file_location separately (not part of MediaSaveParams)
-        file_location = arguments.get("file_location")
-
-        # All other arguments are for metadata
-        media_params = {k: v for k, v in arguments.items() if k != "file_location"}
-        params = MediaSaveParams(**media_params) if media_params else None
+        params = MediaSaveParams(**arguments) if arguments else None
+        file_location = params.media_path if params else None
+        if params:
+            params.media_path = None
 
         settings = get_settings()
         tree_id = settings.gramps_tree_id
@@ -366,7 +364,7 @@ async def create_media_tool(arguments: dict) -> list[TextContent]:
                 # If no handle, we are creating a new media object,
                 # which requires a file
                 if not file_location:
-                    raise ValueError("file_location is required to create new media.")
+                    raise ValueError("media_path is required to create new media.")
 
                 # 1. Upload the file to create the initial media object
                 initial_media_object = await upload_media_from_path(

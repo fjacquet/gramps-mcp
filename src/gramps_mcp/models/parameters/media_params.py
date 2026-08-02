@@ -60,7 +60,7 @@ class MediaSaveParams(BaseModel):
     path: str | None = Field(
         None, min_length=1, description="File path or URL to media"
     )
-    file_location: str | None = Field(
+    media_path: str | None = Field(
         None,
         min_length=1,
         description=(

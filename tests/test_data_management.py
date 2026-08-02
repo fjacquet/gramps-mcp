@@ -7,6 +7,8 @@ These tests require a working Gramps Web API instance with valid credentials.
 Only tests actual API integration - Pydantic validation is tested elsewhere.
 """
 
+import re
+
 import pytest
 
 from src.gramps_mcp.tools.data_management import (
@@ -31,6 +33,18 @@ test_citation_handle = None
 test_place_handle = None
 test_event_handle = None
 test_person_handles = []
+
+
+def _handle_on_line(text: str, marker: str) -> str:
+    """Find the [handle] on the line containing marker - avoids picking up
+    an unrelated handle (e.g. a repository or media ref) from elsewhere in
+    a concatenated multi-entity response."""
+    for line in text.splitlines():
+        if marker in line:
+            match = re.search(r"\[([a-f0-9]+)\]", line)
+            if match:
+                return match.group(1)
+    raise AssertionError(f"No handle found on a line containing {marker!r} in: {text}")
 
 
 class TestCreateNoteTool:
@@ -109,7 +123,7 @@ class TestCreateMediaTool:
 
         result = await create_media_tool(
             {
-                "file_location": "tests/sample/33SQ-GP8N-NLK.jpg",
+                "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
                 "desc": "Birth register page showing John Smith entry",
                 "date": {"dateval": [15, 1, 2024, False], "quality": 0, "modifier": 0},
             }
@@ -121,7 +135,7 @@ class TestCreateMediaTool:
 
         # Debug: Show what we sent
         print("\n--- DEBUG: Parameters sent ---")
-        print("file_location: tests/sample/33SQ-GP8N-NLK.jpg")
+        print("media_path: tests/sample/33SQ-GP8N-NLK.jpg")
         print("desc: Birth register page showing John Smith entry")
         print("--- END DEBUG ---\n")
 
@@ -442,8 +456,9 @@ class TestCreateCitationTool:
         # If an existing media_list ref was also provided, both should show -
         # count attached media references via the format_citation output
         if test_media_handle:
-            assert text.count("image/") >= 1, (
-                f"Expected at least the inline-uploaded media attached but got: {text}"
+            assert text.count("image/") >= 2, (
+                "Expected both the pre-existing and the inline-uploaded media "
+                f"to be attached but got: {text}"
             )
 
 
@@ -1003,8 +1018,6 @@ class TestCreateSourcedEventTool:
         """Source, citation, and event are created in one call, with the
         citation auto-wired onto the event - the exact chain that used to
         require three separate calls and a copy-pasted handle."""
-        import re
-
         from src.gramps_mcp.client import GrampsWebAPIClient
         from src.gramps_mcp.config import get_settings
         from src.gramps_mcp.models.api_calls import ApiCalls
@@ -1036,11 +1049,8 @@ class TestCreateSourcedEventTool:
         )
         assert "Birth" in text, f"Expected event type in output but got: {text}"
 
-        handles = re.findall(r"\[([a-f0-9]+)\]", text)
-        assert len(handles) >= 3, (
-            f"Expected at least 3 handles (source, citation, event) but got: {handles}"
-        )
-        citation_handle, event_handle = handles[1], handles[2]
+        citation_handle = _handle_on_line(text, "Page 7, composite test entry")
+        event_handle = _handle_on_line(text, "Birth")
 
         # The whole point of this tool: verify the event actually got the
         # citation attached, not just that the response text claims success.
@@ -1065,8 +1075,6 @@ class TestCreateSourcedEventTool:
     async def test_create_sourced_event_with_media_path(self):
         """media_path on the composite tool attaches to the citation, not
         the event or source."""
-        import re
-
         from src.gramps_mcp.client import GrampsWebAPIClient
         from src.gramps_mcp.config import get_settings
         from src.gramps_mcp.models.api_calls import ApiCalls
@@ -1093,9 +1101,7 @@ class TestCreateSourcedEventTool:
             f"Expected inline-uploaded media to be attached but got: {text}"
         )
 
-        handles = re.findall(r"\[([a-f0-9]+)\]", text)
-        assert len(handles) >= 2, f"Expected source and citation handles: {handles}"
-        citation_handle = handles[1]
+        citation_handle = _handle_on_line(text, "Page 9, media test entry")
 
         settings = get_settings()
         client = GrampsWebAPIClient()

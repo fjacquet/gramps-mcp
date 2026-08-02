@@ -776,7 +776,7 @@ class TestCompleteWorkflow:
         """
         create_result = await create_media_tool(
             {
-                "file_location": file_path,
+                "media_path": file_path,
                 "desc": title,
                 "date": {
                     "dateval": [
