@@ -46,6 +46,7 @@ from ..models.parameters.people_params import PersonData
 from ..models.parameters.place_params import PlaceSaveParams
 from ..models.parameters.repository_params import RepositoryData
 from ..models.parameters.source_params import SourceSaveParams
+from .media_upload import upload_media_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +85,22 @@ def _extract_entity_data(result, entity_type: str | None = None):
 
 
 async def _handle_crud_operation(
-    params, entity_type: str, post_api_call, put_api_call, param_class
+    params,
+    entity_type: str,
+    post_api_call,
+    put_api_call,
+    param_class,
+    pre_save_hook=None,
 ) -> list[TextContent]:
-    """Common helper for create/update operations."""
+    """Common helper for create/update operations.
+
+    Args:
+        pre_save_hook: optional async callable
+            (client, tree_id, validated_params) -> validated_params, run
+            after validation and before the create/update dispatch. Used to
+            perform side effects (like an inline media upload) that need to
+            mutate validated_params before it's sent to the Gramps API.
+    """
     try:
         # Validate parameters
         validated_params = param_class(**params)
@@ -98,6 +112,11 @@ async def _handle_crud_operation(
         # Create client and make unified API call
         client = GrampsWebAPIClient()
         try:
+            if pre_save_hook is not None:
+                validated_params = await pre_save_hook(
+                    client, tree_id, validated_params
+                )
+
             # Choose API call based on whether handle is provided (update vs create)
             if hasattr(validated_params, "handle") and validated_params.handle:
                 # Update existing entity
@@ -265,6 +284,20 @@ async def create_place_tool(arguments: dict) -> list[TextContent]:
     )
 
 
+async def _attach_media_path_hook(client, tree_id, validated_params):
+    """Upload validated_params.media_path (if set) and append its ref to
+    media_list, then clear media_path so it never reaches the Gramps API."""
+    if getattr(validated_params, "media_path", None):
+        media_object = await upload_media_from_path(
+            client, validated_params.media_path, tree_id
+        )
+        media_list = list(validated_params.media_list or [])
+        media_list.append({"ref": media_object["handle"]})
+        validated_params.media_list = media_list
+        validated_params.media_path = None
+    return validated_params
+
+
 async def create_source_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update source document.
@@ -275,6 +308,7 @@ async def create_source_tool(arguments: dict) -> list[TextContent]:
         ApiCalls.POST_SOURCES,
         ApiCalls.PUT_SOURCE,
         SourceSaveParams,
+        pre_save_hook=_attach_media_path_hook,
     )
 
 
@@ -288,6 +322,7 @@ async def create_citation_tool(arguments: dict) -> list[TextContent]:
         ApiCalls.POST_CITATIONS,
         ApiCalls.PUT_CITATION,
         CitationData,
+        pre_save_hook=_attach_media_path_hook,
     )
 
 
@@ -304,9 +339,6 @@ async def create_media_tool(arguments: dict) -> list[TextContent]:
     """
     Create or update media files including object associations.
     """
-    import mimetypes
-    import os
-
     try:
         # Extract file_location separately (not part of MediaSaveParams)
         file_location = arguments.get("file_location")
@@ -335,29 +367,11 @@ async def create_media_tool(arguments: dict) -> list[TextContent]:
                 # which requires a file
                 if not file_location:
                     raise ValueError("file_location is required to create new media.")
-                if not os.path.isfile(file_location):
-                    raise FileNotFoundError(f"File not found: {file_location}")
 
                 # 1. Upload the file to create the initial media object
-                with open(file_location, "rb") as f:
-                    file_content = f.read()
-                mime_type, _ = mimetypes.guess_type(file_location)
-                if not mime_type:
-                    mime_type = "application/octet-stream"
-
-                upload_result = await client.upload_media_file(
-                    file_content, mime_type, tree_id
+                initial_media_object = await upload_media_from_path(
+                    client, file_location, tree_id
                 )
-
-                if not (
-                    upload_result
-                    and isinstance(upload_result, list)
-                    and "new" in upload_result[0]
-                ):
-                    raise GrampsAPIError(
-                        "Media upload did not return the expected new object."
-                    )
-                initial_media_object = upload_result[0]["new"]
                 media_handle = initial_media_object["handle"]
 
                 # 2. Merge initial object with metadata and update via PUT

@@ -27,16 +27,29 @@ import os
 import sys
 from typing import Any
 
-from mcp.server import Server
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer, Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool
-from pydantic import BaseModel, Field
+from mcp.types import (
+    CallToolRequestParams,
+    CallToolResult,
+    ListToolsResult,
+    PaginatedRequestParams,
+    TextContent,
+    Tool,
+)
 
 from . import __version__
 from .config import get_settings
 
 # Import all parameter models
+from .models.parameters.analysis_params import (
+    AncestorsParams,
+    DescendantsParams,
+    LivingStatusParams,
+    RelationshipQueryParams,
+    TimelineQueryParams,
+    TreeInfoParams,
+)
 from .models.parameters.citation_params import CitationData
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
@@ -52,6 +65,7 @@ from .models.parameters.simple_params import (
     SimpleSearchParams,
 )
 from .models.parameters.source_params import SourceSaveParams
+from .models.parameters.sourced_event_params import SourcedEventData
 from .models.parameters.tag_params import ManageTagsParams
 from .models.parameters.transactions_params import TransactionHistoryParams
 
@@ -66,6 +80,7 @@ from .tools import (
     create_place_tool,
     create_repository_tool,
     create_source_tool,
+    create_sourced_event_tool,
     find_anything_tool,
     get_ancestors_tool,
     get_descendants_tool,
@@ -80,121 +95,6 @@ from .tools.relationship_tools import (
 )
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
-
-
-# Simple analysis models for tools that use direct dict access
-class TreeInfoParams(BaseModel):
-    include_statistics: bool = Field(True, description="Include statistics")
-
-
-class DescendantsParams(BaseModel):
-    gramps_id: str = Field(..., description="Person ID")
-    max_generations: int | None = Field(
-        5,
-        description=(
-            "Max generations to retrieve (default: 5, use higher values "
-            "carefully as they can overflow context)"
-        ),
-    )
-
-
-class AncestorsParams(BaseModel):
-    gramps_id: str = Field(..., description="Person ID")
-    max_generations: int | None = Field(
-        5,
-        description=(
-            "Max generations to retrieve (default: 5, use higher values "
-            "carefully as they can overflow context)"
-        ),
-    )
-
-
-class RelationshipQueryParams(BaseModel):
-    person1: str = Field(..., description="Handle or gramps_id of the first person")
-    person2: str = Field(..., description="Handle or gramps_id of the second person")
-    all_relationships: bool = Field(
-        False,
-        description=(
-            "If true, return all possible relationships; if false, only "
-            "the most direct one"
-        ),
-    )
-    depth: int | None = Field(
-        None, ge=1, description="Search depth in generations (API default: 15)"
-    )
-
-
-class LivingStatusParams(BaseModel):
-    person: str = Field(
-        ..., description="Handle or gramps_id of the person to evaluate"
-    )
-    average_generation_gap: int | None = Field(None, ge=1)
-    max_age_probably_alive: int | None = Field(None, ge=1)
-    max_sibling_age_difference: int | None = Field(None, ge=0)
-    include_dates: bool = Field(
-        True, description="Also fetch estimated birth/death dates"
-    )
-
-
-class TimelineQueryParams(BaseModel):
-    scope: str = Field(
-        ...,
-        description=(
-            "One of: 'person', 'family', 'people', 'families' - whose timeline to build"
-        ),
-    )
-    target: str | None = Field(
-        None,
-        description=(
-            "Handle or gramps_id of the person/family (required when scope "
-            "is 'person' or 'family'; optional anchor for scope 'people')"
-        ),
-    )
-    dates: str | None = Field(
-        None, description="Date range filter, e.g. '1900/1/1-1950/1/1'"
-    )
-    handles: str | None = Field(
-        None, description="Comma-delimited handles (scope 'people'/'families' only)"
-    )
-    events: str | None = Field(
-        None, description="Comma-delimited event types to include"
-    )
-    event_classes: str | None = Field(
-        None, description="Comma-delimited event classes to include"
-    )
-    ratings: bool | None = Field(
-        None,
-        description=(
-            "Include citation count and confidence score (not used for scope 'person')"
-        ),
-    )
-    precision: int | None = Field(
-        None, ge=1, le=3, description="Date precision, 1-3 (scope 'people' only)"
-    )
-    discard_empty: bool | None = Field(
-        None, description="Discard undated events (not used for scope 'person')"
-    )
-    first: bool | None = Field(
-        None,
-        description=(
-            "Include events before the anchor's first event "
-            "(scope 'person'/'people' only)"
-        ),
-    )
-    last: bool | None = Field(
-        None,
-        description=(
-            "Include events after the anchor's last event "
-            "(scope 'person'/'people' only)"
-        ),
-    )
-    page: int | None = Field(
-        None, ge=0, description="Page number (not used for scope 'person')"
-    )
-    pagesize: int | None = Field(
-        None, gt=0, description="Items per page (not used for scope 'person')"
-    )
-
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -276,6 +176,16 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "schema": RepositoryData,
         "handler": create_repository_tool,
     },
+    "create_sourced_event": {
+        "description": (
+            "Composite tool: create a source, citation, and event in one "
+            "call, auto-wiring the citation to the event (and optionally "
+            "uploading media to the citation) - avoids copy-paste handle "
+            "mistakes"
+        ),
+        "schema": SourcedEventData,
+        "handler": create_sourced_event_tool,
+    },
     # Analysis Tools
     "tree_stats": {
         "description": (
@@ -345,18 +255,19 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
 }
 
 
-# Create FastMCP app with stateless HTTP (no SSE)
-app = FastMCP("gramps", stateless_http=True, json_response=True)
+# Create MCPServer app; stateless_http/json_response now live on .run(), not
+# the constructor (mcp>=2.0.0)
+app = MCPServer("gramps")
 
 
 # ============================================================================
-# Dynamic FastMCP Tool Registration
+# Dynamic MCPServer Tool Registration
 # ============================================================================
 
 
 # Register all tools dynamically from the registry
 def register_tools():
-    """Register all tools from the registry with FastMCP."""
+    """Register all tools from the registry with MCPServer."""
     for tool_name, tool_config in TOOL_REGISTRY.items():
         schema = tool_config["schema"]
         handler_func = tool_config["handler"]
@@ -371,7 +282,7 @@ def register_tools():
         create_handler.__doc__ = description
         create_handler.__annotations__ = {"arguments": schema}
 
-        # Register with FastMCP
+        # Register with MCPServer
         app.tool(description=description)(create_handler)
 
 
@@ -447,30 +358,41 @@ async def health_check(request):
     )
 
 
-async def run_stdio_server():
-    """Run the MCP server with stdio transport."""
-    # Create a standard MCP server for stdio transport
-    server = Server("gramps")
-
-    @server.list_tools()
-    async def handle_list_tools():
-        """List all available tools."""
-        return [
+async def handle_list_tools(
+    ctx: Any, params: PaginatedRequestParams | None
+) -> ListToolsResult:
+    """List all available tools."""
+    return ListToolsResult(
+        tools=[
             Tool(
                 name=tool_name,
                 description=tool_config["description"],
-                inputSchema=tool_config["schema"].model_json_schema(),
+                input_schema=tool_config["schema"].model_json_schema(),
             )
             for tool_name, tool_config in TOOL_REGISTRY.items()
         ]
+    )
 
-    @server.call_tool()
-    async def handle_call_tool(name: str, arguments: dict):
-        """Handle tool calls."""
-        if name in TOOL_REGISTRY:
-            return await TOOL_REGISTRY[name]["handler"](arguments)
-        else:
-            raise ValueError(f"Unknown tool: {name}")
+
+async def handle_call_tool(ctx: Any, params: CallToolRequestParams) -> CallToolResult:
+    """Handle tool calls."""
+    if params.name in TOOL_REGISTRY:
+        content = await TOOL_REGISTRY[params.name]["handler"](params.arguments or {})
+        return CallToolResult(content=content, is_error=False)
+    return CallToolResult(
+        content=[TextContent(type="text", text=f"Unknown tool: {params.name}")],
+        is_error=True,
+    )
+
+
+async def run_stdio_server():
+    """Run the MCP server with stdio transport."""
+    # Low-level Server: handlers are injected via the constructor in
+    # mcp>=2.0.0 (the @server.list_tools()/@server.call_tool() decorators
+    # were removed, not merely deprecated)
+    server = Server(
+        "gramps", on_list_tools=handle_list_tools, on_call_tool=handle_call_tool
+    )
 
     # Run the server with stdio transport
     async with stdio_server() as (read_stream, write_stream):
@@ -487,11 +409,13 @@ if __name__ == "__main__":
         # Run with stdio transport for CLI usage
         asyncio.run(run_stdio_server())
     else:
-        # Run the FastMCP server with streamable HTTP transport
-        # Configure server settings
+        # Run the MCPServer with streamable HTTP transport; transport
+        # params live on .run() in mcp>=2.0.0, not the constructor
         settings = get_settings()
-        app.settings.host = settings.gramps_mcp_host
-        app.settings.port = settings.gramps_mcp_port
-
-        # Run with streamable-http transport for production use
-        app.run(transport="streamable-http")
+        app.run(
+            transport="streamable-http",
+            host=settings.gramps_mcp_host,
+            port=settings.gramps_mcp_port,
+            stateless_http=True,
+            json_response=True,
+        )

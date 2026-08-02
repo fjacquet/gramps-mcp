@@ -65,6 +65,11 @@
       """
   ```
 
+### Genealogy Data Entry Workflow
+- See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
+  research/data-entry workflow (sourcing chain, media attachment, match vs.
+  hypothesis handling, homonym hygiene).
+
 ### Documentation & Explainability
 - **Update `README.md`** when new features are added, dependencies change, or setup steps are modified.
 - **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.

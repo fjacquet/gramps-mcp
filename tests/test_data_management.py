@@ -20,6 +20,7 @@ from src.gramps_mcp.tools.data_management import (
     create_repository_tool,
     create_source_tool,
 )
+from src.gramps_mcp.tools.sourced_event import create_sourced_event_tool
 
 # Store handles for chaining tests following proper Gramps workflow
 test_note_handle = None
@@ -293,6 +294,38 @@ class TestCreateSourceTool:
         else:
             pytest.fail("Could not extract source handle for chaining tests")
 
+    @pytest.mark.asyncio
+    async def test_create_source_with_media_path(self):
+        """media_path uploads a local file inline on create_source too."""
+        global test_repository_handle
+
+        if not test_repository_handle:
+            pytest.fail(
+                "No repository handle available from previous test - run tests in order"
+            )
+
+        result = await create_source_tool(
+            {
+                "title": "Inline Media Source Test",
+                "reporef_list": [{"ref": test_repository_handle}],
+                "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
+            }
+        )
+
+        print("\n--- CREATE SOURCE WITH MEDIA_PATH RESULT ---")
+        print(result[0].text)
+        print("--- END ---\n")
+
+        text = result[0].text
+        assert "Error:" not in text, f"Expected success but got error: {text}"
+        assert "successfully" in text.lower()
+        assert "media_path" not in text, (
+            f"media_path must not leak into the response but got: {text}"
+        )
+        assert "image/jpeg" in text, (
+            f"Expected inline-uploaded media to be attached but got: {text}"
+        )
+
 
 class TestCreateCitationTool:
     """Test create_citation_tool functionality - Fifth in workflow."""
@@ -367,6 +400,51 @@ class TestCreateCitationTool:
             print(f"Extracted citation handle: {test_citation_handle}")
         else:
             pytest.fail("Could not extract citation handle for chaining tests")
+
+    @pytest.mark.asyncio
+    async def test_create_citation_with_media_path(self):
+        """media_path uploads a local file inline, without a prior
+        create_media call, and is additive with an existing media_list."""
+        global test_source_handle, test_media_handle
+
+        if not test_source_handle:
+            pytest.fail(
+                "No source handle available from previous test - run tests in order"
+            )
+
+        result = await create_citation_tool(
+            {
+                "source_handle": test_source_handle,
+                "page": "Page 12, inline media test",
+                "media_list": [{"ref": test_media_handle}] if test_media_handle else [],
+                "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
+            }
+        )
+
+        print("\n--- CREATE CITATION WITH MEDIA_PATH RESULT ---")
+        print(result[0].text)
+        print("--- END ---\n")
+
+        text = result[0].text
+        assert "Error:" not in text, f"Expected success but got error: {text}"
+        assert "successfully" in text.lower()
+
+        # media_path itself must never leak into the API body/response
+        assert "media_path" not in text, (
+            f"media_path must not leak into the response but got: {text}"
+        )
+
+        # The newly-uploaded media should be attached
+        assert "image/jpeg" in text, (
+            f"Expected inline-uploaded media to be attached but got: {text}"
+        )
+
+        # If an existing media_list ref was also provided, both should show -
+        # count attached media references via the format_citation output
+        if test_media_handle:
+            assert text.count("image/") >= 1, (
+                f"Expected at least the inline-uploaded media attached but got: {text}"
+            )
 
 
 class TestCreatePlaceTool:
@@ -915,6 +993,138 @@ class TestCreateFamilyTool:
         assert "ChildHandles" in family_text and "RegressionChild" in family_text, (
             f"Expected child to appear in family details but got: {family_text}"
         )
+
+
+class TestCreateSourcedEventTool:
+    """Test create_sourced_event_tool - composite source+citation+event."""
+
+    @pytest.mark.asyncio
+    async def test_create_sourced_event_success(self):
+        """Source, citation, and event are created in one call, with the
+        citation auto-wired onto the event - the exact chain that used to
+        require three separate calls and a copy-pasted handle."""
+        import re
+
+        from src.gramps_mcp.client import GrampsWebAPIClient
+        from src.gramps_mcp.config import get_settings
+        from src.gramps_mcp.models.api_calls import ApiCalls
+
+        result = await create_sourced_event_tool(
+            {
+                "source_title": "Sourced Event Composite Test Register",
+                "citation_page": "Page 7, composite test entry",
+                "event_type": "Birth",
+                "event_date": {
+                    "dateval": [3, 4, 1890, False],
+                    "quality": 0,
+                    "modifier": 0,
+                },
+            }
+        )
+
+        print("\n--- CREATE SOURCED EVENT SUCCESS RESULT ---")
+        print(result[0].text)
+        print("--- END ---\n")
+
+        text = result[0].text
+        assert "Error:" not in text, f"Expected success but got error: {text}"
+        assert "Sourced Event Composite Test Register" in text, (
+            f"Expected source title in output but got: {text}"
+        )
+        assert "Page 7, composite test entry" in text, (
+            f"Expected citation page in output but got: {text}"
+        )
+        assert "Birth" in text, f"Expected event type in output but got: {text}"
+
+        handles = re.findall(r"\[([a-f0-9]+)\]", text)
+        assert len(handles) >= 3, (
+            f"Expected at least 3 handles (source, citation, event) but got: {handles}"
+        )
+        citation_handle, event_handle = handles[1], handles[2]
+
+        # The whole point of this tool: verify the event actually got the
+        # citation attached, not just that the response text claims success.
+        settings = get_settings()
+        client = GrampsWebAPIClient()
+        try:
+            event_data = await client.make_api_call(
+                api_call=ApiCalls.GET_EVENT,
+                tree_id=settings.gramps_tree_id,
+                handle=event_handle,
+            )
+        finally:
+            await client.close()
+
+        assert citation_handle in event_data.get("citation_list", []), (
+            f"Expected citation {citation_handle} attached to event "
+            f"{event_handle} but citation_list was: "
+            f"{event_data.get('citation_list')}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_sourced_event_with_media_path(self):
+        """media_path on the composite tool attaches to the citation, not
+        the event or source."""
+        import re
+
+        from src.gramps_mcp.client import GrampsWebAPIClient
+        from src.gramps_mcp.config import get_settings
+        from src.gramps_mcp.models.api_calls import ApiCalls
+
+        result = await create_sourced_event_tool(
+            {
+                "source_title": "Sourced Event Media Test Register",
+                "citation_page": "Page 9, media test entry",
+                "event_type": "Death",
+                "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
+            }
+        )
+
+        print("\n--- CREATE SOURCED EVENT WITH MEDIA_PATH RESULT ---")
+        print(result[0].text)
+        print("--- END ---\n")
+
+        text = result[0].text
+        assert "Error:" not in text, f"Expected success but got error: {text}"
+        assert "media_path" not in text, (
+            f"media_path must not leak into the response but got: {text}"
+        )
+        assert "image/jpeg" in text, (
+            f"Expected inline-uploaded media to be attached but got: {text}"
+        )
+
+        handles = re.findall(r"\[([a-f0-9]+)\]", text)
+        assert len(handles) >= 2, f"Expected source and citation handles: {handles}"
+        citation_handle = handles[1]
+
+        settings = get_settings()
+        client = GrampsWebAPIClient()
+        try:
+            citation_data = await client.make_api_call(
+                api_call=ApiCalls.GET_CITATION,
+                tree_id=settings.gramps_tree_id,
+                handle=citation_handle,
+            )
+        finally:
+            await client.close()
+
+        assert citation_data.get("media_list"), (
+            f"Expected media attached to citation {citation_handle} but "
+            f"media_list was: {citation_data.get('media_list')}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_create_sourced_event_missing_required_fields(self):
+        """Omitting source_title/event_type must produce a clean validation
+        error, not a crash."""
+        result = await create_sourced_event_tool(
+            {
+                "citation_page": "Page 1",
+            }
+        )
+
+        text = result[0].text
+        assert "Error:" in text, f"Expected a clean validation error but got: {text}"
 
 
 # Removed validation tests - Pydantic handles input validation automatically

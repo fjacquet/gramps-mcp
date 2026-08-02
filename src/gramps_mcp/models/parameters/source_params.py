@@ -122,3 +122,12 @@ class SourceSaveParams(BaseDataModel):
     )
     author: str | None = Field(None, description="Source author")
     pubinfo: str | None = Field(None, description="Publication information")
+    media_path: str | None = Field(
+        None,
+        description=(
+            "Local file path to upload as media and attach to this source "
+            "(alternative to referencing an existing media handle via "
+            "media_list; the resulting ref is appended to media_list, not "
+            "replacing any existing entries)"
+        ),
+    )

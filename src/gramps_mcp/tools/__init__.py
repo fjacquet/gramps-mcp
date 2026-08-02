@@ -59,6 +59,7 @@ from .search_details import (
     get_family_tool,
     get_person_tool,
 )
+from .sourced_event import create_sourced_event_tool
 
 # Export all tools for easy import
 __all__ = [
@@ -84,6 +85,7 @@ __all__ = [
     "create_note_tool",
     "create_media_tool",
     "create_repository_tool",
+    "create_sourced_event_tool",
     # Analysis Tools
     "get_tree_info_tool",
     "get_descendants_tool",
