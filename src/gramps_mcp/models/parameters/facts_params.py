@@ -21,12 +21,12 @@ API calls supported in this category:
 - GET_FACTS: Get interesting facts about records in the tree
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator
 
 
-class LivingProxy(str, Enum):
+class LivingProxy(StrEnum):
     """Enumeration for living proxy options."""
 
     INCLUDE_ALL = "IncludeAll"
@@ -36,7 +36,7 @@ class LivingProxy(str, Enum):
     EXCLUDE_ALL = "ExcludeAll"
 
 
-class PersonFilter(str, Enum):
+class PersonFilter(StrEnum):
     """Enumeration for built-in person filters."""
 
     DESCENDANTS = "Descendants"

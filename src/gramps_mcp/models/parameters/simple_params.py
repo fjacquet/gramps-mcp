@@ -18,12 +18,12 @@
 Simplified parameter models for reduced token usage.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class EntityType(str, Enum):
+class EntityType(StrEnum):
     """All searchable entity types in Gramps."""
 
     PERSON = "person"
@@ -37,7 +37,7 @@ class EntityType(str, Enum):
     NOTE = "note"
 
 
-class GetEntityType(str, Enum):
+class GetEntityType(StrEnum):
     """Entity types that support detailed get operations."""
 
     PERSON = "person"
