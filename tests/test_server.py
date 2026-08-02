@@ -12,7 +12,7 @@ import httpx
 import pytest
 from dotenv import load_dotenv
 from mcp.client.session import ClientSession
-from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.streamable_http import streamable_http_client
 from mcp.types import InitializeResult, TextContent
 
 # Load environment variables
@@ -69,8 +69,7 @@ class TestMCPServerSetup:
         """Test that only 3 simplified tools plus create/analysis tools are registered."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams  # Unpack 3 elements
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 result = await session.initialize()
@@ -80,15 +79,15 @@ class TestMCPServerSetup:
                 # List tools
                 tools_result = await session.list_tools()
                 tools = tools_result.tools
-                assert len(tools) == 16  # 3 simplified + 9 create + 4 analysis tools
+                assert len(tools) == 22  # matches TOOL_REGISTRY in server.py
 
                 # Verify all expected tools are registered
                 expected_tools = {
-                    # Simplified Search & Retrieval Tools (3)
+                    # Search & Retrieval Tools (3)
                     "find_type",
                     "find_anything",
                     "get_type",
-                    # Data Creation & Management Tools (9) - keep unchanged
+                    # Data Management Tools (10)
                     "create_person",
                     "create_family",
                     "create_event",
@@ -98,12 +97,17 @@ class TestMCPServerSetup:
                     "create_note",
                     "create_media",
                     "create_repository",
-                    # Tree Management Tools (1)
+                    "create_sourced_event",
+                    # Analysis Tools (9)
                     "tree_stats",
-                    # Analysis Tools (3)
                     "get_descendants",
                     "get_ancestors",
                     "recent_changes",
+                    "get_relationship",
+                    "check_living",
+                    "get_timeline",
+                    "manage_tags",
+                    "get_facts",
                 }
 
                 registered_tool_names = {tool.name for tool in tools}
@@ -114,8 +118,7 @@ class TestMCPServerSetup:
         """Test that all tools have proper descriptions."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()
@@ -141,7 +144,7 @@ class TestHTTPRoutes:
             assert response.status_code == 200
             data = response.json()
             assert data["service"] == "Gramps MCP Server"
-            assert data["tools_count"] == 16  # 3 simplified + 9 create + 4 analysis
+            assert data["tools_count"] == 22  # matches TOOL_REGISTRY in server.py
 
     @pytest.mark.asyncio
     async def test_health_endpoint(self):
@@ -162,8 +165,7 @@ class TestMCPProtocolCompliance:
         """Test MCP tools/list request."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 result = await session.initialize()
@@ -172,16 +174,15 @@ class TestMCPProtocolCompliance:
                 # List tools
                 tools_result = await session.list_tools()
                 assert (
-                    len(tools_result.tools) == 16
-                )  # 3 simplified + 9 create + 4 analysis
+                    len(tools_result.tools) == 22
+                )  # matches TOOL_REGISTRY in server.py
 
     @pytest.mark.asyncio
     async def test_mcp_tool_call_find_type_real_api(self):
         """Test find_type tool call with real API integration."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()
@@ -217,8 +218,7 @@ class TestMCPProtocolCompliance:
         """Test MCP server handles invalid tool calls properly."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()
@@ -245,8 +245,7 @@ class TestToolIntegrationRealAPI:
         """Test find_type tool with specific query."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()
@@ -276,8 +275,7 @@ class TestToolIntegrationRealAPI:
         """Test search_all tool for comprehensive search."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()
@@ -300,8 +298,7 @@ class TestErrorHandling:
         """Test handling of invalid tree ID."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()
@@ -326,8 +323,7 @@ class TestErrorHandling:
         """Test get_type with invalid handle."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()
@@ -377,8 +373,7 @@ class TestMCPResources:
         """Test that resources are properly registered."""
         endpoint = f"{BASE_URL}/mcp"
 
-        async with streamablehttp_client(endpoint) as client_streams:
-            read_stream, write_stream, _ = client_streams
+        async with streamable_http_client(endpoint) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
                 # Initialize session
                 await session.initialize()

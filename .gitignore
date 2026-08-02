@@ -13,4 +13,9 @@ coverage.xml
 # Local all-in-one stacks (Gramps Web + MCP on one host) - not shipped
 docker-compose-pgsql.yml
 docker-compose-sqllite.yml
+docker-compose-homelab.yml
 docker/
+
+# Local editor config and generated research output
+.vscode/
+output/

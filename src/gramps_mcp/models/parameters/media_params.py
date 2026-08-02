@@ -60,6 +60,14 @@ class MediaSaveParams(BaseModel):
     path: str | None = Field(
         None, min_length=1, description="File path or URL to media"
     )
+    media_path: str | None = Field(
+        None,
+        min_length=1,
+        description=(
+            "Local file path to upload when creating new media (required "
+            "when handle is not provided)"
+        ),
+    )
     description: str | None = Field(None, description="Media description")
     mime: str | None = Field(None, description="MIME type of the media file")
     citation_list: list[str] | None = Field(

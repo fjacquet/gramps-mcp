@@ -54,3 +54,12 @@ class CitationData(BaseDataModel):
     )
     page: str | None = Field(None, description="Page or location within the source")
     source_handle: str = Field(..., description="Handle of the source being cited")
+    media_path: str | None = Field(
+        None,
+        description=(
+            "Local file path to upload as media and attach to this citation "
+            "(alternative to referencing an existing media handle via "
+            "media_list; the resulting ref is appended to media_list, not "
+            "replacing any existing entries)"
+        ),
+    )
