@@ -79,7 +79,7 @@ class TestMCPServerSetup:
                 # List tools
                 tools_result = await session.list_tools()
                 tools = tools_result.tools
-                assert len(tools) == 22  # matches TOOL_REGISTRY in server.py
+                assert len(tools) == 23  # matches TOOL_REGISTRY in server.py
 
                 # Verify all expected tools are registered
                 expected_tools = {
@@ -98,7 +98,7 @@ class TestMCPServerSetup:
                     "create_media",
                     "create_repository",
                     "create_sourced_event",
-                    # Analysis Tools (9)
+                    # Analysis & Management Tools (10)
                     "tree_stats",
                     "get_descendants",
                     "get_ancestors",
@@ -108,6 +108,7 @@ class TestMCPServerSetup:
                     "get_timeline",
                     "manage_tags",
                     "get_facts",
+                    "manage_users",
                 }
 
                 registered_tool_names = {tool.name for tool in tools}
@@ -144,7 +145,7 @@ class TestHTTPRoutes:
             assert response.status_code == 200
             data = response.json()
             assert data["service"] == "Gramps MCP Server"
-            assert data["tools_count"] == 22  # matches TOOL_REGISTRY in server.py
+            assert data["tools_count"] == 23  # matches TOOL_REGISTRY in server.py
 
     @pytest.mark.asyncio
     async def test_health_endpoint(self):
@@ -174,7 +175,7 @@ class TestMCPProtocolCompliance:
                 # List tools
                 tools_result = await session.list_tools()
                 assert (
-                    len(tools_result.tools) == 22
+                    len(tools_result.tools) == 23
                 )  # matches TOOL_REGISTRY in server.py
 
     @pytest.mark.asyncio
@@ -385,3 +386,14 @@ class TestMCPResources:
                 # Should have at least the GQL documentation resource
                 resource_uris = {str(resource.uri) for resource in resources}
                 assert "gql://documentation" in resource_uris
+
+
+def test_manage_users_registered():
+    from src.gramps_mcp.server import TOOL_REGISTRY
+
+    assert "manage_users" in TOOL_REGISTRY
+    entry = TOOL_REGISTRY["manage_users"]
+    schema = entry["schema"].model_json_schema()
+    # The role ceiling must be visible in the advertised schema, so a caller
+    # knows owner/admin are impossible before trying.
+    assert "owner" not in str(schema["$defs"]["NewUser"]["properties"]["role"])
