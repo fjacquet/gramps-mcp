@@ -95,6 +95,7 @@ from .tools.relationship_tools import (
 )
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
+from .tools.user_tools import ManageUsersParams, manage_users_tool
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -246,6 +247,17 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
         "schema": ManageTagsParams,
         "handler": manage_tags_tool,
+    },
+    "manage_users": {
+        "description": (
+            "List, get, or create Gramps Web user accounts with generated "
+            "passwords (action: list/get/create - no update or delete). "
+            "Requires an owner account. Roles are capped at editor. "
+            "WARNING: generated passwords appear in the response - have "
+            "users change them on first login"
+        ),
+        "schema": ManageUsersParams,
+        "handler": manage_users_tool,
     },
     "get_facts": {
         "description": "Get interesting facts and statistics about the tree",

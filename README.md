@@ -59,14 +59,14 @@ No more manual data entry, no context switching between apps, no generic genealo
 
 ## Features
 
-### 21 Genealogy Tools
+### 23 Genealogy Tools
 
 #### Search & Retrieval (3 tools)
 - **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language
 - **find_anything** - Text search across all genealogy data (matches literal text, not logical combinations)
 - **get_type** - Get comprehensive information about specific persons or families by ID
 
-#### Data Management (9 tools)
+#### Data Management (10 tools)
 - **create_person** - Create or update person records
 - **create_family** - Create or update family units
 - **create_event** - Create or update life events
@@ -76,6 +76,7 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **create_note** - Create or update textual notes
 - **create_media** - Create or update media files
 - **create_repository** - Create or update repository records
+- **create_sourced_event** - Create a fully sourced event (event, citation, and source) in one call
 
 #### Analysis Tools (4 tools)
 - **tree_stats** - Get tree statistics and information
@@ -83,11 +84,12 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **get_ancestors** - Find all ancestors of a person
 - **recent_changes** - Track recent modifications to your data
 
-#### Extended Analysis Tools (5 tools)
+#### Extended Analysis Tools (6 tools)
 - **get_relationship** - Calculate how two people are related
 - **check_living** - Check living status and estimated birth/death dates
 - **get_timeline** - Build a chronological timeline for a person, family, or group
 - **manage_tags** - List, get, or create/update tags
+- **manage_users** - List, get, or create Gramps Web accounts with generated passwords (owner rights required, see [docs/user-management.md](docs/user-management.md))
 - **get_facts** - Get interesting facts and statistics about the tree
 
 ## Installation
