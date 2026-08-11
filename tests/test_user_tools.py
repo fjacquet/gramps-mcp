@@ -5,8 +5,13 @@ Integration tests for the user management tool using the real Gramps API.
 import pytest
 from pydantic import ValidationError
 
+from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
-from src.gramps_mcp.tools.user_tools import ManageUsersParams, NewUser
+from src.gramps_mcp.tools.user_tools import (
+    ManageUsersParams,
+    NewUser,
+    manage_users_tool,
+)
 
 
 class TestUserSchema:
@@ -54,3 +59,43 @@ class TestApiCalls:
         assert ApiCalls.GET_USER.value == ("GET", "users/{name}/")
         assert ApiCalls.POST_USER.value == ("POST", "users/{name}/")
         assert ApiCalls.DELETE_USER.value == ("DELETE", "users/{name}/")
+
+
+class TestListAndGet:
+    """Live-server tests for the read-only actions."""
+
+    @pytest.mark.asyncio
+    async def test_list_users(self):
+        result = await manage_users_tool({"action": "list"})
+        text = result[0].text
+        assert "error" not in text.lower()
+        # The account from .env must appear in its own instance's user list.
+        assert get_settings().gramps_username in text
+
+    @pytest.mark.asyncio
+    async def test_get_user(self):
+        username = get_settings().gramps_username
+        result = await manage_users_tool({"action": "get", "name": username})
+        text = result[0].text
+        assert "error" not in text.lower()
+        assert username in text
+
+    @pytest.mark.asyncio
+    async def test_get_without_name_returns_error(self):
+        result = await manage_users_tool({"action": "get"})
+        assert "error" in result[0].text.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_action_returns_error(self):
+        result = await manage_users_tool({"action": "destroy"})
+        assert "error" in result[0].text.lower()
+
+    @pytest.mark.asyncio
+    async def test_owner_role_returns_error_not_raise(self):
+        result = await manage_users_tool(
+            {
+                "action": "create",
+                "users": [{"name": "nope", "email": "a@b.fr", "role": "owner"}],
+            }
+        )
+        assert "error" in result[0].text.lower()
