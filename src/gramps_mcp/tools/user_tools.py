@@ -48,6 +48,11 @@ PASSWORD_BYTES = 16
 
 MAX_BATCH = 50
 
+PERMISSION_MESSAGE = (
+    "Permission denied - the account in .env must have the "
+    "owner or admin role to create users"
+)
+
 
 class NewUser(BaseModel):
     """One account to create."""
@@ -71,7 +76,11 @@ class ManageUsersParams(BaseModel):
     """Parameters for the manage_users tool."""
 
     action: Literal["list", "get", "create"]
-    name: str | None = None
+    # Reason: this is substituted, unescaped, into the request URL path by the
+    # client. Without the same USERNAME_PATTERN used for NewUser.name, a
+    # value like "../metadata" survives urljoin's path normalization and
+    # redirects a "get" call to an unrelated endpoint.
+    name: str | None = Field(default=None, pattern=USERNAME_PATTERN)
     users: list[NewUser] | None = Field(default=None, max_length=MAX_BATCH)
 
 
@@ -152,16 +161,31 @@ async def _existing_usernames(client, tree_id: str) -> set[str]:
 
     Returns:
         set[str]: Existing usernames.
+
+    Raises:
+        GrampsAPIError: If the call fails. A 403 here is rewritten to the
+            tailored owner/admin-rights message, since this is the first
+            network call the "create" action makes and a non-owner account
+            hits it before any per-user POST.
     """
     # Reason: one list call up front, rather than reading a 409 back off each
     # POST. _format_http_error flattens every status into prose, so "already
     # exists" and a real server fault would otherwise be indistinguishable.
-    result = await client.make_api_call(
-        api_call=ApiCalls.GET_USERS, params=None, tree_id=tree_id
-    )
+    try:
+        result = await client.make_api_call(
+            api_call=ApiCalls.GET_USERS, params=None, tree_id=tree_id
+        )
+    except GrampsAPIError as e:
+        message = str(e)
+        if "Permission denied" in message:
+            raise GrampsAPIError(PERMISSION_MESSAGE) from e
+        raise
     if not isinstance(result, list):
         return set()
-    return {user.get("name", "") for user in result}
+    # Reason: same null-name defense as _format_user_rows - .get(..., "")
+    # only supplies the default when the key is absent, not when the API
+    # emits an explicit JSON null for "name".
+    return {user.get("name") or "" for user in result}
 
 
 async def _create_one(client, tree_id: str, user: NewUser) -> tuple[str, str]:
@@ -174,16 +198,20 @@ async def _create_one(client, tree_id: str, user: NewUser) -> tuple[str, str]:
         user (NewUser): Account to create.
 
     Returns:
-        tuple[str, str]: ("created", password) or ("failed", reason).
+        tuple[str, str]: ("created", password), ("skipped", reason), or
+            ("failed", reason). This never raises: a per-user failure -
+            expected (GrampsAPIError) or not (cancellation, a bug in URL
+            building, anything else) - must not abort the batch and discard
+            the passwords already issued to earlier users in it.
     """
     password = secrets.token_urlsafe(PASSWORD_BYTES)
-    body = UserCreateBody(
-        email=user.email,
-        full_name=user.full_name or user.name,
-        password=password,
-        role=ROLE_IDS[user.role],
-    )
     try:
+        body = UserCreateBody(
+            email=user.email,
+            full_name=user.full_name or user.name,
+            password=password,
+            role=ROLE_IDS[user.role],
+        )
         await client.make_api_call(
             api_call=ApiCalls.POST_USER,
             params=body,
@@ -193,11 +221,17 @@ async def _create_one(client, tree_id: str, user: NewUser) -> tuple[str, str]:
     except GrampsAPIError as e:
         message = str(e)
         if "Permission denied" in message:
-            message = (
-                "Permission denied - the account in .env must have the "
-                "owner or admin role to create users"
-            )
+            return "failed", PERMISSION_MESSAGE
+        # Reason: 409 is the acknowledged create-time race (or a username
+        # that differs only in case from an existing one, which the
+        # pre-check's exact-match set does not catch) - report it the same
+        # way as a pre-check hit, not as a generic HTTP failure.
+        if "status 409" in message:
+            return "skipped", "already exists"
         return "failed", message
+    except Exception as e:
+        # Reason: deliberately broad - see docstring, this must never raise.
+        return "failed", f"unexpected error: {e}"
     return "created", password
 
 
@@ -242,15 +276,28 @@ async def manage_users_tool(client, arguments: dict) -> list[TextContent]:
             existing = await _existing_usernames(client, tree_id)
             rows: list[str] = []
             counts = {"created": 0, "skipped": 0, "failed": 0}
+            aborted_after: int | None = None
 
             # Reason: sequential on purpose. Parallel writes against one
             # Gramps Web worker invite rate-limiting and interleave partial
             # failures that are hard to read back.
-            for user in params.users:
-                if user.name in existing:
-                    status, detail = "skipped", "already exists"
-                else:
-                    status, detail = await _create_one(client, tree_id, user)
+            for index, user in enumerate(params.users):
+                try:
+                    if user.name in existing:
+                        status, detail = "skipped", "already exists"
+                    else:
+                        status, detail = await _create_one(client, tree_id, user)
+                except Exception as e:
+                    # Reason: _create_one already turns every failure it can
+                    # anticipate into a ("failed"/"skipped", reason) tuple
+                    # and never raises. This is a last-resort guard for
+                    # anything that still escapes it (e.g. a cancellation on
+                    # client disconnect) so the passwords already generated
+                    # for earlier users in this batch are still returned
+                    # instead of discarded by the outer error handler.
+                    aborted_after = index
+                    rows.append(f"{user.name:<20} aborted: {e}")
+                    break
                 counts[status] += 1
                 if status == "created":
                     rows.append(
@@ -264,6 +311,13 @@ async def manage_users_tool(client, arguments: dict) -> list[TextContent]:
                 f"failed {counts['failed']}"
             )
             formatted = header + "\n\n" + "\n".join(rows)
+            if aborted_after is not None:
+                formatted += (
+                    f"\n\nABORTED after {aborted_after} of {len(params.users)} "
+                    "users due to an unexpected error. Rows above for "
+                    "already-processed users are complete; any passwords "
+                    "shown above are the only copy - capture them now."
+                )
 
         else:
             raise ValueError(f"Unsupported action: {params.action}")

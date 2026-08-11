@@ -54,6 +54,16 @@ class TestUserSchema:
         with pytest.raises(ValidationError):
             ManageUsersParams(action="delete", name="someone")
 
+    def test_rejects_path_traversal_name(self):
+        """
+        ManageUsersParams.name is substituted unescaped into the request
+        URL path. Without USERNAME_PATTERN, a value like "../metadata"
+        survives urljoin's path normalization and redirects a "get" call to
+        an unrelated endpoint - see the fix for that finding.
+        """
+        with pytest.raises(ValidationError):
+            ManageUsersParams(action="get", name="../metadata")
+
 
 class TestApiCalls:
     """The endpoints the tool relies on exist and are not tree-scoped."""
@@ -234,6 +244,58 @@ class TestCreate:
         finally:
             # Reason: DELETE is not a tool action, so cleanup goes straight
             # through the client.
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_USER,
+                params=None,
+                tree_id=get_settings().gramps_tree_id,
+                name=name,
+            )
+            await client.close()
+
+    @pytest.mark.asyncio
+    async def test_duplicate_name_within_batch_maps_to_skipped(self):
+        """
+        Two entries in one batch sharing a name reproduce the acknowledged
+        create-time race for real: the pre-check's existing-username set is
+        fetched once up front, so the second entry is not caught by it and
+        reaches the API after the first entry has already created the
+        account, drawing a real 409.
+
+        This also proves the fix for the mid-batch-abort finding: the row
+        for the user that succeeded (first entry) is still present in the
+        output alongside the row for the one that did not (second entry),
+        rather than the whole batch aborting and losing the first entry's
+        password.
+        """
+        name = f"pytest_{uuid.uuid4().hex[:8]}"
+        client = GrampsWebAPIClient()
+        try:
+            result = await manage_users_tool(
+                {
+                    "action": "create",
+                    "users": [
+                        {
+                            "name": name,
+                            "email": f"{name}@example.org",
+                            "role": "guest",
+                        },
+                        {
+                            "name": name,
+                            "email": f"{name}-second@example.org",
+                            "role": "guest",
+                        },
+                    ],
+                }
+            )
+            text = result[0].text
+            assert "created 1" in text.lower()
+            assert "skipped 1" in text.lower()
+            assert "already exists" in text.lower()
+            assert "status 409" not in text.lower()
+            # Both rows for this name are present - the row for the user
+            # that succeeded was not discarded by the second entry's 409.
+            assert text.count(name) >= 2
+        finally:
             await client.make_api_call(
                 api_call=ApiCalls.DELETE_USER,
                 params=None,
