@@ -23,6 +23,7 @@ small enough that the split would cost more than it buys.
 """
 
 import logging
+import secrets
 from typing import Literal
 
 from mcp.types import TextContent
@@ -141,6 +142,65 @@ def _format_user_rows(users: list[dict]) -> str:
     return "\n".join(rows)
 
 
+async def _existing_usernames(client, tree_id: str) -> set[str]:
+    """
+    Fetch the set of usernames already registered on the instance.
+
+    Args:
+        client (GrampsWebAPIClient): Client to use.
+        tree_id (str): Family tree identifier.
+
+    Returns:
+        set[str]: Existing usernames.
+    """
+    # Reason: one list call up front, rather than reading a 409 back off each
+    # POST. _format_http_error flattens every status into prose, so "already
+    # exists" and a real server fault would otherwise be indistinguishable.
+    result = await client.make_api_call(
+        api_call=ApiCalls.GET_USERS, params=None, tree_id=tree_id
+    )
+    if not isinstance(result, list):
+        return set()
+    return {user.get("name", "") for user in result}
+
+
+async def _create_one(client, tree_id: str, user: NewUser) -> tuple[str, str]:
+    """
+    Create a single account with a generated password.
+
+    Args:
+        client (GrampsWebAPIClient): Client to use.
+        tree_id (str): Family tree identifier.
+        user (NewUser): Account to create.
+
+    Returns:
+        tuple[str, str]: ("created", password) or ("failed", reason).
+    """
+    password = secrets.token_urlsafe(PASSWORD_BYTES)
+    body = UserCreateBody(
+        email=user.email,
+        full_name=user.full_name or user.name,
+        password=password,
+        role=ROLE_IDS[user.role],
+    )
+    try:
+        await client.make_api_call(
+            api_call=ApiCalls.POST_USER,
+            params=body,
+            tree_id=tree_id,
+            name=user.name,
+        )
+    except GrampsAPIError as e:
+        message = str(e)
+        if "Permission denied" in message:
+            message = (
+                "Permission denied - the account in .env must have the "
+                "owner or admin role to create users"
+            )
+        return "failed", message
+    return "created", password
+
+
 @with_client
 async def manage_users_tool(client, arguments: dict) -> list[TextContent]:
     """
@@ -174,6 +234,36 @@ async def manage_users_tool(client, arguments: dict) -> list[TextContent]:
                 name=params.name,
             )
             formatted = _format_user_rows([result] if result else [])
+
+        elif params.action == "create":
+            if not params.users:
+                raise ValueError("users is required for action 'create'")
+
+            existing = await _existing_usernames(client, tree_id)
+            rows: list[str] = []
+            counts = {"created": 0, "skipped": 0, "failed": 0}
+
+            # Reason: sequential on purpose. Parallel writes against one
+            # Gramps Web worker invite rate-limiting and interleave partial
+            # failures that are hard to read back.
+            for user in params.users:
+                if user.name in existing:
+                    status, detail = "skipped", "already exists"
+                else:
+                    status, detail = await _create_one(client, tree_id, user)
+                counts[status] += 1
+                if status == "created":
+                    rows.append(
+                        f"{user.name:<20} {user.email:<30} {user.role:<12} {detail}"
+                    )
+                else:
+                    rows.append(f"{user.name:<20} {status}: {detail}")
+
+            header = (
+                f"Created {counts['created']}, skipped {counts['skipped']}, "
+                f"failed {counts['failed']}"
+            )
+            formatted = header + "\n\n" + "\n".join(rows)
 
         else:
             raise ValueError(f"Unsupported action: {params.action}")

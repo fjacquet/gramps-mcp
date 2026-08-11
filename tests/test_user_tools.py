@@ -2,9 +2,12 @@
 Integration tests for the user management tool using the real Gramps API.
 """
 
+import uuid
+
 import pytest
 from pydantic import ValidationError
 
+from src.gramps_mcp.client import GrampsWebAPIClient
 from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.user_tools import (
@@ -181,3 +184,60 @@ class TestListAndGet:
             }
         )
         assert "error" in result[0].text.lower()
+
+
+class TestCreate:
+    """Live-server tests for the writing action."""
+
+    @pytest.mark.asyncio
+    async def test_create_without_users_returns_error(self):
+        result = await manage_users_tool({"action": "create"})
+        assert "error" in result[0].text.lower()
+
+    @pytest.mark.asyncio
+    async def test_create_skips_existing_user(self):
+        username = get_settings().gramps_username
+        result = await manage_users_tool(
+            {
+                "action": "create",
+                "users": [{"name": username, "email": "someone@example.org"}],
+            }
+        )
+        text = result[0].text
+        assert "skipped" in text.lower()
+        assert "created 0" in text.lower()
+
+    @pytest.mark.asyncio
+    async def test_create_then_delete(self):
+        name = f"pytest_{uuid.uuid4().hex[:8]}"
+        client = GrampsWebAPIClient()
+        try:
+            result = await manage_users_tool(
+                {
+                    "action": "create",
+                    "users": [
+                        {
+                            "name": name,
+                            "email": f"{name}@example.org",
+                            "full_name": "Pytest Account",
+                            "role": "guest",
+                        }
+                    ],
+                }
+            )
+            text = result[0].text
+            assert "created 1" in text.lower()
+            assert name in text
+
+            listed = await manage_users_tool({"action": "list"})
+            assert name in listed[0].text
+        finally:
+            # Reason: DELETE is not a tool action, so cleanup goes straight
+            # through the client.
+            await client.make_api_call(
+                api_call=ApiCalls.DELETE_USER,
+                params=None,
+                tree_id=get_settings().gramps_tree_id,
+                name=name,
+            )
+            await client.close()
