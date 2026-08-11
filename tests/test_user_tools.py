@@ -10,6 +10,7 @@ from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.user_tools import (
     ManageUsersParams,
     NewUser,
+    _format_user_rows,
     manage_users_tool,
 )
 
@@ -59,6 +60,69 @@ class TestApiCalls:
         assert ApiCalls.GET_USER.value == ("GET", "users/{name}/")
         assert ApiCalls.POST_USER.value == ("POST", "users/{name}/")
         assert ApiCalls.DELETE_USER.value == ("DELETE", "users/{name}/")
+
+
+class TestFormatUserRows:
+    """Test the _format_user_rows helper function with various input scenarios."""
+
+    def test_format_with_null_values(self):
+        """Test that null values in user objects are coerced to placeholder."""
+        users = [
+            {
+                "name": None,
+                "email": None,
+                "full_name": None,
+                "role": None,
+            }
+        ]
+        result = _format_user_rows(users)
+        assert "error" not in result.lower()
+        # All fields should have been replaced with placeholder
+        assert "-" in result
+
+    def test_format_with_mixed_null_and_values(self):
+        """Test formatting with some null and some present fields."""
+        users = [
+            {
+                "name": "alice",
+                "email": None,
+                "full_name": "Alice Smith",
+                "role": 1,  # member
+            }
+        ]
+        result = _format_user_rows(users)
+        assert "alice" in result
+        assert "Alice Smith" in result
+        assert "member" in result
+
+    def test_format_with_absent_keys(self):
+        """Test formatting with absent keys (should use defaults)."""
+        users = [{"name": "bob"}]
+        result = _format_user_rows(users)
+        assert "bob" in result
+        # Missing fields should show as placeholder
+        assert "-" in result
+
+    def test_format_empty_list(self):
+        """Test formatting with empty user list."""
+        result = _format_user_rows([])
+        assert result == "No users found."
+
+    def test_format_with_normal_values(self):
+        """Test formatting with all normal values."""
+        users = [
+            {
+                "name": "charlie",
+                "email": "charlie@example.com",
+                "full_name": "Charlie Brown",
+                "role": 3,  # editor
+            }
+        ]
+        result = _format_user_rows(users)
+        assert "charlie" in result
+        assert "charlie@example.com" in result
+        assert "Charlie Brown" in result
+        assert "editor" in result
 
 
 class TestListAndGet:

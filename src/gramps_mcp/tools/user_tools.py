@@ -126,12 +126,15 @@ def _format_user_rows(users: list[dict]) -> str:
 
     rows = []
     for user in users:
-        rows.append(
-            f"{user.get('name', '-'):<20} "
-            f"{user.get('email', '-'):<30} "
-            f"{user.get('full_name', '-'):<25} "
-            f"{_role_name(user.get('role', -99))}"
-        )
+        # Reason: Gramps Web API can emit JSON nulls for optional fields.
+        # .get() returns None for null values, not the default, so coerce null
+        # to placeholder to avoid "TypeError: unsupported format string passed
+        # to NoneType.__format__" crashes in the f-string formatting.
+        name = user.get("name") or "-"
+        email = user.get("email") or "-"
+        full_name = user.get("full_name") or "-"
+        role = user.get("role", -99)
+        rows.append(f"{name:<20} {email:<30} {full_name:<25} {_role_name(role)}")
     return "\n".join(rows)
 
 
