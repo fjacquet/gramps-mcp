@@ -144,6 +144,32 @@ The mitigation is operational, not technical: hand each new account out for a
 first login and have the password changed immediately. Do not treat a
 tool-generated password as a long-term credential.
 
+The tool result is the only copy of a generated password. It is not logged,
+stored, or retrievable through any other action in this tool - there is no
+`get`-the-password, no reset, no re-issue. If that message is lost (scrolled
+past, the transcript truncated, the client crashes before it is read), the
+account it describes is still live on the server with no way to recover or
+delete it through this tool. Treat losing the message as equivalent to
+losing the password permanently, not as an inconvenience to be retried.
+
+The exposure is also wider than "this tool's context and this session's
+transcript." Once a password is relayed into a chat reply to satisfy the
+user's request, it also lands in the client application's own chat history,
+and from there in whatever that client does with its history - local
+storage, cloud sync, export, backup. Assume the password is now present
+everywhere that conversation is, not just in the two places this tool
+directly touches.
+
+The "change on first login" mitigation above is trust-based, not enforced:
+Gramps Web has no force-password-change-on-first-login flag, and the account
+this tool creates is fully live and usable with the generated password from
+the moment `create` returns - there is no intermediate "pending" state. The
+least-privilege hedge, when the recipient's discipline about changing the
+password promptly cannot be guaranteed, is to create the account at the
+`guest` role and have an owner promote it to its intended role through the
+Gramps Web UI only after the password change is confirmed, rather than
+creating it at its final role up front.
+
 ## What the tool cannot do
 
 There is no `update` action (changing e-mail, full name, or role on an
