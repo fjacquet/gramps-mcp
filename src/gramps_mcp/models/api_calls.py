@@ -149,6 +149,14 @@ class ApiCalls(Enum):
     GET_TREES = ("GET", "trees/")
     GET_TREE = ("GET", "trees/{tree_id}")
 
+    # USER operations (not tree-scoped - the tree comes from the JWT)
+    GET_USERS = ("GET", "users/")
+    GET_USER = ("GET", "users/{name}/")
+    POST_USER = ("POST", "users/{name}/")
+    # Reason: DELETE is defined for test cleanup only. It is deliberately not
+    # reachable through any manage_users action - see the design spec.
+    DELETE_USER = ("DELETE", "users/{name}/")
+
     @property
     def method(self) -> str:
         """Get HTTP method for this API call."""
