@@ -88,6 +88,7 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **check_living** - Check living status and estimated birth/death dates
 - **get_timeline** - Build a chronological timeline for a person, family, or group
 - **manage_tags** - List, get, or create/update tags
+- **manage_users** - List, get, or create Gramps Web accounts with generated passwords (owner rights required, see [docs/user-management.md](docs/user-management.md))
 - **get_facts** - Get interesting facts and statistics about the tree
 
 ## Installation
