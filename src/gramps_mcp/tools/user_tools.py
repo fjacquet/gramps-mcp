@@ -133,8 +133,11 @@ def _format_user_rows(users: list[dict]) -> str:
         name = user.get("name") or "-"
         email = user.get("email") or "-"
         full_name = user.get("full_name") or "-"
-        role = user.get("role", -99)
-        rows.append(f"{name:<20} {email:<30} {full_name:<25} {_role_name(role)}")
+        # Reason: role is nullable in the API, so coerce to "-" when null or
+        # absent, then only call _role_name for valid integer role IDs.
+        role = user.get("role")
+        role_str = _role_name(role) if isinstance(role, int) else "-"
+        rows.append(f"{name:<20} {email:<30} {full_name:<25} {role_str}")
     return "\n".join(rows)
 
 

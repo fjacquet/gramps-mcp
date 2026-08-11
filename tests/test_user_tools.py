@@ -78,7 +78,25 @@ class TestFormatUserRows:
         result = _format_user_rows(users)
         assert "error" not in result.lower()
         # All fields should have been replaced with placeholder
+        # Verify that null role renders as "-", not as "None"
         assert "-" in result
+        assert "None" not in result
+
+    def test_format_null_and_absent_role_consistency(self):
+        """Test that null role and absent role both render as placeholder."""
+        users_null_role = [
+            {"name": "alice", "email": "a@b.fr", "full_name": "Alice", "role": None}
+        ]
+        users_absent_role = [{"name": "bob", "email": "b@b.fr", "full_name": "Bob"}]
+        result_null = _format_user_rows(users_null_role)
+        result_absent = _format_user_rows(users_absent_role)
+        # Both should have exactly one "-" in the role column (rightmost)
+        # Verify both render "-" for role, not "None" or "-99"
+        assert result_null.rstrip().endswith("-")
+        assert result_absent.rstrip().endswith("-")
+        # Neither should contain "None" (would indicate null role bug)
+        assert "None" not in result_null
+        assert "None" not in result_absent
 
     def test_format_with_mixed_null_and_values(self):
         """Test formatting with some null and some present fields."""
