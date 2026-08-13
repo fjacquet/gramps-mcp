@@ -44,7 +44,9 @@
   tests that work offline: `uv run pytest -m "not integration"`. The offline
   suite currently reports three known failures in
   `tests/test_parameter_alignment.py` from a `media_path` mismatch that
-  predates this work - expected until fixed.
+  predates this work - expected until fixed. CI does not use the marker for
+  that reason: `.github/workflows/ci.yml` runs a narrower explicit file list,
+  a strict subset of what the marker selects.
 - **Live tests run from the macOS host need `GRAMPS_API_URL=http://localhost:80`**
   as an env override, not the `.env` value. `.env` points at
   `host.docker.internal`, which only resolves inside the container. Do not
