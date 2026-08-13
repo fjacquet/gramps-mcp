@@ -73,3 +73,22 @@ class TestPlaceMedia:
                     tree_id=tree_id,
                     handle=media_handle,
                 )
+
+
+class TestPartialPlaceUpdate:
+    """A partial update must not demand fields it is not changing."""
+
+    def test_place_type_is_optional(self):
+        """place_type must be omittable when only updating other fields."""
+        params = PlaceSaveParams(
+            handle="103c4094f2414e2400974f979824",
+            placeref_list=[{"ref": "103c732d2adc19424a3fad17954c"}],
+        )
+
+        assert params.place_type is None
+
+    def test_creation_still_carries_a_type(self):
+        """place_type must still be settable when creating a new place."""
+        params = PlaceSaveParams(name={"value": "Somewhere"}, place_type="City")
+
+        assert params.place_type == "City"

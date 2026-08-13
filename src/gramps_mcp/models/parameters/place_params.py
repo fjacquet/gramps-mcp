@@ -54,7 +54,14 @@ class PlaceSaveParams(BaseModel):
     name: dict | None = Field(None, description="Place name object with 'value' field")
     code: str | None = Field(None, description="Place code")
     alt_loc: list[dict] | None = Field(None, description="Alternative locations")
-    place_type: str = Field(..., description="Place type")
+    place_type: str | None = Field(
+        None,
+        description=(
+            "Place type, for example City or Parish. Required when creating a "
+            "place; omit it when updating one, so a partial update does not "
+            "have to resupply it."
+        ),
+    )
     placeref_list: list[dict] | None = Field(
         None, description="List of place references"
     )

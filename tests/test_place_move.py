@@ -34,19 +34,16 @@ class TestPlaceMove:
                 handles.append(created[0]["new"]["handle"])
             parent_a, parent_b, child = handles
 
-            # Reason: PlaceSaveParams requires place_type on every save
-            # (POST and PUT share one model), so a partial PUT that only
-            # touches placeref_list must still supply it.
             await client.make_api_call(
                 api_call=ApiCalls.PUT_PLACE,
-                params={"placeref_list": [{"ref": parent_a}], "place_type": "City"},
+                params={"placeref_list": [{"ref": parent_a}]},
                 tree_id=tree_id,
                 handle=child,
             )
 
             await client.make_api_call(
                 api_call=ApiCalls.PUT_PLACE,
-                params={"placeref_list": [{"ref": parent_b}], "place_type": "City"},
+                params={"placeref_list": [{"ref": parent_b}]},
                 tree_id=tree_id,
                 handle=child,
                 replace_lists=["placeref_list"],

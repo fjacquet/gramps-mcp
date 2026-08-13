@@ -338,13 +338,16 @@ class TestParameterAlignment:
 
     def test_place_parameters_alignment(self):
         """Test PlaceSaveParams parameters match current implementation."""
-        # Current implementation: Place requires place_type
-        # Optional: handle, gramps_id, name, code, alt_loc, placeref_list, alt_names, lat, long, urls, media_list, citation_list, note_list, tag_list, private
+        # Current implementation: place_type is optional so a partial
+        # update (e.g. moving a place via placeref_list) does not have to
+        # resupply it. It is still required by the API when creating a
+        # place, but that is enforced by Gramps, not this model.
+        # Optional: handle, gramps_id, name, code, alt_loc, place_type, placeref_list, alt_names, lat, long, urls, media_list, citation_list, note_list, tag_list, private
         model = PlaceSaveParams
         fields = model.model_fields
 
         # Required fields in current implementation
-        required_fields = {"place_type"}
+        required_fields = set()
 
         # Check all required fields are present and required
         for field_name in required_fields:
@@ -378,6 +381,7 @@ class TestParameterAlignment:
             "name",
             "code",
             "alt_loc",
+            "place_type",
             "placeref_list",
             "alt_names",
             "lat",
