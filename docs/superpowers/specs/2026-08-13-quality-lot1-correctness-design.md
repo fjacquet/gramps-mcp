@@ -1,7 +1,7 @@
 # Design: quality improvements, lot 1 — correctness and stability
 
 Date: 2026-08-13
-Status: approved, not yet implemented
+Status: implemented, three of four defects fixed, one falsified and dropped, open as pull request #8
 Branch: `fix/quality-lot1-correctness`
 
 ## Context
@@ -29,7 +29,7 @@ Four defects, each with its twin occurrences.
 | Defect | Files |
 |---|---|
 | `with_client` closes the process-wide HTTP pool | `tools/search_basic.py:69`; the manual `finally` blocks in `tools/data_management.py:145,263,395,459` and `tools/sourced_event.py:125` |
-| Crash when a save produces no change | `tools/data_management.py:159`; the sharper variant at `tools/sourced_event.py:69` |
+| Crash when a save produces no change | **(dropped — falsified during testing)** |
 | Collection endpoint used where the item endpoint is meant | `handlers/person_handler.py:159`, `handlers/family_handler.py:194` |
 | One dead handle discards an entire person detail | `handlers/person_detail_handler.py:264` and 277-288 |
 
@@ -70,13 +70,22 @@ process exit releases the sockets.
 `_format_save_response` reads `entity_data.get("handle", "N/A")` at
 `data_management.py:159`, *before* its `try` block at 162. `_extract_entity_data`
 returns `None` for a falsy response (line 67-68). A Gramps PUT that produces no
-actual change returns `[]`, so updating an entity with data identical to what
-is stored raises `AttributeError: 'NoneType' object has no attribute 'get'` and
-reports a failure for a save that in fact succeeded. `sourced_event.py:69` does
+actual change was assumed to return `[]`, which would cause updating an entity
+with data identical to what is stored to raise `AttributeError: 'NoneType'
+object has no attribute 'get'`. Similarly, `sourced_event.py:69` would do
 `source_data["handle"]` on the same `None`, raising `TypeError`.
 
-Fix: handle the `None` case before dereferencing, and report the no-change
-outcome as the success it is.
+**Would-be fix (had the premise been true):** handle the `None` case before
+dereferencing, and report the no-change outcome as the success it is.
+
+**Outcome:** The premise was verified against the live Gramps Web server during
+testing. A PUT with unchanged place data does not return `[]` or any other falsy
+value. Instead, it returns a fully populated response: `{'new': {...}, 'old':
+{...}, 'type': 'update'}`. Consequently, `_extract_entity_data` never returns
+`None` on this code path, and the described `AttributeError` cannot occur. The
+defect is theoretical rather than real. Per the testing plan, this task has been
+dropped rather than worked around: no code changes were made to
+`data_management.py` or `sourced_event.py` for this defect.
 
 ### 3. Collection endpoint used where the item endpoint is meant
 
@@ -118,14 +127,14 @@ failing before the fix.
 | Defect | Test |
 |---|---|
 | Shared pool | Two tool calls launched concurrently with `asyncio.gather`; both must succeed. Fails today because the first to finish closes the second's pool. |
-| No-change save | Save an entity, save the identical data again, expect success. |
+| No-change save | **(dropped — defect falsified during testing)** |
 | Media endpoint | A person carrying a media object must render its "Attached media" line. |
 | Dead handle | Attach a media object to a person, delete the media, request the person detail; it must degrade without losing the rest. |
 
-**One assumption to verify before writing the no-change test:** that a Gramps
-PUT with unchanged data really returns `[]`. This was not confirmed against the
-live server. The implementation plan must check it first; if Gramps returns
-something else, the defect is theoretical and that task is dropped rather than
+**Premise for the no-change test (verified):** A Gramps PUT with unchanged data
+returns `{'new': {...}, 'old': {...}, 'type': 'update'}`, not `[]` as
+originally assumed. The defect is theoretical; the premise check determined that
+Gramps returns a fully populated response, so the task was dropped rather than
 worked around.
 
 Tests that write to the tree must clean up in a `finally` block, as
@@ -149,4 +158,9 @@ release tag — the four lots ship together as one version.
 
 The tests write to a real genealogy tree: creating and deleting a media object,
 saving an entity twice. Every test cleans up after itself, but the target is
-the repository owner's live data rather than a scratch database.
+the repository owner's live data rather than a scratch database. The
+person-detail resilience test deliberately writes a referentially inconsistent
+record — a person carrying a media reference to a handle that does not exist —
+which `CLAUDE.md` warns can crash the XML export or backup if left behind; the
+test removes it in a `finally` block, but if a run is killed outright, a
+leftover can be identified by grepping for surnames beginning with "Pytest".
