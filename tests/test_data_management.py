@@ -23,18 +23,9 @@ from src.gramps_mcp.tools.data_management import (
     create_source_tool,
 )
 from src.gramps_mcp.tools.sourced_event import create_sourced_event_tool
+from tests.conftest import PREFIX
 
 pytestmark = pytest.mark.integration
-
-# Store handles for chaining tests following proper Gramps workflow
-test_note_handle = None
-test_media_handle = None
-test_repository_handle = None
-test_source_handle = None
-test_citation_handle = None
-test_place_handle = None
-test_event_handle = None
-test_person_handles = []
 
 
 def _handle_on_line(text: str, marker: str) -> str:
@@ -55,8 +46,6 @@ class TestCreateNoteTool:
     @pytest.mark.asyncio
     async def test_create_note_success(self):
         """Test successful note creation with proper text structure and type."""
-        global test_note_handle
-
         result = await create_note_tool(
             {
                 "text": "This is a test research note about the family history.",
@@ -79,16 +68,6 @@ class TestCreateNoteTool:
         assert "Research" in text, (
             f"Expected note type 'Research' in output but got: {text}"
         )
-
-        # Extract note handle for use in subsequent tests
-        import re
-
-        handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if handle_match:
-            test_note_handle = handle_match.group(1)
-            print(f"Extracted note handle: {test_note_handle}")
-        else:
-            pytest.fail("Could not extract note handle for chaining tests")
 
     @pytest.mark.asyncio
     async def test_create_note_via_fastmcp_transport(self):
@@ -121,8 +100,6 @@ class TestCreateMediaTool:
     @pytest.mark.asyncio
     async def test_create_media_success(self):
         """Test successful media creation with actual file upload."""
-        global test_media_handle
-
         result = await create_media_tool(
             {
                 "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
@@ -158,31 +135,13 @@ class TestCreateMediaTool:
             f"Expected formatted date '15 January 2024' in output but got: {text}"
         )
 
-        # Extract media handle for use in subsequent tests
-        import re
-
-        handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if handle_match:
-            test_media_handle = handle_match.group(1)
-            print(f"Extracted media handle: {test_media_handle}")
-        else:
-            pytest.fail("Could not extract media handle for chaining tests")
-
 
 class TestCreateRepositoryTool:
     """Test create_repository_tool functionality - Third in workflow."""
 
     @pytest.mark.asyncio
-    async def test_create_repository_success(self):
-        """Test successful repository creation using note handle from previous test."""
-        global test_repository_handle, test_note_handle
-
-        # Ensure we have a note handle from the previous test
-        if not test_note_handle:
-            pytest.fail(
-                "No note handle available from previous test - run tests in order"
-            )
-
+    async def test_create_repository_success(self, note_handle):
+        """Test successful repository creation with a note attached."""
         result = await create_repository_tool(
             {
                 "name": "National Archives - Boston Branch",
@@ -194,7 +153,7 @@ class TestCreateRepositoryTool:
                         "desc": "Official website",
                     }
                 ],
-                "note_list": [test_note_handle],
+                "note_list": [note_handle],
             }
         )
 
@@ -226,44 +185,23 @@ class TestCreateRepositoryTool:
             f"Expected note reference after 'Attached notes:' in output but got: {text}"
         )
 
-        # Extract repository handle for use in subsequent tests
-        import re
-
-        # Repository handler format: "Archive: Name - ID - [handle]"
-        handle_match = re.search(r"- \[([^\]]+)\]", text)
-        if handle_match:
-            test_repository_handle = handle_match.group(1)
-            print(f"Extracted repository handle: {test_repository_handle}")
-        else:
-            pytest.fail("Could not extract repository handle for chaining tests")
-
 
 class TestCreateSourceTool:
     """Test create_source_tool functionality - Fourth in workflow."""
 
     @pytest.mark.asyncio
-    async def test_create_source_success(self):
+    async def test_create_source_success(
+        self, repository_handle, media_handle, note_handle
+    ):
         """Test successful source creation using repository and media handles."""
-        global \
-            test_source_handle, \
-            test_repository_handle, \
-            test_media_handle, \
-            test_note_handle
-
-        # Ensure we have handles from previous tests
-        if not test_repository_handle:
-            pytest.fail(
-                "No repository handle available from previous test - run tests in order"
-            )
-
         result = await create_source_tool(
             {
                 "title": "Birth Register 1850-1860",
-                "reporef_list": [{"ref": test_repository_handle}],
+                "reporef_list": [{"ref": repository_handle}],
                 "author": "City Clerk's Office",
                 "pubinfo": "Boston City Records, Volume 12",
-                "media_list": [{"ref": test_media_handle}] if test_media_handle else [],
-                "note_list": [test_note_handle] if test_note_handle else [],
+                "media_list": [{"ref": media_handle}],
+                "note_list": [note_handle],
             }
         )
 
@@ -279,7 +217,7 @@ class TestCreateSourceTool:
         assert "Birth Register 1850-1860" in text, (
             f"Expected source title (required) in output but got: {text}"
         )
-        assert "National Archives - Boston Branch" in text, (
+        assert f"{PREFIX} repository" in text, (
             f"Expected repository reference (required) in output but got: {text}"
         )
 
@@ -290,40 +228,21 @@ class TestCreateSourceTool:
         assert "Boston City Records, Volume 12" in text, (
             f"Expected publication info in output but got: {text}"
         )
-        # Should show linked media and note if present
-        if "image/" in text:
-            assert "Birth register page showing John Smith entry" in text, (
-                f"Expected linked media description in output but got: {text}"
-            )
-        if "Research" in text:
-            assert "Research" in text, (
-                f"Expected linked note type in output but got: {text}"
-            )
-
-        # Extract source handle for use in subsequent tests
-        import re
-
-        handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if handle_match:
-            test_source_handle = handle_match.group(1)
-            print(f"Extracted source handle: {test_source_handle}")
-        else:
-            pytest.fail("Could not extract source handle for chaining tests")
+        # Should show the linked media and note that were passed in
+        assert "Attached media: O" in text, (
+            f"Expected linked media reference in output but got: {text}"
+        )
+        assert "Attached notes: N" in text, (
+            f"Expected linked note reference in output but got: {text}"
+        )
 
     @pytest.mark.asyncio
-    async def test_create_source_with_media_path(self):
+    async def test_create_source_with_media_path(self, repository_handle):
         """media_path uploads a local file inline on create_source too."""
-        global test_repository_handle
-
-        if not test_repository_handle:
-            pytest.fail(
-                "No repository handle available from previous test - run tests in order"
-            )
-
         result = await create_source_tool(
             {
                 "title": "Inline Media Source Test",
-                "reporef_list": [{"ref": test_repository_handle}],
+                "reporef_list": [{"ref": repository_handle}],
                 "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
             }
         )
@@ -347,31 +266,21 @@ class TestCreateCitationTool:
     """Test create_citation_tool functionality - Fifth in workflow."""
 
     @pytest.mark.asyncio
-    async def test_create_citation_success(self):
+    async def test_create_citation_success(
+        self, source_handle, media_handle, note_handle
+    ):
         """Test successful citation creation using source handle."""
-        global \
-            test_citation_handle, \
-            test_source_handle, \
-            test_media_handle, \
-            test_note_handle
-
-        # Ensure we have a source handle from previous test
-        if not test_source_handle:
-            pytest.fail(
-                "No source handle available from previous test - run tests in order"
-            )
-
         result = await create_citation_tool(
             {
-                "source_handle": test_source_handle,
+                "source_handle": source_handle,
                 "page": "Page 45, Entry 23",
                 "date": {
                     "dateval": [15, 1, 2024, False],
                     "quality": 1,  # estimated
                     "modifier": 3,  # about
                 },
-                "media_list": [{"ref": test_media_handle}] if test_media_handle else [],
-                "note_list": [test_note_handle] if test_note_handle else [],
+                "media_list": [{"ref": media_handle}],
+                "note_list": [note_handle],
             }
         )
 
@@ -384,7 +293,7 @@ class TestCreateCitationTool:
         assert "successfully" in text.lower()
 
         # Assert all required fields from usage guide are in output
-        assert "Birth Register 1850-1860" in text, (
+        assert f"{PREFIX} source" in text, (
             f"Expected source reference (required) in output but got: {text}"
         )
 
@@ -397,42 +306,23 @@ class TestCreateCitationTool:
         assert "about 15 January 2024 (estimated)" in text, (
             f"Expected full citation date with modifier and quality in output but got: {text}"
         )
-        # Should show linked media and note if present
-        if "image/" in text:
-            assert "Birth register page showing John Smith entry" in text, (
-                f"Expected linked media description in output but got: {text}"
-            )
-        if "Research" in text:
-            assert "Research" in text, (
-                f"Expected linked note type in output but got: {text}"
-            )
-
-        # Extract citation handle for use in subsequent tests
-        import re
-
-        handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if handle_match:
-            test_citation_handle = handle_match.group(1)
-            print(f"Extracted citation handle: {test_citation_handle}")
-        else:
-            pytest.fail("Could not extract citation handle for chaining tests")
+        # Should show the linked media and note that were passed in
+        assert "Attached media: O" in text, (
+            f"Expected linked media reference in output but got: {text}"
+        )
+        assert "Attached notes: N" in text, (
+            f"Expected linked note reference in output but got: {text}"
+        )
 
     @pytest.mark.asyncio
-    async def test_create_citation_with_media_path(self):
+    async def test_create_citation_with_media_path(self, source_handle, media_handle):
         """media_path uploads a local file inline, without a prior
         create_media call, and is additive with an existing media_list."""
-        global test_source_handle, test_media_handle
-
-        if not test_source_handle:
-            pytest.fail(
-                "No source handle available from previous test - run tests in order"
-            )
-
         result = await create_citation_tool(
             {
-                "source_handle": test_source_handle,
+                "source_handle": source_handle,
                 "page": "Page 12, inline media test",
-                "media_list": [{"ref": test_media_handle}] if test_media_handle else [],
+                "media_list": [{"ref": media_handle}],
                 "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
             }
         )
@@ -455,13 +345,12 @@ class TestCreateCitationTool:
             f"Expected inline-uploaded media to be attached but got: {text}"
         )
 
-        # If an existing media_list ref was also provided, both should show -
+        # The existing media_list ref was also provided, so both should show -
         # count attached media references via the format_citation output
-        if test_media_handle:
-            assert text.count("image/") >= 2, (
-                "Expected both the pre-existing and the inline-uploaded media "
-                f"to be attached but got: {text}"
-            )
+        assert text.count("image/") >= 2, (
+            "Expected both the pre-existing and the inline-uploaded media "
+            f"to be attached but got: {text}"
+        )
 
 
 class TestCreatePlaceTool:
@@ -470,8 +359,6 @@ class TestCreatePlaceTool:
     @pytest.mark.asyncio
     async def test_create_place_success(self):
         """Test successful place creation with proper hierarchy."""
-        global test_place_handle
-
         # First create country (top level)
         country_result = await create_place_tool(
             {"name": {"value": "United States"}, "place_type": "Country"}
@@ -550,35 +437,19 @@ class TestCreatePlaceTool:
             f"Expected URL description in output but got: {text}"
         )
 
-        # Extract place handle for use in subsequent tests
-        place_handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if place_handle_match:
-            test_place_handle = place_handle_match.group(1)
-            print(f"Extracted place handle: {test_place_handle}")
-        else:
-            pytest.fail("Could not extract place handle for chaining tests")
-
 
 class TestCreateEventTool:
     """Test create_event_tool functionality - Seventh in workflow."""
 
     @pytest.mark.asyncio
-    async def test_create_event_success(self):
+    async def test_create_event_success(self, citation_handle, place_handle):
         """Test successful event creation using citation and place handles."""
-        global test_event_handle, test_citation_handle, test_place_handle
-
-        # Ensure we have handles from previous tests
-        if not test_citation_handle:
-            pytest.fail(
-                "No citation handle available from previous test - run tests in order"
-            )
-
         result = await create_event_tool(
             {
                 "type": "Birth",
-                "citation_list": [test_citation_handle],
+                "citation_list": [citation_handle],
                 "date": {"dateval": [15, 6, 1878, False], "quality": 0, "modifier": 0},
-                "place": test_place_handle if test_place_handle else None,
+                "place": place_handle,
             }
         )
 
@@ -603,31 +474,17 @@ class TestCreateEventTool:
             f"Expected formatted event date in output but got: {text}"
         )
         # Should show linked place if present
-        assert "Boston" in text, f"Expected linked place in output but got: {text}"
-
-        # Extract event handle for use in subsequent tests
-        import re
-
-        handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if handle_match:
-            test_event_handle = handle_match.group(1)
-            print(f"Extracted event handle: {test_event_handle}")
-        else:
-            pytest.fail("Could not extract event handle for chaining tests")
+        assert f"{PREFIX} place" in text, (
+            f"Expected linked place in output but got: {text}"
+        )
 
 
 class TestCreatePersonTool:
     """Test create_person_tool functionality - Eighth in workflow."""
 
     @pytest.mark.asyncio
-    async def test_create_person_success(self):
+    async def test_create_person_success(self, event_handle, media_handle, note_handle):
         """Test successful person creation using proper structure and linking events."""
-        global \
-            test_person_handles, \
-            test_event_handle, \
-            test_media_handle, \
-            test_note_handle
-
         result = await create_person_tool(
             {
                 "primary_name": {
@@ -635,11 +492,9 @@ class TestCreatePersonTool:
                     "surname_list": [{"surname": "Smith", "primary": True}],
                 },
                 "gender": 1,  # Male
-                "event_ref_list": [{"ref": test_event_handle, "role": "Primary"}]
-                if test_event_handle
-                else [],
-                "media_list": [{"ref": test_media_handle}] if test_media_handle else [],
-                "note_list": [test_note_handle] if test_note_handle else [],
+                "event_ref_list": [{"ref": event_handle, "role": "Primary"}],
+                "media_list": [{"ref": media_handle}],
+                "note_list": [note_handle],
                 "urls": [
                     {
                         "type": "Web Home",
@@ -669,19 +524,16 @@ class TestCreatePersonTool:
         assert "(M)" in text, f"Expected gender (M) in output but got: {text}"
 
         # Assert optional fields that were provided
-        # Should show linked event with role
-        if "Birth" in text:
-            assert "Birth" in text, f"Expected linked event in output but got: {text}"
-            assert "Primary" in text, f"Expected event role in output but got: {text}"
-        # Should show linked media and note if present
-        if "image/" in text:
-            assert "Birth register page showing John Smith entry" in text, (
-                f"Expected linked media description in output but got: {text}"
-            )
-        if "Research" in text:
-            assert "Research" in text, (
-                f"Expected linked note type in output but got: {text}"
-            )
+        # Should show linked event with role - the shared event is a Marriage
+        assert "Marriage" in text, f"Expected linked event in output but got: {text}"
+        assert "Primary" in text, f"Expected event role in output but got: {text}"
+        # Should show the linked media and note that were passed in
+        assert "Attached media: O" in text, (
+            f"Expected linked media reference in output but got: {text}"
+        )
+        assert "Attached notes: N" in text, (
+            f"Expected linked note reference in output but got: {text}"
+        )
         # Should show URLs
         assert "https://familysearch.org/person/123" in text, (
             f"Expected URL path in output but got: {text}"
@@ -689,17 +541,6 @@ class TestCreatePersonTool:
         assert "FamilySearch profile" in text, (
             f"Expected URL description in output but got: {text}"
         )
-
-        # Extract person handle for use in family test
-        import re
-
-        handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if handle_match:
-            john_handle = handle_match.group(1)
-            test_person_handles.append(john_handle)
-            print(f"Extracted person handle: {john_handle}")
-        else:
-            pytest.fail("Could not extract person handle for chaining tests")
 
     @pytest.mark.asyncio
     async def test_update_person_with_event_reference(self):
@@ -841,10 +682,8 @@ class TestCreatePersonTool:
         assert "Death" in text, f"Expected Death event in output but got: {text}"
 
     @pytest.mark.asyncio
-    async def test_create_second_person_success(self):
+    async def test_create_second_person_success(self, media_handle, note_handle):
         """Test creation of second person for family test."""
-        global test_person_handles, test_media_handle, test_note_handle
-
         result = await create_person_tool(
             {
                 "primary_name": {
@@ -852,8 +691,8 @@ class TestCreatePersonTool:
                     "surname_list": [{"surname": "Johnson", "primary": True}],
                 },
                 "gender": 0,  # Female
-                "media_list": [{"ref": test_media_handle}] if test_media_handle else [],
-                "note_list": [test_note_handle] if test_note_handle else [],
+                "media_list": [{"ref": media_handle}],
+                "note_list": [note_handle],
                 "urls": [
                     {
                         "type": "Web Home",
@@ -883,15 +722,13 @@ class TestCreatePersonTool:
         assert "(F)" in text, f"Expected gender (F) in output but got: {text}"
 
         # Assert optional fields that were provided
-        # Should show linked media and note if present
-        if "image/" in text:
-            assert "Birth register page showing John Smith entry" in text, (
-                f"Expected linked media description in output but got: {text}"
-            )
-        if "Research" in text:
-            assert "Research" in text, (
-                f"Expected linked note type in output but got: {text}"
-            )
+        # Should show the linked media and note that were passed in
+        assert "Attached media: O" in text, (
+            f"Expected linked media reference in output but got: {text}"
+        )
+        assert "Attached notes: N" in text, (
+            f"Expected linked note reference in output but got: {text}"
+        )
         # Should show URLs
         assert "https://familysearch.org/person/456" in text, (
             f"Expected URL path in output but got: {text}"
@@ -900,41 +737,23 @@ class TestCreatePersonTool:
             f"Expected URL description in output but got: {text}"
         )
 
-        # Extract person handle for use in family test
-        import re
-
-        handle_match = re.search(r"\[([a-f0-9]+)\]", text)
-        if handle_match:
-            mary_handle = handle_match.group(1)
-            test_person_handles.append(mary_handle)
-            print(f"Extracted second person handle: {mary_handle}")
-        else:
-            pytest.fail("Could not extract second person handle for chaining tests")
-
 
 class TestCreateFamilyTool:
     """Test create_family_tool functionality - Last in workflow."""
 
     @pytest.mark.asyncio
-    async def test_create_family_success(self):
-        """Test successful family creation using person handles from previous tests."""
-        global test_person_handles, test_media_handle, test_note_handle
-
-        # Ensure we have person handles from previous tests
-        if len(test_person_handles) < 2:
-            pytest.fail(
-                "Need at least 2 person handles from previous tests - run tests in order"
-            )
-
-        father_handle = test_person_handles[0]  # John Smith
-        mother_handle = test_person_handles[1]  # Mary Johnson
+    async def test_create_family_success(
+        self, person_handles, media_handle, note_handle
+    ):
+        """Test successful family creation using the two shared people."""
+        father_handle, mother_handle = person_handles
 
         result = await create_family_tool(
             {
                 "father_handle": father_handle,
                 "mother_handle": mother_handle,
-                "media_list": [{"ref": test_media_handle}] if test_media_handle else [],
-                "note_list": [test_note_handle] if test_note_handle else [],
+                "media_list": [{"ref": media_handle}],
+                "note_list": [note_handle],
                 "urls": [
                     {
                         "type": "Web Home",
@@ -955,23 +774,21 @@ class TestCreateFamilyTool:
 
         # Assert required fields from usage guide are in output (at least one parent)
         # Father and mother handles are both optional, but at least one should be present
-        assert "John" in text or "Smith" in text, (
+        assert f"{PREFIX} Father" in text, (
             f"Expected father reference in output but got: {text}"
         )
-        assert "Mary" in text or "Johnson" in text, (
+        assert f"{PREFIX} Mother" in text, (
             f"Expected mother reference in output but got: {text}"
         )
 
         # Assert optional fields that were provided
-        # Should show linked media and note if present
-        if "image/" in text:
-            assert "Birth register page showing John Smith entry" in text, (
-                f"Expected linked media description in output but got: {text}"
-            )
-        if "Research" in text:
-            assert "Research" in text, (
-                f"Expected linked note type in output but got: {text}"
-            )
+        # Should show the linked media and note that were passed in
+        assert "Attached media: O" in text, (
+            f"Expected linked media reference in output but got: {text}"
+        )
+        assert "Attached notes: N" in text, (
+            f"Expected linked note reference in output but got: {text}"
+        )
         # Should show URLs (new format: path - description)
         assert "https://familysearch.org/family/789" in text, (
             f"Expected URL path in output but got: {text}"
