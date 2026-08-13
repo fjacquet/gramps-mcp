@@ -14,7 +14,10 @@ Attribute sets exercised here, as described in gramps-usage-guide.md:
 - Note (text, type)
 - Media (description)
 - Repository (name, type, URL, note)
-- Source (title, author, publication info, abbreviation, media, note)
+- Source (title, author, publication info, repository, media, note)
+
+The usage guide also lists an abbreviation for a source, but `SourceSaveParams`
+declares no field for it, so no test here can exercise it.
 
 Date structures (regular, about, before, after with quality indicators) were
 also listed here, but no creation tool takes the shape that block used, and
@@ -97,21 +100,35 @@ class TestEntityAttributes:
     async def test_source_attributes(
         self, repository_handle, media_handle, note_handle
     ):
-        """A source is created with every attribute the usage guide lists."""
+        """A source is created with title, author, publication info, repository,
+        media and note.
+
+        Abbreviation is listed by the usage guide but `SourceSaveParams` declares
+        no field for it, so it cannot be exercised here.
+        """
         source_result = await create_source_tool(
             {
                 "title": "Test Source Document with All Attributes",
-                "repository_handle": repository_handle,
+                "reporef_list": [{"ref": repository_handle}],
                 "author": "Test Author Name",
-                "publication_info": "Published by Test Publisher, 2024 Edition",
-                "abbreviation": "TEST-SRC-2024",
-                "media_handle": media_handle,
-                "note_handle": note_handle,
+                "pubinfo": "Published by Test Publisher, 2024 Edition",
+                "media_list": [{"ref": media_handle}],
+                "note_list": [note_handle],
             }
         )
 
         assert isinstance(source_result, list) and len(source_result) == 1
         source_text = source_result[0].text
+        assert "Error:" not in source_text, source_text
+        # Reason: the parameter models ignore unknown keys, so a handle alone
+        # would still be returned if every attribute had been dropped. Each
+        # attribute has to be visible in the output to prove it was accepted.
+        assert "Test Source Document with All Attributes" in source_text, source_text
+        assert "Test Author Name" in source_text, source_text
+        assert "Published by Test Publisher, 2024 Edition" in source_text, source_text
+        assert f"{PREFIX} repository" in source_text, source_text
+        assert "Attached media:" in source_text, source_text
+        assert "Attached notes:" in source_text, source_text
         source_match = re.search(r"\[([a-f0-9]+)\]", source_text)
         assert source_match, f"No source handle found in: {source_text}"
         print(f"Source created with all attributes: {source_match.group(1)}")
