@@ -21,7 +21,7 @@ defects each of which was found while fixing something else.
 
 ## Scope
 
-Seven items, all known and bounded. No exploratory work.
+Nine items, all known and bounded. No exploratory work.
 
 ### Test debt
 
