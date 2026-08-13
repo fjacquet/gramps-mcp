@@ -54,3 +54,34 @@ class TestDateValue:
         value = DateValue(dateval=[12, 3, 1885, False], modifier=8)
 
         assert value.modifier == 8
+
+    def test_text_only_date_with_no_dateval_is_accepted(self):
+        # Reason: this is the case that motivated relaxing the field-level
+        # requirement. date_handler.py returns `text` for modifier 6 before
+        # ever reading `dateval`, so a text-only payload with no dateval key
+        # at all is legitimate and must not be rejected.
+        value = DateValue(modifier=6, text="vers la Saint-Jean 1885")
+
+        assert value.dateval is None
+        assert value.text == "vers la Saint-Jean 1885"
+
+    def test_text_only_date_with_empty_dateval_is_accepted(self):
+        value = DateValue(dateval=[], modifier=6, text="vers 1885")
+
+        assert value.text == "vers 1885"
+
+    def test_range_with_more_than_eight_entries_is_rejected(self):
+        with pytest.raises(ValidationError):
+            DateValue(
+                dateval=[12, 3, 1885, False, 26, 3, 1885, False, 1, 1, 1900, False],
+                modifier=4,
+            )
+
+    def test_regular_date_with_fewer_than_four_entries_is_rejected(self):
+        with pytest.raises(ValidationError):
+            DateValue(dateval=[12, 3], modifier=0)
+
+    def test_regular_date_with_four_entries_is_accepted(self):
+        value = DateValue(dateval=[12, 3, 1885, False], modifier=0)
+
+        assert len(value.dateval) == 4

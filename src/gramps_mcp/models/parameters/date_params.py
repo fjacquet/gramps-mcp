@@ -26,16 +26,23 @@ from pydantic import BaseModel, Field, model_validator
 # is_compound(), which returns True only for modifier 4 and 5.
 TWO_DATE_MODIFIERS = (4, 5)
 
+# Text-only date: content lives in `text`, not `dateval`. Matches
+# handlers/date_handler.py:69-71, which special-cases this modifier and
+# returns `text` before any `dateval` entry is read.
+TEXT_ONLY_MODIFIER = 6
+
 
 class DateValue(BaseModel):
     """A Gramps date object."""
 
-    dateval: list[int | bool] = Field(
-        ...,
+    dateval: list[int | bool] | None = Field(
+        None,
         description=(
             "Date values: [day, month, year, False] for a single date, or "
             "[day1, month1, year1, False, day2, month2, year2, False] for a "
-            "range or span. Use 0 for an unknown day or month."
+            "range or span. Use 0 for an unknown day or month. May be "
+            "omitted when modifier=6 (text-only date), since the content "
+            "lives in `text` instead."
         ),
     )
     modifier: int = Field(
@@ -49,25 +56,45 @@ class DateValue(BaseModel):
     text: str = Field("", description="Free-text date, used when modifier is 6")
 
     @model_validator(mode="after")
-    def check_two_date_modifiers(self) -> "DateValue":
+    def check_dateval_matches_modifier(self) -> "DateValue":
         """
-        Reject a range or span that carries only one date.
+        Enforce the dateval shape each modifier requires.
+
+        - Modifier 6 (text-only): dateval may be absent or empty; the date
+          lives in `text`.
+        - Modifiers 4 and 5 (range, span): dateval must have exactly eight
+          entries, the second date bracket.
+        - Every other modifier: dateval must have at least four entries.
 
         Returns:
             DateValue: The validated model.
 
         Raises:
-            ValueError: If a two-date modifier has fewer than eight dateval
-                entries.
+            ValueError: If dateval does not match the shape its modifier
+                requires.
         """
         # Reason: Gramps accepts the malformed object and only fails later,
         # during the XML export, with IndexError in exportxml.py. Refusing it
         # here turns a corrupted backup into an immediate validation error.
-        if self.modifier in TWO_DATE_MODIFIERS and len(self.dateval) < 8:
+        if self.modifier == TEXT_ONLY_MODIFIER:
+            return self
+
+        dateval = self.dateval or []
+
+        if self.modifier in TWO_DATE_MODIFIERS:
+            if len(dateval) != 8:
+                raise ValueError(
+                    f"modifier {self.modifier} needs a second date: dateval "
+                    "must have exactly 8 entries, [day1, month1, year1, "
+                    "False, day2, month2, year2, False]. For an approximate "
+                    "single date use quality=1 with modifier=0 instead."
+                )
+            return self
+
+        if len(dateval) < 4:
             raise ValueError(
-                f"modifier {self.modifier} needs a second date: dateval must "
-                "have 8 entries, [day1, month1, year1, False, day2, month2, "
-                "year2, False]. For an approximate single date use quality=1 "
-                "with modifier=0 instead."
+                f"modifier {self.modifier} needs dateval with at least 4 "
+                "entries, [day, month, year, False]. Use 0 for an unknown "
+                "day or month."
             )
         return self
