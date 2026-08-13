@@ -51,3 +51,16 @@ class TestSourcedEventPlaceValidation:
         params = SourcedEventData(source_title="Acte de naissance", event_type="Birth")
 
         assert params.event_place is None
+
+    def test_handle_with_trailing_newline_is_rejected(self):
+        """Shares HANDLE_PATTERN with EventSaveParams.place; same gap applies:
+
+        re.match plus a "$"-anchored pattern accepts a trailing newline
+        because "$" matches just before a final newline.
+        """
+        with pytest.raises(ValidationError):
+            SourcedEventData(
+                source_title="Acte de naissance",
+                event_type="Birth",
+                event_place="103c4094f2414e2400974f979824\n",
+            )

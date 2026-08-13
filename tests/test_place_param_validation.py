@@ -66,6 +66,20 @@ class TestPlaceValidation:
 
         assert params.place is None
 
+    def test_handle_with_trailing_newline_is_rejected(self):
+        """re.match + a "$"-anchored pattern accepts a trailing newline,
+
+        because "$" matches just before a final newline. A handle carrying
+        one is not a valid handle and must be rejected the same as any
+        other malformed value.
+        """
+        with pytest.raises(ValidationError):
+            EventSaveParams(
+                type="Birth",
+                citation_list=[],
+                place="103c4094f2414e2400974f979824\n",
+            )
+
 
 class TestPlaceListShapeValidation:
     """alt_names and media_list take PlaceName/MediaRef objects, not strings.

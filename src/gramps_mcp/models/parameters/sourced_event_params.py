@@ -89,7 +89,7 @@ class SourcedEventData(BaseModel):
             ValueError: If value is not None and does not match
                 HANDLE_PATTERN.
         """
-        if value is not None and not re.match(HANDLE_PATTERN, value):
+        if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
             raise ValueError(
                 f"event_place must be a place handle, not a name. Got: "
                 f"{value!r}. Use find_type(type='place', ...) to obtain the "

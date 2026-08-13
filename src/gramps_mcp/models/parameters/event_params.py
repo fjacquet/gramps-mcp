@@ -41,7 +41,11 @@ from .date_params import DateValue
 # tolerate handle shapes not covered by that sample. Passing a name here
 # used to overwrite a valid handle with text that resolves to nothing - the
 # trap documented in CLAUDE.md.
-HANDLE_PATTERN = r"^[0-9a-f]{16,}$"
+#
+# Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
+# needed here. re.match plus a "$" anchor accepts a trailing newline because
+# "$" matches just before a final newline; fullmatch has no such gap.
+HANDLE_PATTERN = r"[0-9a-f]{16,}"
 
 
 class EventSearchParams(BaseGetMultipleParams):
@@ -93,7 +97,7 @@ class EventSaveParams(BaseModel):
             ValueError: If value is not None and does not match
                 HANDLE_PATTERN.
         """
-        if value is not None and not re.match(HANDLE_PATTERN, value):
+        if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
             raise ValueError(
                 f"place must be a place handle, not a name. Got: {value!r}. "
                 "Use find_type(type='place', ...) to obtain the handle for "
