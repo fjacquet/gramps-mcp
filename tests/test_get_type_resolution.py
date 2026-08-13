@@ -37,7 +37,7 @@ class TestGetTypeResolution:
     """A gramps_id resolves through the API, and a missing one says so."""
 
     @pytest.mark.asyncio
-    async def test_known_gramps_id_resolves(self):
+    async def test_known_gramps_id_resolves(self) -> None:
         result = await get_type_tool({"type": "person", "gramps_id": "I0076"})
         text = result[0].text
 
@@ -45,7 +45,7 @@ class TestGetTypeResolution:
         assert "I0076" in text
 
     @pytest.mark.asyncio
-    async def test_missing_gramps_id_says_not_found(self):
+    async def test_missing_gramps_id_says_not_found(self) -> None:
         result = await get_type_tool({"type": "person", "gramps_id": "I999999"})
         text = result[0].text
 
@@ -55,7 +55,7 @@ class TestGetTypeResolution:
         assert "I999999" in text
 
     @pytest.mark.asyncio
-    async def test_handle_still_works(self):
+    async def test_handle_still_works(self) -> None:
         # Reason: resolves I0076 to a real handle first (rather than
         # hardcoding one), then calls get_type_tool with that handle
         # directly, so this exercises the handle branch instead of
@@ -71,7 +71,7 @@ class TestGetTypeResolution:
         assert "I0076" in text
 
     @pytest.mark.asyncio
-    async def test_missing_type_and_identifier_names_the_problem(self):
+    async def test_missing_type_and_identifier_names_the_problem(self) -> None:
         # Reason: neither handle nor gramps_id is supplied, so the tool
         # falls through both branches to the final message. An earlier lot
         # removed a literal "not yet implemented" string here in favor of a
@@ -84,7 +84,7 @@ class TestGetTypeResolution:
         assert "handle" in text or "gramps_id" in text
 
     @pytest.mark.asyncio
-    async def test_unsupported_type_names_the_problem(self):
+    async def test_unsupported_type_names_the_problem(self) -> None:
         # Reason: no gramps_id or handle is supplied, so this reaches the
         # final fallthrough (search_details.py:206-213) rather than the
         # "No {type} found with gramps_id" exit that a supplied identifier
@@ -99,7 +99,7 @@ class TestGetTypeResolution:
         assert "banana" in text
 
     @pytest.mark.asyncio
-    async def test_family_gramps_id_resolves(self):
+    async def test_family_gramps_id_resolves(self) -> None:
         result = await get_type_tool(
             {"type": "family", "gramps_id": KNOWN_FAMILY_GRAMPS_ID}
         )
@@ -109,7 +109,7 @@ class TestGetTypeResolution:
         assert KNOWN_FAMILY_GRAMPS_ID in text
 
     @pytest.mark.asyncio
-    async def test_quote_in_gramps_id_reports_not_found(self):
+    async def test_quote_in_gramps_id_reports_not_found(self) -> None:
         # Reason: gramps_id is now escaped before being interpolated into
         # the GQL filter string (see the "Reason:" comment on the gql=
         # call in _resolve_gramps_id), so an id containing a double quote
@@ -124,7 +124,7 @@ class TestGetTypeResolution:
         assert 'I0076"' in text
 
     @pytest.mark.asyncio
-    async def test_well_formed_quote_injection_reports_not_found(self):
+    async def test_well_formed_quote_injection_reports_not_found(self) -> None:
         # Reason: this identifier was verified live (see task-5-brief Step
         # 1) to resolve to a real, unrelated person when interpolated
         # unescaped into the GQL filter - the exact hole a prior lot closed
@@ -141,7 +141,7 @@ class TestGetTypeResolution:
         assert crafted_id in text
 
     @pytest.mark.asyncio
-    async def test_backslash_in_gramps_id_reports_not_found(self):
+    async def test_backslash_in_gramps_id_reports_not_found(self) -> None:
         # Reason: a backslash is the other character that changes what a
         # quoted GQL string literal means. Escaped, it is searched for
         # literally and matches nothing rather than being refused.
@@ -164,7 +164,9 @@ class TestResolveGrampsIdIndependentOfRendering:
     """
 
     @pytest.mark.asyncio
-    async def test_resolve_gramps_id_matches_ground_truth_handle_for_person(self):
+    async def test_resolve_gramps_id_matches_ground_truth_handle_for_person(
+        self,
+    ) -> None:
         client = GrampsWebAPIClient()
         tree_id = get_settings().gramps_tree_id
 
@@ -182,7 +184,9 @@ class TestResolveGrampsIdIndependentOfRendering:
         assert handle == expected_handle
 
     @pytest.mark.asyncio
-    async def test_resolve_gramps_id_matches_ground_truth_handle_for_family(self):
+    async def test_resolve_gramps_id_matches_ground_truth_handle_for_family(
+        self,
+    ) -> None:
         client = GrampsWebAPIClient()
         tree_id = get_settings().gramps_tree_id
 
@@ -198,6 +202,6 @@ class TestResolveGrampsIdIndependentOfRendering:
         assert handle == expected_handle
 
     @pytest.mark.asyncio
-    async def test_resolve_gramps_id_returns_none_for_missing_id(self):
+    async def test_resolve_gramps_id_returns_none_for_missing_id(self) -> None:
         handle = await _resolve_gramps_id("person", "I999999")
         assert handle is None
