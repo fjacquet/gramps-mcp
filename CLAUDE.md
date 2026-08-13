@@ -89,5 +89,5 @@
 - **Never delete or overwrite existing code** unless explicitly instructed to
 - **Do not use emojis in the code** to maintain a clean and professional coding style.
 - **Never use `git stash`.** Compare against `main` with `git show
-  main:<path>` instead. An uncommitted change was lost to a stash cycle in
-  this repo.
+  main:<path>` instead. An uncommitted change was lost in this repo, most
+  likely to a stash cycle.
