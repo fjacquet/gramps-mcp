@@ -256,12 +256,10 @@ class TestCreateSourcedEventTool:
     """Test create_sourced_event_tool - composite source+citation+event."""
 
     @pytest.mark.asyncio
-    async def test_create_sourced_event_success(self):
+    async def test_create_sourced_event_success(self, gramps_client, tree_id):
         """Source, citation, and event are created in one call, with the
         citation auto-wired onto the event - the exact chain that used to
         require three separate calls and a copy-pasted handle."""
-        from src.gramps_mcp.client import GrampsWebAPIClient
-        from src.gramps_mcp.config import get_settings
         from src.gramps_mcp.models.api_calls import ApiCalls
 
         result = await create_sourced_event_tool(
@@ -296,16 +294,14 @@ class TestCreateSourcedEventTool:
 
         # The whole point of this tool: verify the event actually got the
         # citation attached, not just that the response text claims success.
-        settings = get_settings()
-        client = GrampsWebAPIClient()
-        try:
-            event_data = await client.make_api_call(
-                api_call=ApiCalls.GET_EVENT,
-                tree_id=settings.gramps_tree_id,
-                handle=event_handle,
-            )
-        finally:
-            await client.close()
+        # Reason: the shared gramps_client fixture is used rather than a
+        # throwaway client - GrampsWebAPIClient.close() tears down the
+        # AuthManager singleton's httpx client, which every other test shares.
+        event_data = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_EVENT,
+            tree_id=tree_id,
+            handle=event_handle,
+        )
 
         assert citation_handle in event_data.get("citation_list", []), (
             f"Expected citation {citation_handle} attached to event "
@@ -314,11 +310,9 @@ class TestCreateSourcedEventTool:
         )
 
     @pytest.mark.asyncio
-    async def test_create_sourced_event_with_media_path(self):
+    async def test_create_sourced_event_with_media_path(self, gramps_client, tree_id):
         """media_path on the composite tool attaches to the citation, not
         the event or source."""
-        from src.gramps_mcp.client import GrampsWebAPIClient
-        from src.gramps_mcp.config import get_settings
         from src.gramps_mcp.models.api_calls import ApiCalls
 
         result = await create_sourced_event_tool(
@@ -345,16 +339,11 @@ class TestCreateSourcedEventTool:
 
         citation_handle = _handle_on_line(text, "Page 9, media test entry")
 
-        settings = get_settings()
-        client = GrampsWebAPIClient()
-        try:
-            citation_data = await client.make_api_call(
-                api_call=ApiCalls.GET_CITATION,
-                tree_id=settings.gramps_tree_id,
-                handle=citation_handle,
-            )
-        finally:
-            await client.close()
+        citation_data = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_CITATION,
+            tree_id=tree_id,
+            handle=citation_handle,
+        )
 
         assert citation_data.get("media_list"), (
             f"Expected media attached to citation {citation_handle} but "
