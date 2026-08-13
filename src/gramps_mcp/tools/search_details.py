@@ -118,21 +118,6 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
     if api_call is None:
         return None
 
-    # Reason: gramps_id is interpolated into the gql filter below without
-    # escaping. A stray double quote can close the quoted value early, and
-    # a well-formed injection like `x" or gramps_id!="` then resolves to an
-    # arbitrary, unrelated record instead of failing loudly - the dangerous
-    # half of this, versus a quote that merely produces a malformed filter
-    # the server rejects. A backslash is rejected too, since it is the
-    # other character that changes what a quoted GQL string means. This is
-    # a narrow refusal, not general GQL escaping - full escaping is out of
-    # scope here.
-    if '"' in gramps_id or "\\" in gramps_id:
-        raise ValueError(
-            f"gramps_id {gramps_id!r} contains a quote or backslash, "
-            "which is not allowed"
-        )
-
     settings = get_settings()
     tree_id = settings.gramps_tree_id
 
@@ -152,8 +137,16 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
     # Field(None, ...) with a positional default) as having defaults, so it
     # flags them as missing even though they are optional at runtime; see
     # the identical pattern in search_basic.py's find_anything_tool.
+    # Reason: escape for the GQL string literal - the backslash first, so
+    # the backslashes introduced when escaping quotes are not escaped
+    # again. This lets an identifier from another system legitimately
+    # containing a quote or backslash be searched for literally, instead of
+    # refusing it outright as a prior lot did; a crafted value like
+    # `x" or gramps_id!="` is escaped to a literal string that matches
+    # nothing rather than closing the quoted value early.
+    escaped = gramps_id.replace("\\", "\\\\").replace('"', '\\"')
     params = BaseGetMultipleParams(  # type: ignore[call-arg]
-        gql=f'gramps_id="{gramps_id}"', pagesize=1
+        gql=f'gramps_id="{escaped}"', pagesize=1
     )
     results = await client.make_api_call(
         api_call=api_call, params=params, tree_id=tree_id

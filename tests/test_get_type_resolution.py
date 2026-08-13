@@ -109,43 +109,48 @@ class TestGetTypeResolution:
         assert KNOWN_FAMILY_GRAMPS_ID in text
 
     @pytest.mark.asyncio
-    async def test_quote_in_gramps_id_reports_formatted_error(self):
-        # Reason: gramps_id is interpolated into a GQL filter string
-        # unescaped (see the "Reason:" comment on the gql= call in
-        # _resolve_gramps_id), so an id containing a double quote builds a
-        # malformed filter the live server rejects with a real 422 error.
-        # This exercises the try/except around _resolve_gramps_id through
-        # the actual API, with no mock, and pins the shape of what a
-        # caller sees on failure.
+    async def test_quote_in_gramps_id_reports_not_found(self):
+        # Reason: gramps_id is now escaped before being interpolated into
+        # the GQL filter string (see the "Reason:" comment on the gql=
+        # call in _resolve_gramps_id), so an id containing a double quote
+        # is searched for literally instead of producing a malformed
+        # filter. No record has that literal identifier, so this reports
+        # "not found" rather than an error.
         result = await get_type_tool({"type": "person", "gramps_id": 'I0076"'})
         text = result[0].text
 
-        assert text.startswith("Error: ")
         assert "not yet implemented" not in text
+        assert not text.startswith("Error: ")
+        assert 'I0076"' in text
 
     @pytest.mark.asyncio
-    async def test_well_formed_quote_injection_is_refused(self):
-        # Reason: the benign half above (a stray quote making the filter
-        # malformed) is not the dangerous case. A quote crafted to keep the
-        # filter well-formed - verified live to resolve to a real,
-        # unrelated person - would otherwise have get_type silently
-        # present someone else's record as the answer. This pins the
-        # refusal added to _resolve_gramps_id rather than exercising the
-        # injection itself.
-        result = await get_type_tool(
-            {"type": "person", "gramps_id": 'x" or gramps_id!="'}
-        )
+    async def test_well_formed_quote_injection_reports_not_found(self):
+        # Reason: this identifier was verified live (see task-5-brief Step
+        # 1) to resolve to a real, unrelated person when interpolated
+        # unescaped into the GQL filter - the exact hole a prior lot closed
+        # with a blunt refusal. With escaping in place, the crafted quote
+        # is searched for literally, matches nothing, and get_type reports
+        # not found by the identifier itself rather than raising or
+        # silently returning someone else's record.
+        crafted_id = 'x" or gramps_id!="'
+        result = await get_type_tool({"type": "person", "gramps_id": crafted_id})
         text = result[0].text
 
-        assert text.startswith("Error: ")
         assert "not yet implemented" not in text
+        assert not text.startswith("Error: ")
+        assert crafted_id in text
 
     @pytest.mark.asyncio
-    async def test_backslash_in_gramps_id_is_refused(self):
-        result = await get_type_tool({"type": "person", "gramps_id": "I0076\\"})
+    async def test_backslash_in_gramps_id_reports_not_found(self):
+        # Reason: a backslash is the other character that changes what a
+        # quoted GQL string literal means. Escaped, it is searched for
+        # literally and matches nothing rather than being refused.
+        gramps_id = "I0076\\"
+        result = await get_type_tool({"type": "person", "gramps_id": gramps_id})
         text = result[0].text
 
-        assert text.startswith("Error: ")
+        assert not text.startswith("Error: ")
+        assert gramps_id in text
 
 
 class TestResolveGrampsIdIndependentOfRendering:
