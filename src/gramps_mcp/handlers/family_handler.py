@@ -191,7 +191,7 @@ async def format_family(client, tree_id: str, handle: str) -> str:
                 if media_handle:
                     try:
                         media_data = await client.make_api_call(
-                            api_call=ApiCalls.GET_MEDIA,
+                            api_call=ApiCalls.GET_MEDIA_ITEM,
                             tree_id=tree_id,
                             handle=media_handle,
                         )
