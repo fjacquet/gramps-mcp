@@ -265,27 +265,37 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
     for media_ref in media_list:
         media_handle = media_ref.get("ref", "")
         if media_handle:
-            media_data = await client.make_api_call(
-                ApiCalls.GET_MEDIA_ITEM, tree_id=tree_id, handle=media_handle
-            )
-            media_desc = media_data.get("desc", "")
-            media_id = media_data.get("gramps_id", "")
-            result += f"- {media_desc} ({media_id})\n"
+            # Reason: a dangling or private handle 404s. Losing one media
+            # line is acceptable; losing the whole person detail is not.
+            try:
+                media_data = await client.make_api_call(
+                    ApiCalls.GET_MEDIA_ITEM, tree_id=tree_id, handle=media_handle
+                )
+                media_desc = media_data.get("desc", "")
+                media_id = media_data.get("gramps_id", "")
+                result += f"- {media_desc} ({media_id})\n"
+            except Exception:
+                result += f"- Media ({media_handle})\n"
 
     # Attached notes section
     result += "\nAttached notes:\n"
     note_list = person_data.get("note_list", [])
     for note_handle in note_list:
-        note_data = await client.make_api_call(
-            ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle
-        )
-        note_type = note_data.get("type", "")
-        note_id = note_data.get("gramps_id", "")
-        note_full_text = note_data.get("text", {}).get("string", "")
-        note_text = note_full_text[:50]
-        if len(note_full_text) > 50:
-            note_text += "..."
-        result += f"- {note_type}: {note_text} ({note_id})\n"
+        try:
+            note_data = await client.make_api_call(
+                ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle
+            )
+            note_type = note_data.get("type", "")
+            note_id = note_data.get("gramps_id", "")
+            # Reason: "text" can be present but JSON null, in which case
+            # .get("text", {}) returns None and chaining would raise.
+            note_full_text = (note_data.get("text") or {}).get("string", "") or ""
+            note_text = note_full_text[:50]
+            if len(note_full_text) > 50:
+                note_text += "..."
+            result += f"- {note_type}: {note_text} ({note_id})\n"
+        except Exception:
+            result += f"- Note ({note_handle})\n"
 
     return result
 
