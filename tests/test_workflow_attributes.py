@@ -12,7 +12,7 @@ depends on another having run first.
 
 Attribute sets exercised here, as described in gramps-usage-guide.md:
 - Note (text, type)
-- Media (file path, title, date)
+- Media (description)
 - Repository (name, type, URL, note)
 - Source (title, author, publication info, abbreviation, media, note)
 
@@ -27,11 +27,12 @@ import re
 
 import pytest
 
+from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.data_management import (
     create_repository_tool,
     create_source_tool,
 )
-from tests.workflow_helpers import create_test_media, create_test_note
+from tests.constants import PREFIX
 
 pytestmark = pytest.mark.integration
 
@@ -40,29 +41,25 @@ class TestEntityAttributes:
     """Each entity type must accept its complete attribute set."""
 
     @pytest.mark.asyncio
-    async def test_note_attributes(self):
+    async def test_note_attributes(self, gramps_client, tree_id, note_handle):
         """A note is created from its text and type."""
-        note_handle = await create_test_note(
-            "This is a comprehensive test note demonstrating the note creation functionality.",
-            "General",
+        note_data = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle
         )
-        print(f"Note created: {note_handle}")
+
+        assert note_data["handle"] == note_handle, note_data
+        assert PREFIX in note_data["text"]["string"], note_data
+        assert note_data["type"] == "Transcript", note_data
 
     @pytest.mark.asyncio
-    async def test_media_attributes(self):
-        """A media object is created from its file path, title and date."""
-        media_handle = await create_test_media(
-            "tests/sample/33SQ-GP8N-NLK.jpg",
-            "Test Document for Comprehensive Testing",
-            {
-                "year": 2024,
-                "month": 1,
-                "day": 15,
-                "type": "regular",
-                "quality": "regular",
-            },
+    async def test_media_attributes(self, gramps_client, tree_id, media_handle):
+        """A media object is created and carries its description."""
+        media_data = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_MEDIA_ITEM, tree_id=tree_id, handle=media_handle
         )
-        print(f"Media created: {media_handle}")
+
+        assert media_data["handle"] == media_handle, media_data
+        assert PREFIX in media_data["desc"], media_data
 
     @pytest.mark.asyncio
     async def test_repository_attributes(self, note_handle):
