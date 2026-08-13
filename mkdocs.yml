@@ -1,0 +1,67 @@
+site_name: Gramps MCP
+site_description: An MCP server for AI-powered genealogy research and management with Gramps Web
+site_url: https://fjacquet.github.io/gramps-mcp/
+repo_url: https://github.com/fjacquet/gramps-mcp
+repo_name: fjacquet/gramps-mcp
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+plugins:
+  - search
+
+# Reason: docs/superpowers/ holds development specs, plans and execution
+# ledgers. They are historical working records, not product documentation, and
+# are deliberately excluded from the published site.
+exclude_docs: |
+  superpowers/
+
+nav:
+  - Home: index.md
+  - User guide: user-guide.md
+  - User management: user-management.md
+  - Product requirements: prd.md
+  - Decisions:
+      - Overview: adr/README.md
+      - 0001 MCP Python SDK 2.x: adr/0001-mcp-python-sdk-2x.md
+      - 0002 Testing against a real server: adr/0002-test-against-a-real-gramps-web-server.md
+      - 0003 Merge semantics for PUT: adr/0003-merge-semantics-for-put-updates.md
+      - 0004 Two transports: adr/0004-two-transports-http-and-stdio.md
+      - 0005 manage_users role whitelist: adr/0005-manage-users-role-whitelist.md
+      - 0006 500-line limit and hooks: adr/0006-500-line-limit-and-pre-commit-hooks.md

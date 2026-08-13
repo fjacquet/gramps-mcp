@@ -2,9 +2,9 @@
 
 This document describes what gramps-mcp is as of v1.7.0 - its scope, its
 boundaries, and the constraints it operates under. It is descriptive, not a
-roadmap: everything here is true of the code today. [README.md](../README.md)
+roadmap: everything here is true of the code today. [README.md](https://github.com/fjacquet/gramps-mcp#readme)
 covers what the product offers and lists the tools; the architecture decisions
-behind the boundaries are recorded in [docs/adr/](adr/).
+behind the boundaries are recorded in [docs/adr/](adr/README.md).
 
 ## Problem
 

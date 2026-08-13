@@ -19,3 +19,6 @@ docker/
 # Local editor config and generated research output
 .vscode/
 output/
+
+# MkDocs build output
+site/

@@ -2,7 +2,7 @@
 
 This guide is for someone who already has the server running and wants to get
 good results out of it through an AI assistant. Installation, configuration and
-the full tool inventory live in [README.md](../README.md); nothing here repeats
+the full tool inventory live in [README.md](https://github.com/fjacquet/gramps-mcp#readme); nothing here repeats
 them.
 
 Everything below is phrased as tool calls because that is what the assistant
