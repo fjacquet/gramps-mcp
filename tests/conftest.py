@@ -26,11 +26,7 @@ from src.gramps_mcp.models.parameters.place_params import PlaceSaveParams
 from src.gramps_mcp.models.parameters.repository_params import RepositoryData
 from src.gramps_mcp.models.parameters.source_params import SourceSaveParams
 from src.gramps_mcp.tools.data_management import _extract_entity_data
-
-# Reason: every record these fixtures create is named with this prefix so a
-# run killed mid-test leaves objects that are obvious in the tree and easy to
-# find and remove by hand.
-PREFIX = "Pytest Lot5"
+from tests.constants import PREFIX
 
 
 async def create_entity(client, tree_id, api_call, params_model, entity_type) -> str:
