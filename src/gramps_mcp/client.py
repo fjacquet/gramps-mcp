@@ -23,6 +23,7 @@ for all Gramps Web API operations through the make_api_call method.
 
 import logging
 import re
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -128,7 +129,7 @@ class GrampsWebAPIClient:
         except Exception as e:
             raise GrampsAPIError(f"Unexpected error: {e}") from e
 
-    def _parse_response_body(self, response: httpx.Response) -> dict:
+    def _parse_response_body(self, response: httpx.Response) -> Any:
         """
         Parse a successful (2xx) response body as JSON.
 
@@ -136,11 +137,15 @@ class GrampsWebAPIClient:
             response (httpx.Response): The response to parse.
 
         Returns:
-            dict: The parsed JSON body. When the body does not parse as
-                JSON, a dict describing the failure, whose ``raw_content``
-                is bounded by MAX_ERROR_DETAIL for the same reason error
-                bodies are bounded above: Gramps can echo the submitted
-                payload, which may hold genealogy data about living people.
+            Any: The parsed JSON body - a dict for most endpoints, but a
+                bare list for the Gramps collection and transaction
+                endpoints (and the media path), since ``response.json()``
+                returns whatever JSON value the server sent. When the body
+                does not parse as JSON, a dict describing the failure is
+                returned instead, whose ``raw_content`` is bounded by
+                MAX_ERROR_DETAIL for the same reason error bodies are
+                bounded above: Gramps can echo the submitted payload, which
+                may hold genealogy data about living people.
         """
         try:
             return response.json()
