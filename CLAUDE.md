@@ -10,6 +10,16 @@
   - **Type check**: `uv run mypy src/gramps_mcp --ignore-missing-imports`
   - **First-time setup**: `uv run pre-commit install` so ruff/ruff-format/copyright/
     file-length/no-emoji hooks run automatically on commit
+  - **Docs site**: `uv run --with mkdocs-material mkdocs build --strict` before
+    pushing anything under `docs/`. Strict mode fails on broken internal links,
+    which is the usual way a docs change breaks the published site.
+  - **Release**: bump `pyproject.toml` and `src/gramps_mcp/__init__.py`, then run
+    `uv lock` **in the same commit**. `uv.lock` pins the project's own version and
+    CI runs `uv sync --locked`, so a bump without it turns `main` red while the
+    Docker publish stays green - the breakage is invisible from the release page.
+  - **Pull requests**: this is a fork, so `gh pr create` needs
+    `--repo fjacquet/gramps-mcp`; without it the error names a token problem,
+    which is misleading. Merge with `--merge`, never `--squash`.
 
 ### Code Structure & Modularity
 - **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
@@ -33,7 +43,12 @@
 - **This project follows Test-Driven Development (TDD) practices**.
 - **Write tests FIRST before implementing functionality** - red, green, refactor cycle.
 - **Always create Pytest integration tests for new features** (functions, classes, routes, etc).
-- **Use real APIs for testing - no mocks, fixtures, or test clients**.
+- **Test against the real Gramps API - do not fake its behaviour.** No
+  fixtures, no test clients, no stubbed responses standing in for the server.
+  Replacing the transport seam alone is permitted in offline unit tests, and is
+  what `tests/test_client_merge.py` and `tests/test_http_error_detail.py` do.
+  Assertions must read the output of the code under test, never the stub's
+  call arguments - a test that asserts on its own mock proves nothing.
 - **After updating any logic**, check whether existing tests need to be updated. If so, do it.
 - **Tests should live in a `/tests` folder** mirroring the main app structure.
 - **Run tests frequently during development** using `uv run pytest` or `uv run pytest -xvs` for verbose output.
@@ -51,11 +66,22 @@
 - **`tree_stats` returns a permission error even for the owner-role account
   in `.env`.** A `tree_stats` failure ("Permission denied for this
   operation") is an environment fact, not a regression.
+- **`tests/test_parameter_alignment.py` holds hardcoded field inventories that
+  must track `src/gramps_mcp/resources/gramps-usage-guide.md`.** Adding a field
+  to a parameter model without documenting it in that guide fails this test.
+  It is doing its job: the guide is served to MCP clients, so an undocumented
+  parameter is one the assistant can pass but was never told about. Fix the
+  guide, then the inventory - not the inventory alone.
+- **Several `tests/test_data_management.py` tests depend on running in order**,
+  passing handles from one to the next. Run alone they fail with "No repository
+  handle available from previous test". Run the module, not the single test.
+- **The 500-line rule is not enforced in `tests/`.** `.pre-commit-config.yaml`
+  excludes `^tests/` from `check_file_length`, and three test files already
+  exceed it. The rule still applies when you write there; nothing will stop you.
 
 
 ### Style & Conventions
-- **Use Python** as the primary language.
-- **Follow PEP8**, use type hints, format with `ruff format`, and lint with `ruff`.
+- Use type hints throughout, format with `ruff format`, lint with `ruff`.
 - **Use `pydantic` for data validation**.
 - Use `httpx` for async HTTP client (no FastAPI needed for MCP servers).
 - Use `MCP Python SDK` for MCP server implementation.
