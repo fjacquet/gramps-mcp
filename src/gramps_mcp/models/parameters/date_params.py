@@ -47,12 +47,16 @@ class DateValue(BaseModel):
     )
     modifier: int = Field(
         0,
+        ge=0,
+        le=8,
         description=(
             "0=regular, 1=before, 2=after, 3=about, 4=range, 5=span, "
             "6=textonly, 7=from, 8=to"
         ),
     )
-    quality: int = Field(0, description="0=regular, 1=estimated, 2=calculated")
+    quality: int = Field(
+        0, ge=0, le=2, description="0=regular, 1=estimated, 2=calculated"
+    )
     text: str = Field("", description="Free-text date, used when modifier is 6")
 
     @model_validator(mode="after")

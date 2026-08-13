@@ -85,3 +85,25 @@ class TestDateValue:
         value = DateValue(dateval=[12, 3, 1885, False], modifier=0)
 
         assert len(value.dateval) == 4
+
+    def test_modifier_out_of_range_is_rejected(self):
+        # Reason: modifier 45 validates against a bare int field and reaches
+        # Gramps, which renders it with an empty prefix (date_handler.py's
+        # lookup falls back to "") - a silently wrong date. Valid modifiers
+        # are 0-8.
+        with pytest.raises(ValidationError):
+            DateValue(dateval=[12, 3, 1885, False], modifier=45)
+
+    def test_negative_modifier_is_rejected(self):
+        with pytest.raises(ValidationError):
+            DateValue(dateval=[12, 3, 1885, False], modifier=-1)
+
+    def test_quality_out_of_range_is_rejected(self):
+        # Reason: valid qualities are 0 (regular), 1 (estimated), 2
+        # (calculated). Anything else is a silently wrong date.
+        with pytest.raises(ValidationError):
+            DateValue(dateval=[12, 3, 1885, False], quality=3)
+
+    def test_negative_quality_is_rejected(self):
+        with pytest.raises(ValidationError):
+            DateValue(dateval=[12, 3, 1885, False], quality=-1)
