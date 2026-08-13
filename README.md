@@ -284,11 +284,13 @@ uv sync --all-extras --dev                               # install dependencies
 uv run ruff check src/                                    # lint
 uv run ruff format --check src/ tests/                    # formatting check
 uv run mypy src/gramps_mcp --ignore-missing-imports        # type check
-uv run pytest tests/test_merge.py tests/test_config.py tests/test_client_merge.py tests/test_utils.py  # offline-safe tests
+uv run pytest tests/test_merge.py tests/test_config.py tests/test_client_merge.py tests/test_utils.py tests/test_http_error_detail.py  # offline-safe tests
 ```
 
 Most tests in `tests/` require a live Gramps Web server (see [CONTRIBUTING.md](CONTRIBUTING.md)
-for setup); the command above runs only the ones that work offline, matching what CI checks.
+for setup); the command above runs only the ones that work offline, matching what CI checks. This
+is the same file list CI runs (`.github/workflows/ci.yml`); see `CLAUDE.md` for the fuller
+`-m "not integration"` marker-based story, including why CI does not use that marker directly.
 
 ## Usage Examples
 
