@@ -7,7 +7,26 @@ Gramps is fundamentally **source-focused** and **event-focused**. All genealogic
 ## The Proper Workflow
 
 ### **FUNDAMENTAL RULE: Always Find First**
-**Before creating ANY entity, always search first using the corresponding find tool.**
+**Before creating ANY entity, always search first.**
+
+There are exactly two search tools:
+
+- `find_type(type=..., gql=..., max_results=20, page=None)` searches ONE record
+  type with a GQL filter. `type` accepts `person`, `family`, `event`, `place`,
+  `source`, `citation`, `media`, `repository`, `note`. Read the
+  `gql://documentation` resource for the filter syntax and the full property list.
+- `find_anything(query=..., max_results=20, page=None)` is a plain full-text
+  search across every record type. It matches literal text inside records, not
+  logical combinations, so give it one distinctive string.
+
+There is no `find_person`, `find_source`, `find_place` or any other per-type
+find tool - every type-scoped search goes through `find_type`.
+
+To read one record in full, use `get_type(type=..., handle=...)` or
+`get_type(type=..., gramps_id=...)`. `get_type` supports `person` and `family`
+only; for the other types use `find_type` with a filter on `gramps_id` or
+`handle`.
+
 - If entity exists and **already contains all the new info**: Use the existing entity as-is (no update needed)
 - If entity exists but **missing some of the new info**: Use `create_X` with the existing handle to **update** it
 - If entity doesn't exist: Use `create_X` without handle to **create** new entity
@@ -22,7 +41,8 @@ When you have a source document, start with the repository (archive, library, co
 - **Note** (optional): If present, use `create_note` tool first, then link to repository
 
 **Process:**
-- **First**: Use `find_repository` to search for existing repository
+- **First**: Search for an existing repository with
+  `find_type(type="repository", gql='class = repository and name ~ "St. Mary"')`
 - **If found and complete**: Use existing repository as-is
 - **If found but missing info**: Use `create_repository` with existing handle to update repository
 - **If not found**: Use `create_repository` without handle to create new repository
@@ -39,7 +59,8 @@ Create the actual source document within the repository:
 - **Note** (optional): If present, use `create_note` tool first, then link to source
 
 **Process:**
-- **First**: Use `find_source` to search for existing source document
+- **First**: Search for an existing source document with
+  `find_type(type="source", gql='class = source and title ~ "Marriage Register"')`
 - **If found and complete**: Use existing source as-is
 - **If found but missing info**: Use `create_source` with existing handle to update source
 - **If not found**: Use `create_source` without handle to create new source
@@ -55,7 +76,8 @@ Create a citation that references the specific page/entry in the source:
 - **Notes** (optional): If present, use `create_note` tool first, then link to citation
 
 **Process:**
-- **First**: Use `find_citation` to search for existing citation
+- **First**: Search for an existing citation with
+  `find_type(type="citation", gql='class = citation and source_handle = "<source handle>" and page ~ "Page 67"')`
 - **If found and complete**: Use existing citation as-is
 - **If found but missing info**: Use `create_citation` with existing handle to update citation
 - **If not found**: Use `create_citation` without handle to create new citation
@@ -68,10 +90,13 @@ Now create the life event that was documented in that citation:
 - **Citation** (required): Handle of the citation created in step 3
 - **Date** (optional): Date when the event occurred
 - **Description** (optional): Additional details about the event
-- **Place** (optional): If present, use `find_place` first, then `create_place` if not found
+- **Place** (optional): If present, search with
+  `find_type(type="place", gql='class = place and name.value = "Boston"')` first,
+  then `create_place` if not found
 
 **Process:**
-- **First**: Use `find_event` to search for existing event
+- **First**: Search for an existing event with
+  `find_type(type="event", gql='class = event and type.string = "Marriage" and description ~ "Smith"')`
 - **If found and complete**: Use existing event as-is
 - **If found but missing info**: Use `create_event` with existing handle to update event
 - **If not found**: Use `create_event` without handle to create new event
@@ -90,8 +115,10 @@ Now create the life event that was documented in that citation:
 - **Birth/Death info**: Should be added as separate birth/death events, NOT directly to person
 
 #### For Each Person Involved:
-- **First**: Use `find_person` to search for existing records
-- Search by name, approximate dates, and locations
+- **First**: Search for existing records with
+  `find_type(type="person", gql='class = person and primary_name.surname_list.any.surname = "Smith"')`
+  (or `find_anything(query="John Smith")` for a loose text sweep)
+- Search by name, approximate dates, and locations - never on a name alone
 - **Always notify the user** if potential matches are found
 - Ask the user to confirm if it's the same person or should be a new record
 
@@ -127,7 +154,8 @@ Now create the life event that was documented in that citation:
 - **Family events** (marriage, divorce, engagement): Added to family records
 
 #### Process:
-- **First**: Use `find_family` to search for existing family unit
+- **First**: Search for an existing family unit with
+  `find_type(type="family", gql='class = family and father_handle = "<father handle>" and mother_handle = "<mother handle>"')`
 - **If found and complete**: Use existing family as-is
 - **If found but missing info**: Use `create_family` with existing handle to update family
 - **If not found**: Use `create_family` without handle to create new family
@@ -137,7 +165,7 @@ Now create the life event that was documented in that citation:
 ```
 1. Repository: "St. Mary's Catholic Church, Boston"
    → If repository has note: create_note first, get note handle
-   → find_repository (search for repository)
+   → find_type(type="repository", gql='class = repository and name ~ "St. Mary"')
    → If found and complete: use existing repository
    → If found but missing info: create_repository with handle (update repository)
    → If not found: create_repository without handle (create repository with name, type, optional URL, optional note handle)
@@ -145,7 +173,7 @@ Now create the life event that was documented in that citation:
 2. Source: "Marriage Register 1875-1880"  
    → If source has media: create_media first, get media handle
    → If source has note: create_note first, get note handle
-   → find_source (search for document)
+   → find_type(type="source", gql='class = source and title ~ "Marriage Register"')
    → If found and complete: use existing source
    → If found but missing info: create_source with handle (update source)
    → If not found: create_source without handle (create source with title, repo link, optional author/pubinfo/abbrev/media/note handles)
@@ -153,14 +181,15 @@ Now create the life event that was documented in that citation:
 3. Citation: "Page 67, Entry 15, Marriage of John Smith and Mary Jones, June 15, 1878"
    → If citation has media: create_media first, get media handle
    → If citation has notes: create_note first, get note handle
-   → find_citation (search for existing citation)
+   → find_type(type="citation", gql='class = citation and source_handle = "<source handle>" and page ~ "Page 67"')
    → If found and complete: use existing citation
    → If found but missing info: create_citation with handle (update citation)
    → If not found: create_citation without handle (create citation with source link, optional page/date/media/notes)
 
 4. Event: Marriage event on June 15, 1878
-   → If event has place: find_place first, create_place if not found, get place handle
-   → find_event (search for existing event)
+   → If event has place: find_type(type="place", gql='class = place and name.value = "Boston"') first,
+     create_place if not found, get place handle
+   → find_type(type="event", gql='class = event and type.string = "Marriage" and description ~ "Smith"')
    → If found and complete: use existing event
    → If found but missing info: create_event with handle (update event)
    → If not found: create_event without handle (create event with type, citation handle, optional date/description/place handle)
@@ -168,14 +197,16 @@ Now create the life event that was documented in that citation:
 5. Link People to Event:
    → If person has notes: create_note first, get note handle
    → If person has media: create_media first, get media handle
-   → find_person "John Smith" (born ~1850, Boston area)
+   → find_type(type="person", gql='class = person and primary_name.surname_list.any.surname = "Smith" and primary_name.first_name = "John"')
+     (John Smith, born ~1850, Boston area)
    → If matches found: Ask user to confirm identity
    → If same person: create_person with handle (update existing person) AND add event with role "groom"
    → If new person: create_person without handle (create new person with given name, surname, gender, optional notes/media/URLs) AND add event with role "groom"
    
    → If person has notes: create_note first, get note handle  
    → If person has media: create_media first, get media handle
-   → find_person "Mary Jones" (born ~1855, Boston area)
+   → find_type(type="person", gql='class = person and primary_name.surname_list.any.surname = "Jones" and primary_name.first_name = "Mary"')
+     (Mary Jones, born ~1855, Boston area)
    → If matches found: Ask user to confirm identity
    → If same person: create_person with handle (update existing person) AND add event with role "bride"
    → If new person: create_person without handle (create new person with given name, surname, gender, optional notes/media/URLs) AND add event with role "bride"
@@ -183,7 +214,8 @@ Now create the life event that was documented in that citation:
 6. Create Family Units (when applicable):
    → If family has notes: create_note first, get note handle
    → If family has media: create_media first, get media handle
-   → If creating family relationships: find_family first to check for existing family
+   → If creating family relationships: find_type(type="family", gql='class = family and father_handle = "<father handle>"')
+     first to check for existing family
    → If family exists and complete: use existing family
    → If family exists but missing info: create_family with handle (update family) AND add family events
    → If family doesn't exist: create_family without handle (create with father/mother/children handles, optional notes/media/URLs) AND add family events
@@ -204,7 +236,8 @@ Now create the life event that was documented in that citation:
 
 ### Check Before Creating
 - **Always search before creating new people**
-- Use `find_person`, `find_place`, `find_source` extensively
+- Use `find_type` (with `type="person"`, `"place"`, `"source"`, etc.) and
+  `find_anything` extensively
 - Present potential matches to the user for verification
 - Prevent duplicate entries through careful checking
 
@@ -223,15 +256,21 @@ When potential duplicates are found:
 
 ## Tool Usage Order Summary
 
-1. `find_repository` → `create_repository` (repository: with handle to update, without handle to create)
-2. `find_source` → `create_source` (source document: with handle to update, without handle to create) 
-3. `find_citation` → `create_citation` (with handle to update, without handle to create)
-4. `find_event` → `create_event` (with handle to update, without handle to create)
-5. `find_person` → `create_person` (with handle to update, without handle to create) + link individual events
-6. `find_place` → `create_place` (with handle to update, without handle to create)
-7. `find_family` → `create_family` (with handle to update, without handle to create) + link family events
+1. `find_type(type="repository", ...)` → `create_repository` (repository: with handle to update, without handle to create)
+2. `find_type(type="source", ...)` → `create_source` (source document: with handle to update, without handle to create)
+3. `find_type(type="citation", ...)` → `create_citation` (with handle to update, without handle to create)
+4. `find_type(type="event", ...)` → `create_event` (with handle to update, without handle to create)
+5. `find_type(type="person", ...)` → `create_person` (with handle to update, without handle to create) + link individual events
+6. `find_type(type="place", ...)` → `create_place` (with handle to update, without handle to create)
+7. `find_type(type="family", ...)` → `create_family` (with handle to update, without handle to create) + link family events
 
 **Remember: ALWAYS find first, then create with handle to UPDATE or without handle to CREATE.**
+
+**Shortcut**: `create_sourced_event` performs steps 2 to 4 in a single call -
+it creates the source, the citation and the event together and wires the
+citation to the event (optionally uploading media to the citation), which
+avoids copy-pasting handles between calls. The find-first rule still applies
+before you call it.
 
 **Event Distribution:**
 - **Individual events** → Person records (birth, death, baptism, burial)
@@ -250,7 +289,8 @@ When potential duplicates are found:
 - **URLs** (optional): Web links with type, path, and description
 
 **Place Process:**
-- **First**: Use `find_place` to search for existing place
+- **First**: Search for an existing place with
+  `find_type(type="place", gql='class = place and name.value = "Boston"')`
 - **If found and complete**: Use existing place as-is
 - **If found but missing info**: Use `create_place` with existing handle to update place
 - **If not found**: Use `create_place` without handle to create new place
@@ -269,19 +309,23 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 - **Type** (required): General, Research, Transcript, etc.
 
 **Note Process:**
-- **First**: Use `find_note` to search for existing note (if applicable)
+- **First**: Search for an existing note (if applicable) with
+  `find_type(type="note", gql='class = note and text.string ~ "marriage contract"')`
 - **If found and complete**: Use existing note as-is
 - **If found but missing info**: Use `create_note` with existing handle to update note
 - **If not found**: Use `create_note` without handle to create new note
 
 ### Creating Media
 **Media requires:**
-- **File** (required): Path to the media file (image, document, etc.)
-- **Title** (required): Descriptive title for the media
-- **Date** (optional): Date when the media was created or taken
+- **`desc`** (required): Descriptive title for the media
+- **`media_path`** (required when creating): Local path to the file to upload
+  (image, document, etc.); it is uploaded and then cleared, so it is only
+  needed when no handle is given
+- **`date`** (optional): Date when the media was created or taken
 
 **Media Process:**
-- **First**: Use `find_media` to search for existing media
+- **First**: Search for existing media with
+  `find_type(type="media", gql='class = media and desc ~ "marriage 1878"')`
 - **If found and complete**: Use existing media as-is
 - **If found but missing info**: Use `create_media` with existing handle to update media
 - **If not found**: Use `create_media` without handle to create new media
