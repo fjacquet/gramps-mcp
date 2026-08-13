@@ -365,6 +365,13 @@ class TestParameterAlignment:
         )
 
         # Check fields match current implementation
+        # Reason: replace_lists names list fields to overwrite rather than
+        # add to (e.g. ["placeref_list"] to move a place to a different
+        # parent instead of giving it a second one). It is popped from the
+        # raw arguments in data_management.py before PlaceSaveParams is
+        # constructed, so it never reaches Gramps as request data - it is
+        # only carried on this model to document/validate the tool's
+        # advertised input schema.
         implementation_fields = required_fields | {
             "handle",
             "gramps_id",
@@ -381,6 +388,7 @@ class TestParameterAlignment:
             "note_list",
             "tag_list",
             "private",
+            "replace_lists",
         }
         actual_fields = set(fields.keys())
         extra_fields = actual_fields - implementation_fields

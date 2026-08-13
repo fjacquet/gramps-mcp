@@ -72,6 +72,10 @@ class PlaceSaveParams(BaseModel):
         description=(
             "List field names to overwrite rather than add to, for example "
             "['placeref_list'] to move a place to a different parent instead "
-            "of giving it a second one. Omit to add to existing lists."
+            "of giving it a second one. Omit to add to existing lists. "
+            "Note: this value is consumed from the raw tool arguments and "
+            "popped before this model is built, so validated_params.replace_lists "
+            "is always None at runtime - it is declared here only so it "
+            "appears in the tool's advertised input schema."
         ),
     )
