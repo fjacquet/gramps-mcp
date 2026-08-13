@@ -1,6 +1,6 @@
-# Product requirements: gramps-mcp v1.7.0
+# Product requirements: gramps-mcp v1.7.1
 
-This document describes what gramps-mcp is as of v1.7.0 - its scope, its
+This document describes what gramps-mcp is as of v1.7.1 - its scope, its
 boundaries, and the constraints it operates under. It is descriptive, not a
 roadmap: everything here is true of the code today. [README.md](https://github.com/fjacquet/gramps-mcp#readme)
 covers what the product offers and lists the tools; the architecture decisions
@@ -135,7 +135,7 @@ python-dotenv, uvicorn and fastapi.
 **Source files are capped at 500 lines**, enforced by a pre-commit hook
 alongside ruff, formatting, copyright-header and no-emoji hooks (ADR 0006).
 
-## Known limitations as of v1.7.0
+## Known limitations as of v1.7.1
 
 These are specific, current and unfixed.
 
