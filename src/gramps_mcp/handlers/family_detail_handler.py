@@ -214,7 +214,7 @@ async def format_family_detail(client, tree_id: str, handle: str) -> str:
                 )
                 note_type = note_data.get("type", "")
                 note_id = note_data.get("gramps_id", "")
-                note_full_text = note_data.get("text", {}).get("string", "")
+                note_full_text = (note_data.get("text") or {}).get("string", "") or ""
                 note_text = note_full_text[:50]  # First 50 chars
                 if len(note_full_text) > 50:
                     note_text += "..."
