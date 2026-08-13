@@ -45,7 +45,16 @@ class SourcedEventData(BaseModel):
         ..., description="Event type (Birth, Death, Marriage, etc.)"
     )
     event_date: DateValue | None = Field(None, description="Event date object")
-    event_place: str | None = Field(None, description="Place handle")
+    event_place: str | None = Field(
+        None,
+        description=(
+            "Place handle where the event occurred. This is a handle, not a "
+            "name: use find_type(type='place', ...) to obtain one. Passing a "
+            "name overwrites the event's existing place. Validated "
+            "transitively when this value is passed through to "
+            "EventSaveParams."
+        ),
+    )
     event_description: str | None = Field(None, description="Event description")
 
     # Attaches to the citation, matching this codebase's existing sourcing

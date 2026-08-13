@@ -35,6 +35,24 @@ class TestPlaceValidation:
         with pytest.raises(ValidationError):
             EventSaveParams(type="Birth", citation_list=[], place="Saint-Germain")
 
+    def test_rejection_message_carries_guidance(self):
+        """The raised error must tell the caller what to do, not just fail.
+
+        A bare Pydantic ``pattern=`` constraint raises a generic message
+        that drops the field's description, leaving the caller with no clue
+        how to fix the call. This asserts the actual guidance text is
+        present in the raised error, not merely that a ValidationError was
+        raised.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            EventSaveParams(type="Birth", citation_list=[], place="Lyon")
+
+        message = str(exc_info.value)
+        assert "handle" in message
+        assert "name" in message
+        assert "find_type" in message
+        assert "Lyon" in message
+
     def test_handle_is_accepted(self):
         params = EventSaveParams(
             type="Birth", citation_list=[], place="103c4094f2414e2400974f979824"
