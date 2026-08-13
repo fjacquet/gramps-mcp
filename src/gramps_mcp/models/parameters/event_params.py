@@ -31,6 +31,16 @@ from pydantic import BaseModel, Field
 from .base_params import BaseGetMultipleParams
 from .date_params import DateValue
 
+# Reason: a Gramps handle is a lowercase hexadecimal string. Live-tree
+# sampling (2026-08-13, GET_PLACES) found handles of 26-32 lowercase hex
+# characters (0-9a-f only - no uppercase, no g-z). Place names contain
+# spaces, hyphens or accents, or are simply short, so this pattern separates
+# them. The 16-char floor stays below the smallest observed handle (26) to
+# tolerate handle shapes not covered by that sample. Passing a name here
+# used to overwrite a valid handle with text that resolves to nothing - the
+# trap documented in CLAUDE.md.
+HANDLE_PATTERN = r"^[0-9a-f]{16,}$"
+
 
 class EventSearchParams(BaseGetMultipleParams):
     """Parameters for searching multiple events."""
@@ -49,7 +59,15 @@ class EventSaveParams(BaseModel):
     type: str = Field(description="Event type (Birth, Death, Marriage, etc.)")
     date: DateValue | None = Field(None, description="Event date")
     description: str | None = Field(None, description="Event description")
-    place: str | None = Field(None, description="Place handle where event occurred")
+    place: str | None = Field(
+        None,
+        pattern=HANDLE_PATTERN,
+        description=(
+            "Place handle where the event occurred. This is a handle, not a "
+            "name: use find_type(type='place', ...) to obtain one. Passing a "
+            "name overwrites the event's existing place."
+        ),
+    )
     citation_list: list[str] = Field(..., description="List of citation handles")
     note_list: list[str] | None = Field(None, description="List of note handles")
 
