@@ -17,7 +17,7 @@ one is silent by nature, which is what makes them worth fixing together.
 
 ## Scope
 
-Six defects across five areas.
+Seven defects across five areas.
 
 | Defect | Files |
 |---|---|

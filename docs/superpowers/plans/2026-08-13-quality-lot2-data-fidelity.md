@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Fix six defects that let the Gramps MCP server store or display the wrong thing without ever raising an error.
+**Goal:** Fix seven defects that let the Gramps MCP server store or display the wrong thing without ever raising an error.
 
-**Architecture:** Four of the six are fixed in pure functions — `merge.py` and `handlers/date_handler.py` — which makes them testable without a server and gives this lot its strongest tests. The other two tighten Pydantic parameter models so malformed input is refused before any network call. One new model, `DateValue`, is introduced and applied to the five date fields that currently accept `dict[str, Any]`.
+**Architecture:** Four of the seven are fixed in pure functions — `merge.py` and `handlers/date_handler.py` — which makes them testable without a server and gives this lot its strongest tests. The other two tighten Pydantic parameter models so malformed input is refused before any network call. One new model, `DateValue`, is introduced and applied to the five date fields that currently accept `dict[str, Any]`.
 
 **Tech Stack:** Python 3.13, pydantic v2, httpx, MCP Python SDK 2.0, pytest + pytest-asyncio, uv, ruff.
 
@@ -1135,12 +1135,15 @@ class TestPlaceMedia:
         media_handle = None
 
         try:
-            media = await client.make_api_call(
-                api_call=ApiCalls.POST_MEDIA,
-                params={"desc": f"Pytest media {suffix}", "path": f"pytest-{suffix}"},
+            # Reason: POST_MEDIA takes no JSON body (file upload only, see
+            # api_mapping.py), so media objects are created via the
+            # multipart upload endpoint, not make_api_call(POST_MEDIA, ...).
+            upload_result = await client.upload_media_file(
+                file_content=f"pytest media {suffix}".encode(),
+                mime_type="text/plain",
                 tree_id=tree_id,
             )
-            media_handle = media[0]["new"]["handle"]
+            media_handle = upload_result[0]["new"]["handle"]
 
             created = await client.make_api_call(
                 api_call=ApiCalls.POST_PLACES,
@@ -1166,11 +1169,18 @@ class TestPlaceMedia:
                 )
             if media_handle:
                 await client.make_api_call(
-                    api_call=ApiCalls.DELETE_MEDIA, tree_id=tree_id, handle=media_handle
+                    api_call=ApiCalls.DELETE_MEDIA_ITEM,
+                    tree_id=tree_id,
+                    handle=media_handle,
                 )
 ```
 
-Confirm the enum names first with `grep -nE "POST_MEDIA|DELETE_MEDIA|POST_PLACES|GET_PLACE|DELETE_PLACE" src/gramps_mcp/models/api_calls.py`, and use the real ones.
+Media objects are created via `client.upload_media_file` (multipart upload),
+not `make_api_call(ApiCalls.POST_MEDIA, ...)` — `POST_MEDIA` takes no JSON
+body, it is upload-only. Clean up with `ApiCalls.DELETE_MEDIA_ITEM` (not
+`DELETE_MEDIA` — that enum member does not exist). Confirm the enum names
+first with `grep -nE "DELETE_MEDIA_ITEM|POST_PLACES|GET_PLACE|DELETE_PLACE" src/gramps_mcp/models/api_calls.py`,
+and use the real ones.
 
 - [ ] **Step 2: Run the tests to verify they fail**
 

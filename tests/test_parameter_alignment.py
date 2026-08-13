@@ -340,8 +340,9 @@ class TestParameterAlignment:
         """Test PlaceSaveParams parameters match current implementation."""
         # Current implementation: place_type is optional so a partial
         # update (e.g. moving a place via placeref_list) does not have to
-        # resupply it. It is still required by the API when creating a
-        # place, but that is enforced by Gramps, not this model.
+        # resupply it. It is also optional on creation: the API accepts a
+        # place with no place_type and Gramps stores "Unknown" (see
+        # tests/test_place_media.py::TestPlaceCreationWithoutType).
         # Optional: handle, gramps_id, name, code, alt_loc, place_type, placeref_list, alt_names, lat, long, urls, media_list, citation_list, note_list, tag_list, private
         model = PlaceSaveParams
         fields = model.model_fields
