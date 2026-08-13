@@ -139,9 +139,9 @@ alongside ruff, formatting, copyright-header and no-emoji hooks (ADR 0006).
 
 These are specific, current and unfixed.
 
-- `tests/test_server.py:82` still asserts `result.serverInfo.name`, which SDK
-  2.x renamed to `server_info`. It has been failing since the migration on
-  2026-08-02 and is carried as a known failure rather than fixed.
+- Several tests in `tests/test_data_management.py` depend on running in order,
+  passing handles from one test to the next. Run alone, they fail with "No
+  repository handle available from previous test".
 - `upload_media_file` in the client bypasses `_make_request`, so it has neither
   the shared 401 refresh-and-retry nor the connection and timeout wrapping every
   other call gets. A media upload that hits an expired token fails instead of

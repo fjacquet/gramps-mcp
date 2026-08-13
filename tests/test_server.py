@@ -79,7 +79,7 @@ class TestMCPServerSetup:
                 # Initialize session
                 result = await session.initialize()
                 assert isinstance(result, InitializeResult)
-                assert result.serverInfo.name == "gramps"
+                assert result.server_info.name == "gramps"
 
                 # List tools
                 tools_result = await session.list_tools()
