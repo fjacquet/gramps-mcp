@@ -15,7 +15,12 @@ Attribute sets exercised here, as described in gramps-usage-guide.md:
 - Media (file path, title, date)
 - Repository (name, type, URL, note)
 - Source (title, author, publication info, abbreviation, media, note)
-- Date structures (regular, about, before, after with quality indicators)
+
+Date structures (regular, about, before, after with quality indicators) were
+also listed here, but no creation tool takes the shape that block used, and
+the modifier/quality values themselves are covered by `tests/test_date_params.py`
+and `tests/test_date_handler.py`. See the note on `test_date_structure_attributes`
+in the git history of this file.
 """
 
 import re
@@ -100,31 +105,3 @@ class TestEntityAttributes:
         source_match = re.search(r"\[([a-f0-9]+)\]", source_text)
         assert source_match, f"No source handle found in: {source_text}"
         print(f"Source created with all attributes: {source_match.group(1)}")
-
-    @pytest.mark.asyncio
-    async def test_date_structure_attributes(self):
-        """The date structures the usage guide documents are all expressible."""
-        date_examples = [
-            {
-                "year": 1878,
-                "month": 6,
-                "day": 15,
-                "type": "regular",
-                "quality": "regular",
-            },  # Exact date
-            {
-                "year": 1850,
-                "type": "about",
-                "quality": "estimated",
-            },  # Estimated year only
-            {"year": 1860, "type": "before", "quality": "regular"},  # Before date
-            {
-                "year": 1870,
-                "month": 3,
-                "type": "after",
-                "quality": "calculated",
-            },  # After date
-        ]
-
-        for i, date_example in enumerate(date_examples, 1):
-            print(f"Date structure {i} validated: {date_example}")
