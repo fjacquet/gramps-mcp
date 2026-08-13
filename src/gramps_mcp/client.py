@@ -338,7 +338,21 @@ class GrampsWebAPIClient:
     async def upload_media_file(
         self, file_content: bytes, mime_type: str, tree_id: str = "default"
     ):
-        """Upload a media file to Gramps."""
+        """
+        Upload a media file to Gramps.
+
+        Args:
+            file_content (bytes): The raw file bytes to upload.
+            mime_type (str): The file's MIME type, sent as Content-Type.
+            tree_id (str): Family tree identifier (default: "default").
+
+        Returns:
+            dict: The parsed JSON response describing the created media object.
+
+        Raises:
+            GrampsAPIError: If the upload fails, formatted the same way as
+                every other request made through _make_request.
+        """
         url = self._build_url(tree_id, "media/")
         headers = await self._get_headers()
         headers["Content-Type"] = mime_type
@@ -346,7 +360,11 @@ class GrampsWebAPIClient:
         response = await self.auth_manager.client.request(
             method="POST", url=url, content=file_content, headers=headers
         )
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            error_msg = self._format_http_error(e)
+            raise GrampsAPIError(error_msg) from e
         return response.json()
 
 

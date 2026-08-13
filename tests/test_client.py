@@ -8,7 +8,7 @@ These tests require a working Gramps Web API instance with valid credentials.
 import pytest
 from dotenv import load_dotenv
 
-from src.gramps_mcp.client import GrampsWebAPIClient
+from src.gramps_mcp.client import GrampsAPIError, GrampsWebAPIClient
 from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.models.parameters.base_params import BaseGetMultipleParams
@@ -179,6 +179,30 @@ class TestMediaFileUpload:
             # The path should be set based on checksum
             assert "checksum" in media
             assert media["checksum"] != ""
+        finally:
+            await client.close()
+
+    @pytest.mark.asyncio
+    async def test_upload_media_file_failure_raises_gramps_api_error(self):
+        """A failed upload must raise GrampsAPIError with the formatted message,
+        not a raw httpx.HTTPStatusError.
+
+        An empty file body combined with a bogus mime type and a nonexistent
+        tree causes the live Gramps Web server to respond with a 500, which
+        is enough to exercise the failure path without a mock.
+        """
+        client = GrampsWebAPIClient()
+
+        try:
+            with pytest.raises(GrampsAPIError) as exc_info:
+                await client.upload_media_file(
+                    file_content=b"",
+                    mime_type="application/x-bogus-mime",
+                    tree_id="no-such-tree",
+                )
+            # The GrampsAPIError message must carry the formatted "Error"
+            # shape produced by _format_http_error, not httpx's own message.
+            assert "Server error" in str(exc_info.value)
         finally:
             await client.close()
 
