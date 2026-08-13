@@ -74,3 +74,48 @@ class TestMergePutData:
         merge_put_data(existing, changes)
         assert existing == {"note_list": ["n1"], "private": False}
         assert changes == {"note_list": ["n2"], "private": True}
+
+
+class TestReplaceLists:
+    """A named list is replaced outright instead of merged."""
+
+    def test_named_list_is_replaced(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": [{"ref": "BBB"}]}
+
+        merged = merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert merged["placeref_list"] == [{"ref": "BBB"}]
+
+    def test_unnamed_list_still_merges(self):
+        existing = {"media_list": [{"ref": "AAA"}]}
+        changes = {"media_list": [{"ref": "BBB"}]}
+
+        merged = merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert merged["media_list"] == [{"ref": "AAA"}, {"ref": "BBB"}]
+
+    def test_default_is_still_union(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": [{"ref": "BBB"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["placeref_list"] == [{"ref": "AAA"}, {"ref": "BBB"}]
+
+    def test_replacing_with_an_empty_list_clears_it(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": []}
+
+        merged = merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert merged["placeref_list"] == []
+
+    def test_inputs_are_not_mutated(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": [{"ref": "BBB"}]}
+
+        merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert existing == {"placeref_list": [{"ref": "AAA"}]}
+        assert changes == {"placeref_list": [{"ref": "BBB"}]}
