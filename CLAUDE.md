@@ -42,7 +42,15 @@
   The `integration` marker in `pytest.ini` is currently unused by any test, so
   `-m "not integration"` will NOT skip them. To run only the tests that work
   offline: `uv run pytest tests/test_merge.py tests/test_config.py
-  tests/test_client_merge.py tests/test_utils.py`.
+  tests/test_client_merge.py tests/test_utils.py
+  tests/test_http_error_detail.py`.
+- **Live tests run from the macOS host need `GRAMPS_API_URL=http://localhost:80`**
+  as an env override, not the `.env` value. `.env` points at
+  `host.docker.internal`, which only resolves inside the container. Do not
+  edit `.env` and do not commit the override.
+- **`tree_stats` returns a permission error even for the owner-role account
+  in `.env`.** A `tree_stats` failure ("Permission denied for this
+  operation") is an environment fact, not a regression.
 
 
 ### Style & Conventions
@@ -81,3 +89,6 @@
 - **Always confirm file paths and module names** exist before referencing them in code or tests.
 - **Never delete or overwrite existing code** unless explicitly instructed to
 - **Do not use emojis in the code** to maintain a clean and professional coding style.
+- **Never use `git stash`.** Compare against `main` with `git show
+  main:<path>` instead. An uncommitted change was lost in this repo, most
+  likely to a stash cycle.

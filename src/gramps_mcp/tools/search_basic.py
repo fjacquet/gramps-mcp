@@ -166,14 +166,17 @@ async def _search_entities(
         tree_id = settings.gramps_tree_id
 
         # Search using unified API client
-        response = await client.make_api_call(
-            api_call=api_call, params=params, tree_id=tree_id
+        response, headers = await client.make_api_call(
+            api_call=api_call, params=params, tree_id=tree_id, with_headers=True
         )
 
         # Extract results and count from response
         if isinstance(response, list):
             results = response
-            total_count = len(results)
+            # Reason: entity endpoints return a bare list for the current page,
+            # so the real match count is only in the header. Using the page
+            # length made every truncated search claim to be complete.
+            total_count = int(headers.get("x-total-count", len(results)))
         else:
             results = response.get("data", [])
             total_count = response.get("total_count", len(results))
@@ -183,7 +186,15 @@ async def _search_entities(
             formatted_results = f"No {entity_type} found"
         else:
             actual_total = total_count if total_count is not None else len(results)
-            displayed_count = len(results)
+            # Reason: the API only honors pagesize server-side when a page
+            # number is also supplied, so an unpaginated call can return
+            # every match while the caller only asked for a page. Count
+            # what is actually rendered below, not the raw response, or
+            # "showing" would be omitted while most results are dropped.
+            results_to_display = (
+                results[: params.pagesize] if params.pagesize else results
+            )
+            displayed_count = len(results_to_display)
 
             if actual_total > displayed_count:
                 header = (
@@ -196,9 +207,6 @@ async def _search_entities(
             formatted_results = header
 
             # Process each result with the appropriate handler
-            results_to_display = (
-                results[: params.pagesize] if params.pagesize else results
-            )
             for item in results_to_display:
                 if not isinstance(item, dict):
                     continue

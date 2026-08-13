@@ -364,6 +364,50 @@ async def get_ancestors_tool(client, arguments: dict) -> list[TextContent]:
         return _format_error_response(e, "ancestors search")
 
 
+def _apply_recent_changes_defaults(arguments: dict) -> dict:
+    """
+    Fill in recent_changes defaults, treating an explicit None/empty value
+    the same as an absent key.
+
+    Args:
+        arguments (dict): Raw tool arguments, possibly containing explicit
+            None values.
+
+    Returns:
+        dict: A new dict with ``sort`` defaulted to ``-id`` and ``page``
+            defaulted to ``1`` whenever the caller did not supply a real
+            value for either. A copy is returned so the caller's dict is
+            never mutated.
+
+    Reason:
+        The MCP HTTP dispatcher (server.py's create_handler) always calls
+        the tool handler with ``handler(arguments.model_dump())``, without
+        ``exclude_none=True``. Every optional field the schema declares
+        therefore arrives explicitly set to ``None`` rather than absent.
+        ``dict.setdefault`` only fires when the key is missing, so it never
+        catches this shape and the sort default below would silently no-op
+        for every caller going through that transport - which is exactly
+        how ``sort`` ended up always reaching the API as ``None``, even
+        though most recent first is the intended default. Falsy values
+        (``None`` or ``""``) are therefore treated as "not supplied"; a
+        real caller-supplied value still wins.
+
+        ``page`` gets the same treatment for a separate reason: the
+        underlying API only honours ``pagesize`` when ``page`` is also
+        given. A caller who sets ``pagesize`` alone (a very natural thing
+        to do) previously got the entire transaction history rendered into
+        the response, since ``page`` reached the API as ``None`` either
+        way. Defaulting an absent/None ``page`` to ``1`` bounds the result
+        the same way an explicit page request already did.
+    """
+    arguments = dict(arguments or {})
+    if not arguments.get("sort"):
+        arguments["sort"] = "-id"
+    if not arguments.get("page"):
+        arguments["page"] = 1
+    return arguments
+
+
 @with_client
 async def get_recent_changes_tool(client, arguments: dict) -> list[TextContent]:
     """
@@ -373,10 +417,7 @@ async def get_recent_changes_tool(client, arguments: dict) -> list[TextContent]:
         # Import and validate parameters
         from ..models.parameters.transactions_params import TransactionHistoryParams
 
-        # Validate parameters and ensure we get most recent changes first
-        if not arguments:
-            arguments = {}
-        arguments["sort"] = "-id"
+        arguments = _apply_recent_changes_defaults(arguments)
         params = TransactionHistoryParams(**arguments)
 
         # Get tree_id from settings

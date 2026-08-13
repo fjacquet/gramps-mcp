@@ -29,6 +29,8 @@ from ..client import GrampsAPIError
 from ..config import get_settings
 from ..handlers.family_detail_handler import format_family_detail
 from ..handlers.person_detail_handler import format_person_detail
+from ..models.api_calls import ApiCalls
+from ..models.parameters.base_params import BaseGetMultipleParams
 from .search_basic import with_client
 
 logger = logging.getLogger(__name__)
@@ -93,31 +95,119 @@ async def get_family_tool(client, arguments: dict) -> list[TextContent]:
         return _format_error_response(e, "family details retrieval")
 
 
+_GRAMPS_ID_API_CALLS = {
+    "person": ApiCalls.GET_PEOPLE,
+    "family": ApiCalls.GET_FAMILIES,
+}
+
+
+@with_client
+async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | None:
+    """
+    Look up an entity's handle from its user-facing identifier.
+
+    Args:
+        entity_type (str): "person" or "family".
+        gramps_id (str): The identifier shown in the Gramps interface.
+
+    Returns:
+        str | None: The handle, or None when no record matches or the
+            entity type is unsupported.
+    """
+    api_call = _GRAMPS_ID_API_CALLS.get(entity_type)
+    if api_call is None:
+        return None
+
+    # Reason: gramps_id is interpolated into the gql filter below without
+    # escaping. A stray double quote can close the quoted value early, and
+    # a well-formed injection like `x" or gramps_id!="` then resolves to an
+    # arbitrary, unrelated record instead of failing loudly - the dangerous
+    # half of this, versus a quote that merely produces a malformed filter
+    # the server rejects. A backslash is rejected too, since it is the
+    # other character that changes what a quoted GQL string means. This is
+    # a narrow refusal, not general GQL escaping - full escaping is out of
+    # scope here.
+    if '"' in gramps_id or "\\" in gramps_id:
+        raise ValueError(
+            f"gramps_id {gramps_id!r} contains a quote or backslash, "
+            "which is not allowed"
+        )
+
+    settings = get_settings()
+    tree_id = settings.gramps_tree_id
+
+    # Reason: BaseGetMultipleParams also has a native gramps_id field, which
+    # was tried live against the API and would sidestep the quoting question
+    # entirely. It was rejected: for a matching id it behaves the same as
+    # the gql filter, but for a missing id the API treats a bare gramps_id
+    # param as a single-record lookup and raises 404 (GrampsAPIError)
+    # instead of returning an empty list - which would turn a normal "not
+    # found" response into a caught error and break the distinction this
+    # function's callers rely on. The gql filter always returns a list, so
+    # it is kept despite the interpolation.
+    #
+    # Reason: the ignore comment below suppresses a mypy false positive -
+    # mypy's dataclass_transform support does not recognize
+    # BaseGetMultipleParams' other Optional fields (declared as
+    # Field(None, ...) with a positional default) as having defaults, so it
+    # flags them as missing even though they are optional at runtime; see
+    # the identical pattern in search_basic.py's find_anything_tool.
+    params = BaseGetMultipleParams(  # type: ignore[call-arg]
+        gql=f'gramps_id="{gramps_id}"', pagesize=1
+    )
+    results = await client.make_api_call(
+        api_call=api_call, params=params, tree_id=tree_id
+    )
+
+    if not results:
+        return None
+
+    handle = results[0].get("handle")
+    return handle if handle else None
+
+
 async def get_type_tool(arguments: dict) -> list[TextContent]:
     """Universal get tool for person and family details."""
     entity_type = arguments.get("type")
     handle = arguments.get("handle")
     gramps_id = arguments.get("gramps_id")
 
-    # If gramps_id provided but no handle, find the handle first
+    # If gramps_id provided but no handle, resolve it through the API
     if gramps_id and not handle:
-        from .search_basic import find_type_tool
-
-        search_result = await find_type_tool(
-            {"type": entity_type, "gql": f'gramps_id="{gramps_id}"', "max_results": 1}
-        )
-
-        # Extract handle from search result
-        search_text = search_result[0].text
-        import re
-
-        handle_match = re.search(r"\[([^\]]+)\]", search_text)
-        if handle_match:
-            handle = handle_match.group(1)
+        # Reason: this used to regex-scrape the handle out of text formatted
+        # for display, so any change to the rendering silently broke lookup by
+        # identifier. Read the structured record instead.
+        try:
+            handle = await _resolve_gramps_id(entity_type, gramps_id)
+        except Exception as e:
+            # Reason: match this file's convention (get_person_tool,
+            # get_family_tool) of catching and reformatting through
+            # _format_error_response, so a caller cannot tell which tool
+            # failed by the shape of the message.
+            return _format_error_response(e, "gramps_id resolution")
+        if handle is None:
+            return [
+                TextContent(
+                    type="text",
+                    text=(
+                        f"No {entity_type} found with gramps_id {gramps_id}. "
+                        f"Check the identifier, or use find_type to search."
+                    ),
+                )
+            ]
 
     if entity_type == "person" and handle:
         return await get_person_tool({"person_handle": handle})
     elif entity_type == "family" and handle:
         return await get_family_tool({"family_handle": handle})
 
-    return [TextContent(type="text", text="get_type_tool not yet implemented")]
+    return [
+        TextContent(
+            type="text",
+            text=(
+                f"Unable to resolve type '{entity_type}': provide a supported "
+                f"type ('person' or 'family') together with a handle or "
+                f"gramps_id."
+            ),
+        )
+    ]
