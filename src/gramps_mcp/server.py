@@ -252,7 +252,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "description": (
             "List, get, or create Gramps Web user accounts with generated "
             "passwords (action: list/get/create - no update or delete). "
-            "Requires an owner account. Roles are capped at editor. "
+            "Requires an owner or admin account. Roles are capped at editor. "
             "WARNING: generated passwords appear in the response - have "
             "users change them on first login"
         ),
