@@ -330,6 +330,136 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 - **If found but missing info**: Use `create_media` with existing handle to update media
 - **If not found**: Use `create_media` without handle to create new media
 
+## Analysis and Administration Tools
+
+The tools above write data. The tools below read and analyse what is already in
+the tree, plus two that manage tags and accounts. Use the read tools **before**
+writing: a timeline or a relationship check is how you confirm that the person
+in front of you is the person in the record.
+
+### `get_timeline` - what already happened to a person or family
+
+`get_timeline(scope=..., target=...)`. `scope` is required and must be one of
+`person`, `family`, `people`, `families`.
+
+- `target` (handle or gramps_id) is **required** for `scope="person"` and
+  `scope="family"`. For `scope="people"` it is the optional anchor person. It is
+  ignored for `scope="families"`.
+- `handles`: comma-delimited handles, for `scope="people"` and
+  `scope="families"` only.
+- `dates`: range filter, e.g. `"1900/1/1-1950/1/1"` (also `"-1950/1/1"` and
+  `"1900/1/1-"`).
+- `events` / `event_classes`: comma-delimited lists to restrict which events
+  appear.
+- `first` / `last`: include events before/after the anchor's own first/last
+  event. `scope="person"` and `scope="people"` only.
+- `precision` (1-3): `scope="people"` only.
+- `ratings`, `discard_empty`, `page`, `pagesize`: not used for
+  `scope="person"`.
+
+**Run `get_timeline(scope="person", target=...)` on every candidate match before
+you decide two records are the same person.** The event sequence disambiguates
+homonyms far more reliably than a name search does.
+
+### `get_facts` - tree statistics. Do not use `tree_stats`
+
+`tree_stats` returns "Permission denied for this operation" for every account,
+including the owner role. Do not call it. Use `get_facts` instead.
+
+`get_facts()` with no arguments reports on the whole tree.
+
+- `rank` (default 1): how many objects to return per ranked statistic. Raise it
+  to see the top N rather than only the top one.
+- `living` (default `IncludeAll`): how living people are handled. One of
+  `IncludeAll`, `FullNameOnly`, `LastNameOnly`, `ReplaceCompleteName`,
+  `ExcludeAll`.
+- `private` (default false): set true to exclude records marked private.
+- **Narrowing requires two arguments together.** Pass `person` with a filter
+  name **and** `gramps_id` (or `handle`) identifying the person the filter
+  applies to. The built-in filter names are `Ancestors`, `Descendants`,
+  `DescendantFamilies` and `CommonAncestor`; a custom filter name defined in the
+  tree is also accepted. A bare `gramps_id` with no `person` filter narrows
+  nothing - you get whole-tree statistics back. When both `gramps_id` and
+  `handle` are given, `gramps_id` wins.
+
+### `get_relationship` - how two people are related
+
+`get_relationship(person1=..., person2=...)`. Each accepts a handle or a
+gramps_id.
+
+- `all_relationships` (default false): false returns only the most direct
+  relationship; true returns every path found.
+- `depth`: search depth in generations. Omit it to use the API default of 15.
+
+### `check_living` - probably-alive estimate, not a fact
+
+`check_living(person=...)` accepts a handle or a gramps_id.
+
+This is a **computed estimate** derived from the dates around the person, not a
+recorded status. A person with no death event reads as living, however old the
+birth date is. Never report the result to the user as established fact; if it
+matters, look for a death event and source it.
+
+- `include_dates` (default true): also returns estimated birth and death dates
+  with the reasoning behind them.
+- `average_generation_gap`, `max_age_probably_alive`,
+  `max_sibling_age_difference`: tune the estimate. Leave them unset unless the
+  user asks for a specific assumption.
+
+### `get_ancestors` / `get_descendants` - token-heavy, start small
+
+`get_ancestors(gramps_id=..., max_generations=5)` and
+`get_descendants(gramps_id=..., max_generations=5)`.
+
+- `gramps_id` is **required** and is the only accepted identifier - these two
+  tools do not take a handle.
+- `max_generations` defaults to 5 and is passed straight through. **No cap is
+  enforced.** A large value on a well-populated tree will overflow the context
+  window. Do not raise it above 5 without the user asking for more generations.
+
+### `recent_changes` - what was modified lately
+
+`recent_changes()` with no arguments returns the most recent transactions.
+
+- `sort` defaults to `-id` (newest first); pass `id` for oldest first.
+- `page` defaults to 1. `pagesize` only reaches the API alongside `page`, and
+  because `page` is defaulted for you, `pagesize` alone applies to page 1.
+- `before` / `after`: Unix timestamps bounding the commit time.
+- `old` / `new`: include the raw object data before/after each change. Both are
+  very token-heavy - set them only when you need to inspect one specific edit.
+
+Use it to check what your own previous calls actually wrote before reporting
+back to the user.
+
+### `manage_tags` - list, read, create and update tags
+
+`manage_tags(action=...)` where `action` is `list`, `get` or `create`. **There is
+no delete.**
+
+- `list`: optional `page`, `pagesize` (1-100), `sort` (a list of field names).
+- `get`: `handle` is required.
+- `create`: `name` is required for a new tag. Pass `handle` as well to update an
+  existing tag instead of creating a second one with the same name - always
+  `list` first and reuse the handle.
+- `color` and `priority` are optional on both create and update.
+
+### `manage_users` - account administration
+
+`manage_users(action=...)` where `action` is `list`, `get` or `create`.
+
+- **Requires an owner or admin account.** With any lesser role every action
+  fails with a permission error. Do not retry - report it to the user.
+- `get` requires `name`. Usernames must match `^[A-Za-z0-9_.-]{2,64}$`.
+- `create` requires `users`, a list of objects with `name`, `email`, optional
+  `full_name`, and `role` (default `member`). **Roles are capped at editor**: only
+  `guest`, `member`, `contributor` and `editor` can be granted - this tool cannot
+  create an owner or an admin. Up to 50 accounts per call.
+- **There is no update, no delete and no password reset.** A mistyped account
+  cannot be corrected through this server.
+- Passwords are generated and appear in the response. That is the only copy.
+  Relay them to the user immediately and tell them to change the password on
+  first login.
+
 ## Date Format Specification
 
 **IMPORTANT**: All dates in Gramps use a specific structure with multiple components:
