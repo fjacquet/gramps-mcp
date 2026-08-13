@@ -121,6 +121,16 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
     settings = get_settings()
     tree_id = settings.gramps_tree_id
 
+    # Reason: BaseGetMultipleParams also has a native gramps_id field, which
+    # was tried live against the API and would sidestep the quoting question
+    # entirely. It was rejected: for a matching id it behaves the same as
+    # the gql filter, but for a missing id the API treats a bare gramps_id
+    # param as a single-record lookup and raises 404 (GrampsAPIError)
+    # instead of returning an empty list - which would turn a normal "not
+    # found" response into a caught error and break the distinction this
+    # function's callers rely on. The gql filter always returns a list, so
+    # it is kept despite the interpolation.
+    #
     # Reason: the ignore comment below suppresses a mypy false positive -
     # mypy's dataclass_transform support does not recognize
     # BaseGetMultipleParams' other Optional fields (declared as
@@ -152,7 +162,14 @@ async def get_type_tool(arguments: dict) -> list[TextContent]:
         # Reason: this used to regex-scrape the handle out of text formatted
         # for display, so any change to the rendering silently broke lookup by
         # identifier. Read the structured record instead.
-        handle = await _resolve_gramps_id(entity_type, gramps_id)
+        try:
+            handle = await _resolve_gramps_id(entity_type, gramps_id)
+        except Exception as e:
+            # Reason: match this file's convention (get_person_tool,
+            # get_family_tool) of catching and reformatting through
+            # _format_error_response, so a caller cannot tell which tool
+            # failed by the shape of the message.
+            return _format_error_response(e, "gramps_id resolution")
         if handle is None:
             return [
                 TextContent(

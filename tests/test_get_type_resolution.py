@@ -20,7 +20,15 @@ Integration tests for resolving a gramps_id in get_type.
 
 import pytest
 
-from src.gramps_mcp.tools.search_details import get_type_tool
+from src.gramps_mcp.client import GrampsWebAPIClient
+from src.gramps_mcp.config import get_settings
+from src.gramps_mcp.models.api_calls import ApiCalls
+from src.gramps_mcp.tools.search_details import _resolve_gramps_id, get_type_tool
+
+# A real family gramps_id from the live tree, found via a direct
+# ApiCalls.GET_FAMILIES probe (F0308 -> handle 103f77ffdd8f25ec1684cd0236c4),
+# the same way I0076 was confirmed for the person case.
+KNOWN_FAMILY_GRAMPS_ID = "F0308"
 
 
 class TestGetTypeResolution:
@@ -48,3 +56,63 @@ class TestGetTypeResolution:
     async def test_handle_still_works(self):
         by_id = await get_type_tool({"type": "person", "gramps_id": "I0076"})
         assert "not yet implemented" not in by_id[0].text
+
+    @pytest.mark.asyncio
+    async def test_family_gramps_id_resolves(self):
+        result = await get_type_tool(
+            {"type": "family", "gramps_id": KNOWN_FAMILY_GRAMPS_ID}
+        )
+        text = result[0].text
+
+        assert "not yet implemented" not in text
+        assert KNOWN_FAMILY_GRAMPS_ID in text
+
+
+class TestResolveGrampsIdIndependentOfRendering:
+    """
+    _resolve_gramps_id must return the correct handle on its own, proven
+    against a ground-truth handle fetched through a separate, direct
+    structured API call rather than through get_type_tool's formatted
+    output. This is the decoupling half of the fix: resolution no longer
+    depends on how results are rendered for display, so it stays correct
+    even if the display formatting changes.
+    """
+
+    @pytest.mark.asyncio
+    async def test_resolve_gramps_id_matches_ground_truth_handle_for_person(self):
+        client = GrampsWebAPIClient()
+        tree_id = get_settings().gramps_tree_id
+
+        # Ground truth obtained directly from the API, independent of
+        # _resolve_gramps_id and of any text formatter.
+        ground_truth = await client.make_api_call(
+            api_call=ApiCalls.GET_PEOPLE,
+            params={"gramps_id": "I0076"},
+            tree_id=tree_id,
+        )
+        expected_handle = ground_truth[0]["handle"]
+
+        handle = await _resolve_gramps_id("person", "I0076")
+
+        assert handle == expected_handle
+
+    @pytest.mark.asyncio
+    async def test_resolve_gramps_id_matches_ground_truth_handle_for_family(self):
+        client = GrampsWebAPIClient()
+        tree_id = get_settings().gramps_tree_id
+
+        ground_truth = await client.make_api_call(
+            api_call=ApiCalls.GET_FAMILIES,
+            params={"gramps_id": KNOWN_FAMILY_GRAMPS_ID},
+            tree_id=tree_id,
+        )
+        expected_handle = ground_truth[0]["handle"]
+
+        handle = await _resolve_gramps_id("family", KNOWN_FAMILY_GRAMPS_ID)
+
+        assert handle == expected_handle
+
+    @pytest.mark.asyncio
+    async def test_resolve_gramps_id_returns_none_for_missing_id(self):
+        handle = await _resolve_gramps_id("person", "I999999")
+        assert handle is None
