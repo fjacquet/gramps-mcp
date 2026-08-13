@@ -364,6 +364,39 @@ async def get_ancestors_tool(client, arguments: dict) -> list[TextContent]:
         return _format_error_response(e, "ancestors search")
 
 
+def _apply_recent_changes_defaults(arguments: dict) -> dict:
+    """
+    Fill in recent_changes defaults, treating an explicit None/empty value
+    the same as an absent key.
+
+    Args:
+        arguments (dict): Raw tool arguments, possibly containing explicit
+            None values.
+
+    Returns:
+        dict: A new dict with ``sort`` defaulted to ``-id`` whenever the
+            caller did not supply a real value for it. A copy is returned
+            so the caller's dict is never mutated.
+
+    Reason:
+        The MCP HTTP dispatcher (server.py's create_handler) always calls
+        the tool handler with ``handler(arguments.model_dump())``, without
+        ``exclude_none=True``. Every optional field the schema declares
+        therefore arrives explicitly set to ``None`` rather than absent.
+        ``dict.setdefault`` only fires when the key is missing, so it never
+        catches this shape and the sort default below would silently no-op
+        for every caller going through that transport - which is exactly
+        how ``sort`` ended up always reaching the API as ``None``, even
+        though most recent first is the intended default. Falsy values
+        (``None`` or ``""``) are therefore treated as "not supplied"; a
+        real caller-supplied value still wins.
+    """
+    arguments = dict(arguments or {})
+    if not arguments.get("sort"):
+        arguments["sort"] = "-id"
+    return arguments
+
+
 @with_client
 async def get_recent_changes_tool(client, arguments: dict) -> list[TextContent]:
     """
@@ -373,11 +406,7 @@ async def get_recent_changes_tool(client, arguments: dict) -> list[TextContent]:
         # Import and validate parameters
         from ..models.parameters.transactions_params import TransactionHistoryParams
 
-        # Reason: most recent first is a sensible default, but the schema
-        # documents sort as the caller's to choose, and writing into the
-        # caller's dict is a side effect no other tool here has.
-        arguments = dict(arguments or {})
-        arguments.setdefault("sort", "-id")
+        arguments = _apply_recent_changes_defaults(arguments)
         params = TransactionHistoryParams(**arguments)
 
         # Get tree_id from settings
