@@ -25,6 +25,8 @@ API calls supported in this category:
 - DELETE_PLACE: Delete the place
 """
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from .base_params import BaseGetMultipleParams, BaseGetSingleParams
@@ -56,11 +58,20 @@ class PlaceSaveParams(BaseModel):
     placeref_list: list[dict] | None = Field(
         None, description="List of place references"
     )
-    alt_names: list[str] | None = Field(None, description="Alternative names")
+    alt_names: list[dict[str, Any]] | None = Field(
+        None,
+        description=(
+            "Alternative names as PlaceName objects, for example "
+            "[{'value': 'Lugdunum'}]"
+        ),
+    )
     lat: str | None = Field(None, description="Latitude coordinate")
     long: str | None = Field(None, description="Longitude coordinate")
     urls: list[dict] | None = Field(None, description="Associated URLs")
-    media_list: list[str] | None = Field(None, description="List of media handles")
+    media_list: list[dict[str, Any]] | None = Field(
+        None,
+        description="Media references as objects, for example [{'ref': '<handle>'}]",
+    )
     citation_list: list[str] | None = Field(
         None, description="List of citation handles"
     )
