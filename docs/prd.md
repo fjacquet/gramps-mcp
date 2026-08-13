@@ -143,10 +143,22 @@ These are specific, current and unfixed.
   the shared 401 refresh-and-retry nor the connection and timeout wrapping every
   other call gets. A media upload that hits an expired token fails instead of
   retrying, and a network failure surfaces as a raw httpx exception.
-- `tests/test_workflow_attributes.py::test_source_attributes` passes five key
-  names `SourceSaveParams` does not declare, so Pydantic drops them silently.
-  The test creates a title-only source while claiming to cover every attribute
-  the usage guide lists.
+- `SourceSaveParams` declares no field for a source abbreviation, though the
+  usage guide lists one among a source's attributes. No tool call can set it.
+- `tests/test_workflow_marriage.py`, in the person-creation helper around lines
+  444 and 454, passes `event_handle`, `event_role`, `note_handle`,
+  `media_handle` and `url` to `create_person_tool`. `PersonData` declares
+  `event_ref_list`, `note_list`, `media_list` and `urls`, so Pydantic drops all
+  five silently. The end-to-end marriage test creates two people linked to
+  nothing and still passes.
+- The same calls pass `primary_name` as `{"given_name": ..., "surname": ...}`.
+  `PersonData.primary_name` is typed `dict[str, Any]`, so nothing validates its
+  shape, while every other call site and every handler uses `first_name` plus
+  `surname_list`. The people that test creates are very likely nameless.
+- As a consequence of the shape mismatch above, `find_person_tool` cannot match
+  those people on a later run, so every suite run adds two more people, a
+  family, a note and a media object to the live tree. None of them carry the
+  `Pytest Lot5` prefix that makes test leftovers findable.
 - Three tests assert a MIME type appears in output that structurally cannot
   contain one; only `format_media` emits a MIME type, and the source, citation,
   person and family formatters emit `Attached media: {gramps_ids}` instead.
