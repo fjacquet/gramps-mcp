@@ -143,7 +143,7 @@ Tests that write to the tree must clean up in a `finally` block, as
 Live tests need a URL override from the macOS host, because `.env` targets
 `host.docker.internal`, which only resolves inside the container:
 
-```
+```bash
 GRAMPS_API_URL=http://localhost:80 uv run pytest ...
 ```
 

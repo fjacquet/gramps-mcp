@@ -14,6 +14,13 @@ async def _find_person_with_media(client, tree_id: str) -> dict | None:
     """
     Find a person in the live tree that carries at least one media reference.
 
+    Pages through GET_PEOPLE rather than trusting a single page, since a
+    person carrying media is not guaranteed to fall within the first
+    `pagesize` results. Stops at the first match, or once a page comes
+    back shorter than requested (the last page), or after a bounded
+    number of pages so a misunderstanding of the paging contract cannot
+    spin forever.
+
     Args:
         client (GrampsWebAPIClient): Client to query with.
         tree_id (str): Family tree identifier.
@@ -22,12 +29,23 @@ async def _find_person_with_media(client, tree_id: str) -> dict | None:
         dict | None: The first person carrying media, or None if the tree
             has none.
     """
-    people = await client.make_api_call(
-        api_call=ApiCalls.GET_PEOPLE, params={"pagesize": 200}, tree_id=tree_id
-    )
-    for person in people if isinstance(people, list) else []:
-        if person.get("media_list"):
-            return person
+    pagesize = 200
+    max_pages = 20  # Reason: sane upper bound (4000 people) against a
+    # misunderstood paging contract; the live tree has ~908 people.
+    # Reason: GET_PEOPLE pages are 1-indexed - page=0 returns 422 from
+    # the live API.
+    for page in range(1, max_pages + 1):
+        people = await client.make_api_call(
+            api_call=ApiCalls.GET_PEOPLE,
+            params={"page": page, "pagesize": pagesize},
+            tree_id=tree_id,
+        )
+        people = people if isinstance(people, list) else []
+        for person in people:
+            if person.get("media_list"):
+                return person
+        if len(people) < pagesize:
+            return None
     return None
 
 
