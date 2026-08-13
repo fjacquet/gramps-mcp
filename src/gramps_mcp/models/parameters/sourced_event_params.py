@@ -21,9 +21,12 @@ Chains source + citation + event creation into one call, auto-wiring the
 citation onto the event so callers never retype a handle between steps.
 """
 
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
 
 from .date_params import DateValue
+from .event_params import HANDLE_PATTERN
 
 
 class SourcedEventData(BaseModel):
@@ -50,9 +53,7 @@ class SourcedEventData(BaseModel):
         description=(
             "Place handle where the event occurred. This is a handle, not a "
             "name: use find_type(type='place', ...) to obtain one. Passing a "
-            "name overwrites the event's existing place. Validated "
-            "transitively when this value is passed through to "
-            "EventSaveParams."
+            "name overwrites the event's existing place."
         ),
     )
     event_description: str | None = Field(None, description="Event description")
@@ -65,3 +66,33 @@ class SourcedEventData(BaseModel):
     note_list: list[str] | None = Field(
         None, description="Note handles to attach to the citation"
     )
+
+    @field_validator("event_place")
+    @classmethod
+    def validate_event_place_is_handle(cls, value: str | None) -> str | None:
+        """Reject a place name before any source/citation/event is created.
+
+        This mirrors ``EventSaveParams.validate_place_is_handle`` (see
+        ``event_params.py``), but must run here too: by the time this value
+        reaches ``EventSaveParams`` in ``create_sourced_event_tool``, the
+        source, media and citation have already been committed to the live
+        tree, so a refusal at that point leaves orphans behind. Validating
+        it on this model refuses the call before any network call is made.
+
+        Args:
+            value (str | None): The proposed place value.
+
+        Returns:
+            str | None: The value unchanged, if it is a valid handle.
+
+        Raises:
+            ValueError: If value is not None and does not match
+                HANDLE_PATTERN.
+        """
+        if value is not None and not re.match(HANDLE_PATTERN, value):
+            raise ValueError(
+                f"event_place must be a place handle, not a name. Got: "
+                f"{value!r}. Use find_type(type='place', ...) to obtain the "
+                "handle for this place."
+            )
+        return value
