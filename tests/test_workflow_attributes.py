@@ -27,7 +27,10 @@ import re
 
 import pytest
 
-from src.gramps_mcp.tools.data_management import create_source_tool
+from src.gramps_mcp.tools.data_management import (
+    create_repository_tool,
+    create_source_tool,
+)
 from tests.workflow_helpers import create_test_media, create_test_note
 
 pytestmark = pytest.mark.integration
@@ -64,21 +67,31 @@ class TestEntityAttributes:
     @pytest.mark.asyncio
     async def test_repository_attributes(self, note_handle):
         """A repository is created with name, type, URL and note."""
-        repository_result = await create_source_tool(
+        repository_result = await create_repository_tool(
             {
-                "title": "Test Repository for Comprehensive Testing",
+                "name": "Test Repository for Comprehensive Testing",
                 "type": "Archive",
-                "url": {
-                    "type": "Website",
-                    "path": "https://test-archive.org",
-                    "description": "Test archive website",
-                },
-                "note_handle": note_handle,
+                "urls": [
+                    {
+                        "type": "Web Home",
+                        "path": "https://test-archive.org",
+                        "desc": "Test archive website",
+                    }
+                ],
+                "note_list": [note_handle],
             }
         )
 
         assert isinstance(repository_result, list) and len(repository_result) == 1
         repo_text = repository_result[0].text
+        assert "Error:" not in repo_text, repo_text
+        # Reason: the parameter models ignore unknown keys, so a handle alone
+        # would still be returned if every attribute had been dropped. Each
+        # attribute has to be visible in the output to prove it was accepted.
+        assert "Test Repository for Comprehensive Testing" in repo_text, repo_text
+        assert "Archive" in repo_text, repo_text
+        assert "https://test-archive.org" in repo_text, repo_text
+        assert "Attached notes:" in repo_text, repo_text
         repo_match = re.search(r"\[([a-f0-9]+)\]", repo_text)
         assert repo_match, f"No repository handle found in: {repo_text}"
         print(f"Repository created with all attributes: {repo_match.group(1)}")
