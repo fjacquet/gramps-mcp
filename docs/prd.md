@@ -139,16 +139,21 @@ alongside ruff, formatting, copyright-header and no-emoji hooks (ADR 0006).
 
 These are specific, current and unfixed.
 
-- Several tests in `tests/test_data_management.py` depend on running in order,
-  passing handles from one test to the next. Run alone, they fail with "No
-  repository handle available from previous test".
 - `upload_media_file` in the client bypasses `_make_request`, so it has neither
   the shared 401 refresh-and-retry nor the connection and timeout wrapping every
   other call gets. A media upload that hits an expired token fails instead of
   retrying, and a network failure surfaces as a raw httpx exception.
-- The file-length pre-commit hook carries `exclude: ^tests/`, so the 500-line
-  rule that CLAUDE.md and CONTRIBUTING.md both state without qualification is
-  unenforced there. Three test files exceed it today.
+- `tests/test_workflow_attributes.py::test_source_attributes` passes five key
+  names `SourceSaveParams` does not declare, so Pydantic drops them silently.
+  The test creates a title-only source while claiming to cover every attribute
+  the usage guide lists.
+- Three tests assert a MIME type appears in output that structurally cannot
+  contain one; only `format_media` emits a MIME type, and the source, citation,
+  person and family formatters emit `Attached media: {gramps_ids}` instead.
+  Tracked as issue #13.
+- `create_sourced_event` always creates a new source and cannot reuse an
+  existing one, so recording two facts from one document produces duplicate
+  sources that no tool can merge or delete. Tracked as issue #12.
 - `tree_stats` returns a permission error even for the owner-role account used
   in the reference deployment. `get_facts` is the working alternative for
   tree-level numbers.

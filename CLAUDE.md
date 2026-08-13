@@ -69,12 +69,17 @@
 - **`tree_stats` returns a permission error even for the owner-role account
   in `.env`.** A `tree_stats` failure ("Permission denied for this
   operation") is an environment fact, not a regression.
-- **`tests/test_parameter_alignment.py` holds hardcoded field inventories that
-  must track `src/gramps_mcp/resources/gramps-usage-guide.md`.** Adding a field
-  to a parameter model without documenting it in that guide fails this test.
-  It is doing its job: the guide is served to MCP clients, so an undocumented
-  parameter is one the assistant can pass but was never told about. Fix the
-  guide, then the inventory - not the inventory alone.
+- **The `tests/test_alignment_*.py` modules hold hardcoded field inventories
+  that must track `src/gramps_mcp/resources/gramps-usage-guide.md`.** Adding a
+  field to a parameter model without documenting it in that guide fails these
+  tests. They are doing their job: the guide is served to MCP clients, so an
+  undocumented parameter is one the assistant can pass but was never told
+  about. Fix the guide, then the inventory - not the inventory alone.
+- **The parameter models ignore unknown keys.** Pydantic's default
+  `extra="ignore"` applies, so a test passing a field name a model does not
+  declare has that field silently dropped - the call still succeeds and the
+  test can still pass while exercising nothing. Check a key against the model
+  in `src/gramps_mcp/models/parameters/` before trusting a test that uses it.
 - **The 500-line rule is enforced in `tests/` as well as `src/`.**
   `.pre-commit-config.yaml`'s `check-file-length` hook covers the whole tree;
   there is no exclusion for tests.
