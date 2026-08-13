@@ -56,6 +56,10 @@ Create the actual source document within the repository:
 - **Author** (optional): Author or compiler of the source
 - **Publication info** (optional): Publisher, publication date, edition, etc.
 - **Media** (optional): If present, use `create_media` tool first, then link to source
+- **`media_path`** (optional): Local path to a file to upload and attach in one
+  step, instead of calling `create_media` first. The resulting reference is
+  appended to `media_list`; the path is cleared after upload, so pass it only
+  when the file is not already in the tree
 - **Note** (optional): If present, use `create_note` tool first, then link to source
 
 **Process:**
@@ -73,6 +77,10 @@ Create a citation that references the specific page/entry in the source:
 - **Page** (optional): "Page 45, Entry 23", "Certificate #1234", specific page reference
 - **Date** (optional): Date when the citation was accessed or created
 - **Media** (optional): If present, use `create_media` tool first, then link to citation
+- **`media_path`** (optional): Local path to a file to upload and attach in one
+  step, instead of calling `create_media` first. The resulting reference is
+  appended to `media_list`; the path is cleared after upload, so pass it only
+  when the file is not already in the tree
 - **Notes** (optional): If present, use `create_note` tool first, then link to citation
 
 **Process:**
@@ -268,9 +276,9 @@ When potential duplicates are found:
 
 **Shortcut**: `create_sourced_event` performs steps 2 to 4 in a single call -
 it creates the source, the citation and the event together and wires the
-citation to the event (optionally uploading media to the citation), which
-avoids copy-pasting handles between calls. The find-first rule still applies
-before you call it.
+citation to the event, which avoids copy-pasting handles between calls. Pass
+`media_path` to upload a local file and attach it to the citation in the same
+call. The find-first rule still applies before you call it.
 
 **Event Distribution:**
 - **Individual events** → Person records (birth, death, baptism, burial)

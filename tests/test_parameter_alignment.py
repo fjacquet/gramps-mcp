@@ -109,7 +109,12 @@ class TestParameterAlignment:
         )
 
         # Check fields match current implementation
-        implementation_fields = required_fields | {"reporef_list", "author", "pubinfo"}
+        implementation_fields = required_fields | {
+            "reporef_list",
+            "author",
+            "pubinfo",
+            "media_path",
+        }
         system_fields = {
             "handle",
             "gramps_id",
@@ -154,7 +159,13 @@ class TestParameterAlignment:
         )
 
         # Check no extra fields beyond what guide allows (plus system fields from BaseDataModel)
-        guide_fields = required_fields | {"page", "date", "media", "urls"}
+        guide_fields = required_fields | {
+            "page",
+            "date",
+            "media",
+            "urls",
+            "media_path",
+        }
         system_fields = {
             "handle",
             "gramps_id",
@@ -484,6 +495,7 @@ class TestParameterAlignment:
             "description",
             "mime",
             "citation_list",
+            "media_path",
         }  # media-specific fields
         system_fields = {
             "handle",

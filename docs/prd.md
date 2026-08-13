@@ -139,10 +139,6 @@ alongside ruff, formatting, copyright-header and no-emoji hooks (ADR 0006).
 
 These are specific, current and unfixed.
 
-- Three tests in `tests/test_parameter_alignment.py` fail offline - the source,
-  citation and media alignment cases - on a `media_path` mismatch between the
-  parameter models and what the alignment check expects. The offline suite is
-  otherwise green.
 - `tests/test_server.py:82` still asserts `result.serverInfo.name`, which SDK
   2.x renamed to `server_info`. It has been failing since the migration on
   2026-08-02 and is carried as a known failure rather than fixed.

@@ -51,9 +51,8 @@ uv run pytest tests/test_search_basic.py::TestFindPersonTool::test_find_person -
 
 Without a live instance, use `uv run pytest -m "not integration"`. Server-dependent
 modules (or, in a mixed module, the classes that need a server) carry
-`pytestmark = pytest.mark.integration`. That offline selection currently reports
-three known failures in `tests/test_parameter_alignment.py`, from a `media_path`
-mismatch that predates the marker work - expected, not a regression.
+`pytestmark = pytest.mark.integration`. That offline selection is green; a
+failure there is a regression, not an environment problem.
 
 The search tests were split across `tests/test_search_basic.py`,
 `test_search_details.py`, `test_search_find_anything.py`, `test_search_find_type.py`
