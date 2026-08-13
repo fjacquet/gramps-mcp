@@ -1294,7 +1294,7 @@ Skip this step if ruff changed nothing. Do not create an empty commit.
 ```bash
 rtk git push -u origin fix/quality-lot2-data-fidelity
 rtk gh pr create --repo fjacquet/gramps-mcp --title "fix: quality lot 2 - data fidelity" --body "$(cat <<'BODY'
-Fixes six defects that let the server store or display the wrong thing without raising an error.
+Fixes seven defects that let the server store or display the wrong thing without raising an error.
 
 - `merge_put_data` can now replace a named list instead of only adding to it, so a place can be moved to a new parent rather than gaining a second one. Union stays the default.
 - Dicts without a `ref` deduplicate on their content, so `attribute_list` no longer accumulates a copy per update.
@@ -1302,6 +1302,7 @@ Fixes six defects that let the server store or display the wrong thing without r
 - A new `DateValue` model refuses a range or span that carries only one date - the structure that saves cleanly and later crashes the XML export.
 - The event `place` parameter refuses a place name, which used to overwrite a valid handle silently.
 - `place_params` declares media and alternative names in the shape the API actually accepts.
+- `place_type` is no longer required for a partial update, so moving a place via `placeref_list` no longer forces the caller to resupply it.
 
 Behaviour change: calls that relied on the permissive validation now fail loudly. That is the point, but it is a break.
 
@@ -1320,7 +1321,7 @@ BODY
 
 ## Self-Review
 
-**Spec coverage:** All six defects in the spec's scope table have a task — list replacement (Tasks 1 and 2, split because the pure function and its plumbing are separately reviewable), attribute duplication (Task 3), date rendering (Task 4), date validation (Task 5), place validation (Task 6), place list types (Task 7). The spec's testing table maps onto Tasks 1 to 7; its accepted-risk section about deliberately breaking permissive calls is surfaced in Task 8 Step 1.
+**Spec coverage:** All seven defects in the spec's scope table have a task — list replacement (Tasks 1 and 2, split because the pure function and its plumbing are separately reviewable), attribute duplication (Task 3), date rendering (Task 4), date validation (Task 5), place validation (Task 6), place list types and the optional `place_type` (Task 7, halves A and B). The spec's testing table maps onto Tasks 1 to 7; its accepted-risk section about deliberately breaking permissive calls is surfaced in Task 8 Step 1.
 
 **Placeholders:** None. Every code step shows the before and after text. Four steps ask the implementer to verify a real value — the handle shape, the enum names, the serialisation behaviour, the attribute comparison method — before trusting this document, and each says what to do if the observation differs.
 
