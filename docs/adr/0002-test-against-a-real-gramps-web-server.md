@@ -68,3 +68,18 @@ transport to construct a response httpx itself would produce is allowed",
 which is what those two files actually do. That version has not been written
 down, so the rule on the books forbids two files the project's own CI
 depends on. This tension is unresolved.
+
+## Update, 2026-08-13
+
+The three known offline failures no longer exist. Branch
+`fix/quality-lot5a-test-structure` split `tests/test_parameter_alignment.py`
+into the `test_alignment_*` modules and the `media_path` mismatch went with
+it; `uv run pytest -m "not integration"` is green at 134 passed. Nothing is
+carried as a known offline failure now, so a red offline run is a
+regression and should be read as one.
+
+The rest of this section still holds: the suite is still mostly
+server-bound, live runs from the macOS host still need the `GRAMPS_API_URL`
+override, `tree_stats` still fails on permissions for the `.env` owner
+account, and the tension over `unittest.mock` in `test_client_merge.py` and
+`test_http_error_detail.py` is still unresolved.

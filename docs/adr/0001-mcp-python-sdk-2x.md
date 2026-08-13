@@ -59,3 +59,14 @@ the migration into a feature commit is why: nothing forced a full-suite
 review of the SDK surface. The `<3` bound also means a future major upgrade
 will be a deliberate piece of work with no incremental path, exactly as this
 one was.
+
+## Update, 2026-08-13
+
+The failing test is fixed. Commit fe7b9e5, on `main`, changed
+`tests/test_server.py:82` to assert `result.server_info.name`, the 2.x name,
+so the failure recorded above is no longer outstanding and no plan carries
+it as known. The account of *why* it survived - a migration bundled into a
+feature commit, with nothing forcing a full-suite review of the SDK surface
+- is unchanged and is the part of this section still worth reading.
+
+The `<3` upper bound and everything else in the Decision stand as written.

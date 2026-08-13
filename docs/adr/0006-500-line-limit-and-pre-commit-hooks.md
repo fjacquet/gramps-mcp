@@ -64,3 +64,25 @@ that stance - but nothing records it as a decision, and the two documents
 that state the rule do not mention an exception. Either the exclusion should
 be justified in `CLAUDE.md` or the three files should be split; as it
 stands, the rule and its enforcement disagree.
+
+## Update, 2026-08-13
+
+The gap recorded above is closed. On branch
+`fix/quality-lot5a-test-structure`, commit 50112b3 removed `exclude:
+^tests/` from the `check-file-length` hook, so the 500-line rule now applies
+to `tests/` exactly as `CLAUDE.md` and `CONTRIBUTING.md` state it. The
+`exclude: ^(tests/|examples/)` that remains in `.pre-commit-config.yaml`
+belongs to the copyright hook, not this one.
+
+The three files named above no longer exist. The same branch split
+`tests/test_data_management.py` and `tests/test_parameter_alignment.py` into
+the `test_create_*` and `test_alignment_*` modules, and
+`tests/test_complete_workflow.py` into `tests/test_workflow_marriage.py` and
+`tests/test_workflow_attributes.py`. The largest file under `tests/` is now
+`tests/test_workflow_marriage.py` at 472 lines. The choice the paragraph
+posed - justify the exclusion or split the files - was resolved by splitting
+the files.
+
+`pyproject.toml` still exempts `tests/*` from ruff's E501. That is a line
+*width* exemption and is unaffected by this; the two rules were only ever
+related by analogy.
