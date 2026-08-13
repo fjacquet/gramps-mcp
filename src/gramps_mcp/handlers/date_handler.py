@@ -26,6 +26,28 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def _format_single_date(day: int, month: int, year: int) -> str:
+    """
+    Format one date triple as human-readable text.
+
+    Args:
+        day (int): Day of month, 0 when unknown.
+        month (int): Month number, 0 when unknown.
+        year (int): Year, must be positive.
+
+    Returns:
+        str: The formatted date, falling back to the year alone.
+    """
+    try:
+        if day > 0 and month > 0:
+            return datetime(year, month, day).strftime("%d %B %Y")
+        if month > 0:
+            return datetime(year, month, 1).strftime("%B %Y")
+        return str(year)
+    except (ValueError, TypeError):
+        return str(year) if year > 0 else "date unknown"
+
+
 def format_date(date_obj: dict) -> str:
     """
     Format Gramps date object into human-readable string with fallback.
@@ -44,6 +66,12 @@ def format_date(date_obj: dict) -> str:
     if formatted_date:
         return formatted_date
 
+    # Reason: a text-only date (modifier 6) carries its content in "text" and
+    # a dateval of [0, 0, 0, False], which the year guard below would reject.
+    if date_obj.get("modifier") == 6:
+        text = date_obj.get("text") or ""
+        return text if text else "date unknown"
+
     # Try to extract from dateval
     dateval = date_obj.get("dateval")
     if not dateval or len(dateval) < 3:
@@ -58,18 +86,20 @@ def format_date(date_obj: dict) -> str:
     quality = date_obj.get("quality", 0)
     modifier = date_obj.get("modifier", 0)
 
-    # Format the base date
-    try:
-        if day > 0 and month > 0:
-            date_dt = datetime(year, month, day)
-            base_date = date_dt.strftime("%d %B %Y")
-        elif month > 0:
-            date_dt = datetime(year, month, 1)
-            base_date = date_dt.strftime("%B %Y")
-        else:
-            base_date = str(year)
-    except (ValueError, TypeError):
-        base_date = str(year) if year > 0 else "date unknown"
+    base_date = _format_single_date(day, month, year)
+
+    # Reason: only range (4) and span (5) carry a second date, in an
+    # eight-element dateval. Rendering only the first turns "between X and Y"
+    # into "between X", which reads as a different claim rather than a
+    # partial one. From (7) and to (8) are open-ended single-date modifiers
+    # with a four-element dateval and no stop date, so they correctly fall
+    # through to the single-date "from X" / "to X" prefix below.
+    if modifier in (4, 5) and len(dateval) >= 8:
+        end_day, end_month, end_year = dateval[4], dateval[5], dateval[6]
+        if end_year > 0:
+            joiner = " and " if modifier == 4 else " to "
+            end_date = _format_single_date(end_day, end_month, end_year)
+            base_date = f"{base_date}{joiner}{end_date}"
 
     # Add modifier prefix
     modifier_prefixes = {
