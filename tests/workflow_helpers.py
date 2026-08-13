@@ -7,7 +7,8 @@ Both halves create notes, media and places the same way, so the helpers live
 here: duplicating them would be waste, and leaving them in the marriage module
 would push it past the project's 500-line limit.
 
-The bodies are unchanged from the original methods - only `self` was dropped.
+The bodies come from the original methods; `self` was dropped and the
+handle-extraction block they all repeated now lives in `extract_handle`.
 """
 
 import re
@@ -20,6 +21,23 @@ from src.gramps_mcp.tools.data_management import (
     create_place_tool,
 )
 from src.gramps_mcp.tools.search_basic import find_person_tool, find_place_tool
+
+
+def extract_handle(create_result: Any) -> str:
+    """
+    Pull the handle out of a creation tool's formatted response.
+
+    Args:
+        create_result (Any): The list the creation tool returned.
+
+    Returns:
+        str: The handle found between square brackets in the response text.
+    """
+    assert isinstance(create_result, list) and len(create_result) == 1
+    create_text = create_result[0].text
+    handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
+    assert handle_match, f"No handle found in: {create_text}"
+    return handle_match.group(1)
 
 
 async def create_test_note(text: str, note_type: str) -> str:
@@ -35,11 +53,7 @@ async def create_test_note(text: str, note_type: str) -> str:
     """
     create_result = await create_note_tool({"text": text, "type": note_type})
 
-    assert isinstance(create_result, list) and len(create_result) == 1
-    create_text = create_result[0].text
-    handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
-    assert handle_match, f"No handle found in: {create_text}"
-    return handle_match.group(1)
+    return extract_handle(create_result)
 
 
 async def create_test_media(
@@ -73,11 +87,7 @@ async def create_test_media(
         }
     )
 
-    assert isinstance(create_result, list) and len(create_result) == 1
-    create_text = create_result[0].text
-    handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
-    assert handle_match, f"No handle found in: {create_text}"
-    return handle_match.group(1)
+    return extract_handle(create_result)
 
 
 async def create_place_hierarchy(workflow_data: dict[str, Any]):
@@ -159,11 +169,7 @@ async def create_or_find_place(
 
         create_result = await create_place_tool(place_data)
 
-        assert isinstance(create_result, list) and len(create_result) == 1
-        create_text = create_result[0].text
-        handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
-        assert handle_match, f"No handle found in: {create_text}"
-        return handle_match.group(1)
+        return extract_handle(create_result)
 
 
 async def create_or_find_person(
@@ -214,8 +220,4 @@ async def create_or_find_person(
             }
         )
 
-        assert isinstance(create_result, list) and len(create_result) == 1
-        create_text = create_result[0].text
-        handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
-        assert handle_match, f"No handle found in: {create_text}"
-        return handle_match.group(1)
+        return extract_handle(create_result)
