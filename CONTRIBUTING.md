@@ -34,6 +34,9 @@ This project follows **Test-Driven Development (TDD)** practices:
 # Run all tests
 uv run pytest
 
+# Run only the tests that work without a server
+uv run pytest -m "not integration"
+
 # Run specific test file
 uv run pytest tests/test_search_basic.py
 
@@ -45,6 +48,16 @@ uv run pytest tests/test_search_basic.py::TestFindPersonTool::test_find_person -
 ```
 
 **Important**: Tests use real Gramps Web API connections (no mocks). Ensure you have a test Gramps Web instance configured in your `.env` file.
+
+Without a live instance, use `uv run pytest -m "not integration"`. Server-dependent
+modules (or, in a mixed module, the classes that need a server) carry
+`pytestmark = pytest.mark.integration`. That offline selection currently reports
+three known failures in `tests/test_parameter_alignment.py`, from a `media_path`
+mismatch that predates the marker work - expected, not a regression.
+
+The search tests were split across `tests/test_search_basic.py`,
+`test_search_details.py`, `test_search_find_anything.py`, `test_search_find_type.py`
+and `test_search_totals.py`, so running only the first covers a fifth of them.
 
 ### Code Quality
 

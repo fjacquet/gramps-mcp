@@ -1,6 +1,6 @@
 # Gramps MCP - AI-Powered Genealogy Research & Management
 
-[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](./LICENSE) [![Python](https://img.shields.io/badge/Python-3.12+-brightgreen)](https://python.org) [![MCP](https://img.shields.io/badge/MCP-1.2.0+-orange)](https://modelcontextprotocol.io)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue)](./LICENSE) [![Python](https://img.shields.io/badge/Python-3.12+-brightgreen)](https://python.org) [![MCP](https://img.shields.io/badge/MCP-2.0.0+-orange)](https://modelcontextprotocol.io) [![Release](https://img.shields.io/github/v/release/fjacquet/gramps-mcp)](https://github.com/fjacquet/gramps-mcp/releases)
 [![CI](https://github.com/fjacquet/gramps-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/fjacquet/gramps-mcp/actions/workflows/ci.yml) [![Docker Build](https://github.com/fjacquet/gramps-mcp/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/fjacquet/gramps-mcp/actions/workflows/docker-publish.yml) [![codecov](https://codecov.io/gh/fjacquet/gramps-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/fjacquet/gramps-mcp) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 ## Without Gramps MCP
@@ -89,7 +89,7 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **check_living** - Check living status and estimated birth/death dates
 - **get_timeline** - Build a chronological timeline for a person, family, or group
 - **manage_tags** - List, get, or create/update tags
-- **manage_users** - List, get, or create Gramps Web accounts with generated passwords (owner rights required, see [docs/user-management.md](docs/user-management.md))
+- **manage_users** - List, get, or create Gramps Web accounts with generated passwords (owner or admin rights required, see [docs/user-management.md](docs/user-management.md))
 - **get_facts** - Get interesting facts and statistics about the tree
 
 ## Installation
@@ -261,7 +261,10 @@ src/gramps_mcp/
 |   |-- data_management.py
 |   |-- analysis.py
 |   |-- relationship_tools.py
-|   `-- records_tools.py
+|   |-- records_tools.py
+|   |-- media_upload.py
+|   |-- sourced_event.py
+|   `-- user_tools.py
 |-- handlers/           # Data formatting handlers
 `-- resources/          # MCP resources (GQL docs, usage guide)
 ```
@@ -351,6 +354,24 @@ What recent changes have been made to my family tree in the last week?
 **Tool timeout errors**: Check your network connection and consider increasing timeout values for large datasets.
 
 **Docker issues**: Ensure Docker and Docker Compose are installed and running.
+
+### Reading error messages
+
+Since v1.7.0, a failed call reports a generic sentence categorising the failure
+followed by the server's own explanation, truncated to 300 characters. A rejected
+create or update usually names the offending field in that fragment. The bound
+exists because Gramps can echo the submitted payload, which may hold data about
+living people.
+
+Media upload failures now raise the same error type as every other tool. Code
+that caught `httpx.HTTPStatusError` around an upload no longer catches it.
+
+### Result counts and ordering
+
+Search results report the true number of matches, read from the API's
+`X-Total-Count` header, which may exceed the number displayed. `recent_changes`
+honours a caller-supplied `sort` instead of always returning newest-first, and
+its response is bounded.
 
 ### Debug Mode
 
