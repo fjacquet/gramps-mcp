@@ -68,9 +68,10 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     """
     Merge two lists, deduplicating when the item type supports it.
 
-    Lists of dicts carrying a "ref" field (event_ref_list, media_list, ...)
-    are deduplicated by ref; lists of strings by value. Existing items always
-    come first. Mixed or unknown item types are concatenated as-is.
+    Dicts with a "ref" field (event_ref_list, media_list, ...) deduplicate
+    by ref; dicts without "ref" (attribute_list, ...) by whole content; and
+    strings by value. Existing items always come first. Mixed or unknown
+    item types are concatenated as-is.
 
     Args:
         existing_items (List): Items already stored in Gramps.
@@ -105,6 +106,17 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     if isinstance(sample_existing, str) and isinstance(sample_new, str):
         existing_set = set(existing_items)
         return existing_items + [item for item in new_items if item not in existing_set]
+
+    if isinstance(sample_existing, dict) and isinstance(sample_new, dict):
+        # Reason: attribute_list entries are {type, value} dicts with no ref,
+        # so they miss the ref branch above. Without this they concatenate,
+        # and N identical updates leave N copies.
+        additions = [
+            item
+            for item in new_items
+            if isinstance(item, dict) and item not in existing_items
+        ]
+        return existing_items + additions
 
     # Reason: mixed/unknown item types - concatenation is the safe fallback
     return existing_items + new_items

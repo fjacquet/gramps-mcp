@@ -33,11 +33,11 @@ class TestMergePutData:
         changes = {"note_list": ["c"]}
         assert merge_put_data(existing, changes)["note_list"] == ["a", "b", "c"]
 
-    def test_dict_items_without_ref_concatenate_without_dedup(self):
+    def test_dict_items_without_ref_deduplicate_on_whole_content(self):
         existing = {"tag_list": [{"name": "x"}]}
         changes = {"tag_list": [{"name": "x"}]}
         merged = merge_put_data(existing, changes)
-        assert merged["tag_list"] == [{"name": "x"}, {"name": "x"}]
+        assert merged["tag_list"] == [{"name": "x"}]
 
     def test_empty_existing_list_concatenates(self):
         existing = {"note_list": []}
@@ -119,3 +119,62 @@ class TestReplaceLists:
 
         assert existing == {"placeref_list": [{"ref": "AAA"}]}
         assert changes == {"placeref_list": [{"ref": "BBB"}]}
+
+
+class TestAttributeDeduplication:
+    """Dicts without a ref deduplicate on their whole content."""
+
+    def test_identical_attribute_is_not_duplicated(self):
+        attribute = {"type": "Occupation", "value": "Cordonnier"}
+        existing = {"attribute_list": [attribute]}
+        changes = {"attribute_list": [dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
+
+    def test_different_attribute_is_appended(self):
+        existing = {"attribute_list": [{"type": "Occupation", "value": "Cordonnier"}]}
+        changes = {"attribute_list": [{"type": "Occupation", "value": "Meunier"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [
+            {"type": "Occupation", "value": "Cordonnier"},
+            {"type": "Occupation", "value": "Meunier"},
+        ]
+
+    def test_ref_dicts_still_deduplicate_on_ref_alone(self):
+        # Reason: two refs to the same object differ in their other keys but
+        # must still count as one; ref identity must keep winning over
+        # whole-content identity.
+        existing = {"media_list": [{"ref": "AAA", "private": False}]}
+        changes = {"media_list": [{"ref": "AAA", "private": True}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [{"ref": "AAA", "private": False}]
+
+    def test_attribute_with_nested_dict_value_deduplicates(self):
+        # Reason: if an attribute's value is itself a dict (e.g., structured
+        # data), dict equality handles nested comparison without needing
+        # serialization, and the `in` check must not crash.
+        attribute = {"type": "CustomData", "value": {"a": 1, "b": 2}}
+        existing = {"attribute_list": [attribute]}
+        changes = {"attribute_list": [dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
+
+    def test_attribute_with_nested_list_value_deduplicates(self):
+        # Reason: if an attribute's value is a list (e.g., array of choices),
+        # dict equality handles the nested list without crashing, and the
+        # same nested value must deduplicate.
+        attribute = {"type": "Tags", "value": ["tag1", "tag2"]}
+        existing = {"attribute_list": [attribute]}
+        changes = {"attribute_list": [dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
