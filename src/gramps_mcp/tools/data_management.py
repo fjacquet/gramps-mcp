@@ -84,6 +84,37 @@ def _extract_entity_data(result, entity_type: str | None = None):
     )
 
 
+def _validate_replace_lists(value) -> list[str] | None:
+    """Validate the popped replace_lists argument before it is forwarded.
+
+    replace_lists is popped out of the raw arguments before param_class
+    validates anything, so nothing else type-checks it. A bare string (a
+    plausible typo for a one-element list, e.g. "placeref_list" instead of
+    ["placeref_list"]) is iterable, so ``set(replace_lists or ())`` in
+    merge_put_data would silently expand it into single characters, no key
+    would match, and the replacement would be skipped without error - the
+    exact "wrong thing stored, no error raised" defect this lot exists to
+    fix.
+
+    Args:
+        value: The raw replace_lists value popped from the tool arguments.
+
+    Returns:
+        list[str] | None: value unchanged, if it is None or a list of str.
+
+    Raises:
+        ValueError: If value is not None and not a list of strings.
+    """
+    if value is None:
+        return None
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise ValueError(
+        "replace_lists must be a list of field names, e.g. "
+        f"['placeref_list'], not a bare string or other type. Got: {value!r}."
+    )
+
+
 async def _handle_crud_operation(
     params,
     entity_type: str,
@@ -106,7 +137,7 @@ async def _handle_crud_operation(
         # list fields to overwrite rather than merge), not entity data. Pop
         # it before building the params model so it never reaches the
         # Gramps API request body via model_dump.
-        replace_lists = params.pop("replace_lists", None)
+        replace_lists = _validate_replace_lists(params.pop("replace_lists", None))
 
         # Validate parameters
         validated_params = param_class(**params)

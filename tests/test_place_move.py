@@ -120,3 +120,26 @@ class TestPlaceMove:
                 await client.make_api_call(
                     api_call=ApiCalls.DELETE_PLACE, tree_id=tree_id, handle=handle
                 )
+
+    @pytest.mark.asyncio
+    async def test_bare_string_replace_lists_is_rejected(self):
+        """A bare string is a plausible typo for a one-element list and is
+        itself iterable, so set(replace_lists or ()) would silently expand
+        "placeref_list" into a set of single characters. No key would then
+        match, the replacement would be skipped, and the place would keep
+        its old parent - the exact bug this lot exists to fix, reintroduced
+        by a typo. This must be rejected loudly instead, before any network
+        call (no live server needed for this assertion).
+        """
+        result = await create_place_tool(
+            {
+                "handle": "0" * 26,
+                "placeref_list": [{"ref": "1" * 26}],
+                "replace_lists": "placeref_list",
+            }
+        )
+
+        text = result[0].text
+        assert "Error" in text
+        assert "replace_lists" in text
+        assert "list" in text
