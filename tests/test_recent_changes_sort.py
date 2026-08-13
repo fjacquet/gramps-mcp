@@ -1,6 +1,8 @@
 """
-Integration tests for recent_changes sort handling.
+Integration tests for recent_changes sort and pagination handling.
 """
+
+import re
 
 import pytest
 
@@ -54,3 +56,38 @@ class TestRecentChangesSort:
         result = await get_recent_changes_tool({"pagesize": 2})
 
         assert "error" not in result[0].text.lower()
+
+
+class TestRecentChangesPageDefault:
+    """`pagesize` alone must bound the result; the API only honours it when
+    `page` is also present."""
+
+    def test_server_shaped_none_page_still_defaults(self):
+        # Reason: mirrors test_server_shaped_none_sort_still_defaults for
+        # the page field - a server-shaped call arrives with page
+        # explicitly None, and dict.setdefault would no-op on it the same
+        # way it did for sort.
+        arguments = {"pagesize": 2, "page": None}
+
+        result = _apply_recent_changes_defaults(arguments)
+
+        assert result["page"] == 1
+
+    @pytest.mark.asyncio
+    async def test_pagesize_without_page_is_bounded(self):
+        # Reason: the API only honours pagesize server-side when page is
+        # also supplied. Before this fix, pagesize=2 with no page dumped
+        # the entire transaction history into the response
+        # (recent_changes(pagesize=2) measured at 1,100,693 characters
+        # against the live tree, versus 253 with page=1 added). Assert a
+        # relationship, not a byte count, so this does not need updating as
+        # the tree grows: a bounded request must report a small handful of
+        # changes, not the whole history.
+        result = await get_recent_changes_tool({"pagesize": 2})
+        text = result[0].text
+
+        assert "error" not in text.lower()
+
+        found = re.search(r"Found (\d+) recent changes", text)
+        assert found is not None
+        assert int(found.group(1)) <= 10

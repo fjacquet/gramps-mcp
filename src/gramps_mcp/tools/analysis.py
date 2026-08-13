@@ -374,9 +374,10 @@ def _apply_recent_changes_defaults(arguments: dict) -> dict:
             None values.
 
     Returns:
-        dict: A new dict with ``sort`` defaulted to ``-id`` whenever the
-            caller did not supply a real value for it. A copy is returned
-            so the caller's dict is never mutated.
+        dict: A new dict with ``sort`` defaulted to ``-id`` and ``page``
+            defaulted to ``1`` whenever the caller did not supply a real
+            value for either. A copy is returned so the caller's dict is
+            never mutated.
 
     Reason:
         The MCP HTTP dispatcher (server.py's create_handler) always calls
@@ -390,10 +391,20 @@ def _apply_recent_changes_defaults(arguments: dict) -> dict:
         though most recent first is the intended default. Falsy values
         (``None`` or ``""``) are therefore treated as "not supplied"; a
         real caller-supplied value still wins.
+
+        ``page`` gets the same treatment for a separate reason: the
+        underlying API only honours ``pagesize`` when ``page`` is also
+        given. A caller who sets ``pagesize`` alone (a very natural thing
+        to do) previously got the entire transaction history rendered into
+        the response, since ``page`` reached the API as ``None`` either
+        way. Defaulting an absent/None ``page`` to ``1`` bounds the result
+        the same way an explicit page request already did.
     """
     arguments = dict(arguments or {})
     if not arguments.get("sort"):
         arguments["sort"] = "-id"
+    if not arguments.get("page"):
+        arguments["page"] = 1
     return arguments
 
 
