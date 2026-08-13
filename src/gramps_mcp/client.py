@@ -36,6 +36,11 @@ from .models.api_mapping import validate_api_call_params
 
 logger = logging.getLogger(__name__)
 
+# Reason: the server's explanation names the offending field, which the generic
+# message cannot. Truncated because Gramps can echo the submitted payload, and
+# that payload holds genealogy data about living people.
+MAX_ERROR_DETAIL = 300
+
 
 class GrampsAPIError(Exception):
     """Custom exception for Gramps Web API errors."""
@@ -133,22 +138,73 @@ class GrampsWebAPIClient:
         except Exception as e:
             raise GrampsAPIError(f"Unexpected error: {e}") from e
 
+    def _extract_error_detail(self, error: httpx.HTTPStatusError) -> str:
+        """
+        Pull the server's explanation out of an error response.
+
+        Args:
+            error (httpx.HTTPStatusError): The failed response.
+
+        Returns:
+            str: The explanation, truncated, or an empty string when the body
+                carries nothing useful.
+        """
+        try:
+            body = error.response.json()
+        except Exception:
+            body = None
+
+        detail = ""
+        if isinstance(body, dict):
+            for key in ("message", "error", "detail"):
+                value = body.get(key)
+                if isinstance(value, str) and value.strip():
+                    detail = value.strip()
+                    break
+            if not detail:
+                detail = str(body)
+        elif body is not None:
+            detail = str(body)
+        else:
+            try:
+                detail = error.response.text.strip()
+            except Exception:
+                detail = ""
+
+        if len(detail) > MAX_ERROR_DETAIL:
+            detail = detail[:MAX_ERROR_DETAIL] + "..."
+        return detail
+
     def _format_http_error(self, error: httpx.HTTPStatusError) -> str:
-        """Convert HTTP error to user-friendly message."""
+        """
+        Convert an HTTP error into a message that names the cause.
+
+        Args:
+            error (httpx.HTTPStatusError): The failed response.
+
+        Returns:
+            str: A generic sentence categorising the failure, followed by the
+                server's own explanation when it sent one.
+        """
         status_code = error.response.status_code
 
         if status_code == 401:
-            return "Authentication failed. Please check your credentials."
+            summary = "Authentication failed. Please check your credentials."
         elif status_code == 403:
-            return "Permission denied for this operation."
+            summary = "Permission denied for this operation."
         elif status_code == 404:
-            return "Record not found."
+            summary = "Record not found."
         elif status_code == 422:
-            return "Invalid data provided."
+            summary = "Invalid data provided."
         elif status_code >= 500:
-            return "Server error. Please try again later."
+            summary = "Server error. Please try again later."
         else:
-            return f"Request failed with status {status_code}"
+            summary = f"Request failed with status {status_code}"
+
+        detail = self._extract_error_detail(error)
+        if detail:
+            return f"{summary} {detail}"
+        return summary
 
     def _build_url_with_substitution(
         self, tree_id: str, endpoint: str, url_params: dict
