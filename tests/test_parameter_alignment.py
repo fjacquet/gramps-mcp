@@ -338,13 +338,17 @@ class TestParameterAlignment:
 
     def test_place_parameters_alignment(self):
         """Test PlaceSaveParams parameters match current implementation."""
-        # Current implementation: Place requires place_type
-        # Optional: handle, gramps_id, name, code, alt_loc, placeref_list, alt_names, lat, long, urls, media_list, citation_list, note_list, tag_list, private
+        # Current implementation: place_type is optional so a partial
+        # update (e.g. moving a place via placeref_list) does not have to
+        # resupply it. It is also optional on creation: the API accepts a
+        # place with no place_type and Gramps stores "Unknown" (see
+        # tests/test_place_media.py::TestPlaceCreationWithoutType).
+        # Optional: handle, gramps_id, name, code, alt_loc, place_type, placeref_list, alt_names, lat, long, urls, media_list, citation_list, note_list, tag_list, private
         model = PlaceSaveParams
         fields = model.model_fields
 
         # Required fields in current implementation
-        required_fields = {"place_type"}
+        required_fields = set()
 
         # Check all required fields are present and required
         for field_name in required_fields:
@@ -365,12 +369,20 @@ class TestParameterAlignment:
         )
 
         # Check fields match current implementation
+        # Reason: replace_lists names list fields to overwrite rather than
+        # add to (e.g. ["placeref_list"] to move a place to a different
+        # parent instead of giving it a second one). It is popped from the
+        # raw arguments in data_management.py before PlaceSaveParams is
+        # constructed, so it never reaches Gramps as request data - it is
+        # only carried on this model to document/validate the tool's
+        # advertised input schema.
         implementation_fields = required_fields | {
             "handle",
             "gramps_id",
             "name",
             "code",
             "alt_loc",
+            "place_type",
             "placeref_list",
             "alt_names",
             "lat",
@@ -381,6 +393,7 @@ class TestParameterAlignment:
             "note_list",
             "tag_list",
             "private",
+            "replace_lists",
         }
         actual_fields = set(fields.keys())
         extra_fields = actual_fields - implementation_fields

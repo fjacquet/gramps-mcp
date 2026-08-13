@@ -25,7 +25,9 @@ server.
 """
 
 
-def merge_put_data(existing: dict, changes: dict) -> dict:
+def merge_put_data(
+    existing: dict, changes: dict, replace_lists: list[str] | None = None
+) -> dict:
     """
     Merge requested changes into an existing record for a PUT update.
 
@@ -36,13 +38,26 @@ def merge_put_data(existing: dict, changes: dict) -> dict:
     Args:
         existing (Dict): The record currently stored in Gramps.
         changes (Dict): The fields the caller wants to change.
+        replace_lists (List | None): Keys whose lists should be replaced
+            outright rather than merged. Everything else keeps the default
+            union behaviour.
 
     Returns:
         Dict: A new dict containing the merged record.
     """
+    replace = set(replace_lists or ())
     merged = existing.copy()
     for key, value in changes.items():
-        if key.endswith("_list") and isinstance(value, list) and key in existing:
+        # Reason: union is the default because a partial update must not wipe
+        # lists the caller did not mention, and attaching media relies on it.
+        # Replacement is opt-in per key so the intent is visible at the call
+        # site rather than inferred from the key's name.
+        if (
+            key.endswith("_list")
+            and isinstance(value, list)
+            and key in existing
+            and key not in replace
+        ):
             merged[key] = _merge_list(existing.get(key, []), value)
         else:
             merged[key] = value
@@ -53,9 +68,10 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     """
     Merge two lists, deduplicating when the item type supports it.
 
-    Lists of dicts carrying a "ref" field (event_ref_list, media_list, ...)
-    are deduplicated by ref; lists of strings by value. Existing items always
-    come first. Mixed or unknown item types are concatenated as-is.
+    Dicts with a "ref" field (event_ref_list, media_list, ...) deduplicate
+    by ref; dicts without "ref" (attribute_list, ...) by whole content; and
+    strings by value. Existing items always come first. Mixed or unknown
+    item types are concatenated as-is.
 
     Args:
         existing_items (List): Items already stored in Gramps.
@@ -64,8 +80,22 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     Returns:
         List: The merged list.
     """
-    # Reason: if either side is empty there is nothing to deduplicate
-    if not existing_items or not new_items:
+    if not existing_items and not new_items:
+        return []
+
+    # Reason: a ref-less dict update can arrive with no existing list to
+    # merge against (e.g. the first attribute_list update on a record), but
+    # the incoming list itself can still carry the same dict twice. That
+    # case needs the same whole-content dedup as the non-empty path below,
+    # so it is routed there instead of the plain-concatenation shortcut.
+    if not existing_items:
+        sample_new = new_items[0]
+        if isinstance(sample_new, dict) and "ref" not in sample_new:
+            return _dedupe_dicts_without_ref(existing_items, new_items)
+        return existing_items + new_items
+
+    # Reason: if there is nothing new, there is nothing to deduplicate
+    if not new_items:
         return existing_items + new_items
 
     sample_existing = existing_items[0]
@@ -91,5 +121,35 @@ def _merge_list(existing_items: list, new_items: list) -> list:
         existing_set = set(existing_items)
         return existing_items + [item for item in new_items if item not in existing_set]
 
+    if isinstance(sample_existing, dict) and isinstance(sample_new, dict):
+        # Reason: attribute_list entries are {type, value} dicts with no ref,
+        # so they miss the ref branch above. Without this they concatenate,
+        # and N identical updates leave N copies.
+        return _dedupe_dicts_without_ref(existing_items, new_items)
+
     # Reason: mixed/unknown item types - concatenation is the safe fallback
     return existing_items + new_items
+
+
+def _dedupe_dicts_without_ref(existing_items: list, new_items: list) -> list:
+    """
+    Append new ref-less dict items, deduplicating on whole content.
+
+    Deduplicates each incoming item against both the existing items and
+    the items already accepted from this same incoming list, so a single
+    update carrying the same dict twice only stores it once.
+
+    Args:
+        existing_items (List): Items already stored in Gramps.
+        new_items (List): Items requested in the update.
+
+    Returns:
+        List: existing_items followed by the deduplicated additions.
+    """
+    seen = list(existing_items)
+    additions = []
+    for item in new_items:
+        if isinstance(item, dict) and item not in seen:
+            additions.append(item)
+            seen.append(item)
+    return existing_items + additions

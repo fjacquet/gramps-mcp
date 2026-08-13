@@ -26,11 +26,26 @@ API calls supported in this category:
 - GET_EVENT_SPAN: Get elapsed time span between two events
 """
 
-from typing import Any
+import re
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .base_params import BaseGetMultipleParams
+from .date_params import DateValue
+
+# Reason: a Gramps handle is a lowercase hexadecimal string. Live-tree
+# sampling (2026-08-13, GET_PLACES) found handles of 26-32 lowercase hex
+# characters (0-9a-f only - no uppercase, no g-z). Place names contain
+# spaces, hyphens or accents, or are simply short, so this pattern separates
+# them. The 16-char floor stays below the smallest observed handle (26) to
+# tolerate handle shapes not covered by that sample. Passing a name here
+# used to overwrite a valid handle with text that resolves to nothing - the
+# trap documented in CLAUDE.md.
+#
+# Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
+# needed here. re.match plus a "$" anchor accepts a trailing newline because
+# "$" matches just before a final newline; fullmatch has no such gap.
+HANDLE_PATTERN = r"[0-9a-f]{16,}"
 
 
 class EventSearchParams(BaseGetMultipleParams):
@@ -48,19 +63,47 @@ class EventSaveParams(BaseModel):
         None, description="Event's handle (for updates; omit for new event)"
     )
     type: str = Field(description="Event type (Birth, Death, Marriage, etc.)")
-    date: dict[str, Any] | None = Field(
+    date: DateValue | None = Field(None, description="Event date")
+    description: str | None = Field(None, description="Event description")
+    place: str | None = Field(
         None,
         description=(
-            "Event date object with dateval array [day, month, year, False], "
-            "quality (0=regular, 1=estimated, 2=calculated), and modifier "
-            "(0=regular, 1=before, 2=after, 3=about, 4=range, 5=span, "
-            "6=textonly, 7=from, 8=to)"
+            "Place handle where the event occurred. This is a handle, not a "
+            "name: use find_type(type='place', ...) to obtain one. Passing a "
+            "name overwrites the event's existing place."
         ),
     )
-    description: str | None = Field(None, description="Event description")
-    place: str | None = Field(None, description="Place handle where event occurred")
     citation_list: list[str] = Field(..., description="List of citation handles")
     note_list: list[str] | None = Field(None, description="List of note handles")
+
+    @field_validator("place")
+    @classmethod
+    def validate_place_is_handle(cls, value: str | None) -> str | None:
+        """Reject a place name where a handle is required.
+
+        A bare Pydantic ``pattern=`` constraint raises its own generic
+        error and drops the field's ``description``, so the caller never
+        sees the guidance on how to fix the call. This validator raises
+        instead, carrying the offending value and pointing at
+        ``find_type`` so the failure is loud and actionable, not just loud.
+
+        Args:
+            value (str | None): The proposed place value.
+
+        Returns:
+            str | None: The value unchanged, if it is a valid handle.
+
+        Raises:
+            ValueError: If value is not None and does not match
+                HANDLE_PATTERN.
+        """
+        if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
+            raise ValueError(
+                f"place must be a place handle, not a name. Got: {value!r}. "
+                "Use find_type(type='place', ...) to obtain the handle for "
+                "this place."
+            )
+        return value
 
 
 class EventSpanParams(BaseModel):

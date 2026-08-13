@@ -188,6 +188,7 @@ class GrampsWebAPIClient:
         params: dict | BaseModel | None = None,
         tree_id: str = "default",
         with_headers: bool = False,
+        replace_lists: list[str] | None = None,
         **url_params,
     ):
         """
@@ -197,6 +198,8 @@ class GrampsWebAPIClient:
             api_call: The API call to make from the ApiCalls enum
             params: Parameters for the API call (dict or Pydantic model)
             tree_id: Family tree identifier (default: "default")
+            replace_lists: Keys whose lists should be replaced outright rather
+                than merged into the existing record. PUT operations only.
             **url_params: URL parameters for endpoint substitution
                 (e.g., handle, handle1, handle2)
 
@@ -249,7 +252,7 @@ class GrampsWebAPIClient:
                 )
                 existing = await self._make_request("GET", get_url)
                 if existing:
-                    json_data = merge_put_data(existing, json_data)
+                    json_data = merge_put_data(existing, json_data, replace_lists)
 
         # Make the API request
         return await self._make_request(

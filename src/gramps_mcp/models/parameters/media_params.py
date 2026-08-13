@@ -27,11 +27,10 @@ API calls supported in this category:
 - PUT_MEDIA_FILE: Update an existing media object's file
 """
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 from .base_params import BaseGetMultipleParams
+from .date_params import DateValue
 
 
 class MediaSearchParams(BaseGetMultipleParams):
@@ -74,11 +73,4 @@ class MediaSaveParams(BaseModel):
         None, description="List of citation handles"
     )
     note_list: list[str] | None = Field(None, description="List of note handles")
-    date: dict[str, Any] | None = Field(
-        None,
-        description=(
-            "Date object with dateval array [day, month, year, False], quality "
-            "(0=regular, 1=estimated, 2=calculated), and modifier (0=regular, "
-            "1=before, 2=after, 3=about, 4=range, 5=span, 6=textonly, 7=from, 8=to)"
-        ),
-    )
+    date: DateValue | None = Field(None, description="Media date")

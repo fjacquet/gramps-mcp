@@ -243,7 +243,7 @@ When potential duplicates are found:
 ### Creating Places
 **Place requires:**
 - **Name** (required): "Boston", "Massachusetts", "United States"
-- **Type** (required): City, County, State, Country, Church, Cemetery, etc.
+- **Type** (strongly recommended when creating): City, County, State, Country, Church, Cemetery, etc. Omitting it is accepted, not rejected, but Gramps then records the type as "Unknown" - always supply it on creation. It can be omitted when only updating other fields on an existing place.
 - **Enclosed by** (required): Handle of the higher-level place that contains this place
   - Example hierarchy: Church → City → County → State → Country
   - Continue until you reach Country type (top level)

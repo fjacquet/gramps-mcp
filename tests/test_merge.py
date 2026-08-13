@@ -33,11 +33,11 @@ class TestMergePutData:
         changes = {"note_list": ["c"]}
         assert merge_put_data(existing, changes)["note_list"] == ["a", "b", "c"]
 
-    def test_dict_items_without_ref_concatenate_without_dedup(self):
+    def test_dict_items_without_ref_deduplicate_on_whole_content(self):
         existing = {"tag_list": [{"name": "x"}]}
         changes = {"tag_list": [{"name": "x"}]}
         merged = merge_put_data(existing, changes)
-        assert merged["tag_list"] == [{"name": "x"}, {"name": "x"}]
+        assert merged["tag_list"] == [{"name": "x"}]
 
     def test_empty_existing_list_concatenates(self):
         existing = {"note_list": []}
@@ -74,3 +74,134 @@ class TestMergePutData:
         merge_put_data(existing, changes)
         assert existing == {"note_list": ["n1"], "private": False}
         assert changes == {"note_list": ["n2"], "private": True}
+
+
+class TestReplaceLists:
+    """A named list is replaced outright instead of merged."""
+
+    def test_named_list_is_replaced(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": [{"ref": "BBB"}]}
+
+        merged = merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert merged["placeref_list"] == [{"ref": "BBB"}]
+
+    def test_unnamed_list_still_merges(self):
+        existing = {"media_list": [{"ref": "AAA"}]}
+        changes = {"media_list": [{"ref": "BBB"}]}
+
+        merged = merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert merged["media_list"] == [{"ref": "AAA"}, {"ref": "BBB"}]
+
+    def test_default_is_still_union(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": [{"ref": "BBB"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["placeref_list"] == [{"ref": "AAA"}, {"ref": "BBB"}]
+
+    def test_replacing_with_an_empty_list_clears_it(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": []}
+
+        merged = merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert merged["placeref_list"] == []
+
+    def test_inputs_are_not_mutated(self):
+        existing = {"placeref_list": [{"ref": "AAA"}]}
+        changes = {"placeref_list": [{"ref": "BBB"}]}
+
+        merge_put_data(existing, changes, replace_lists=["placeref_list"])
+
+        assert existing == {"placeref_list": [{"ref": "AAA"}]}
+        assert changes == {"placeref_list": [{"ref": "BBB"}]}
+
+
+class TestAttributeDeduplication:
+    """Dicts without a ref deduplicate on their whole content."""
+
+    def test_identical_attribute_is_not_duplicated(self):
+        attribute = {"type": "Occupation", "value": "Cordonnier"}
+        existing = {"attribute_list": [attribute]}
+        changes = {"attribute_list": [dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
+
+    def test_different_attribute_is_appended(self):
+        existing = {"attribute_list": [{"type": "Occupation", "value": "Cordonnier"}]}
+        changes = {"attribute_list": [{"type": "Occupation", "value": "Meunier"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [
+            {"type": "Occupation", "value": "Cordonnier"},
+            {"type": "Occupation", "value": "Meunier"},
+        ]
+
+    def test_ref_dicts_still_deduplicate_on_ref_alone(self):
+        # Reason: two refs to the same object differ in their other keys but
+        # must still count as one; ref identity must keep winning over
+        # whole-content identity.
+        existing = {"media_list": [{"ref": "AAA", "private": False}]}
+        changes = {"media_list": [{"ref": "AAA", "private": True}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [{"ref": "AAA", "private": False}]
+
+    def test_attribute_with_nested_dict_value_deduplicates(self):
+        # Reason: if an attribute's value is itself a dict (e.g., structured
+        # data), dict equality handles nested comparison without needing
+        # serialization, and the `in` check must not crash.
+        attribute = {"type": "CustomData", "value": {"a": 1, "b": 2}}
+        existing = {"attribute_list": [attribute]}
+        changes = {"attribute_list": [dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
+
+    def test_attribute_with_nested_list_value_deduplicates(self):
+        # Reason: if an attribute's value is a list (e.g., array of choices),
+        # dict equality handles the nested list without crashing, and the
+        # same nested value must deduplicate.
+        attribute = {"type": "Tags", "value": ["tag1", "tag2"]}
+        existing = {"attribute_list": [attribute]}
+        changes = {"attribute_list": [dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
+
+    def test_duplicate_within_incoming_list_is_collapsed(self):
+        # Reason: comparing only against existing_items missed the case
+        # where a single update carries the same attribute twice - both
+        # passed the check and both got appended. The duplicated incoming
+        # attribute must differ from the existing entry, or the old code
+        # would filter both copies out anyway (each equal to the existing
+        # entry) and this test would pass without discriminating anything.
+        existing_attribute = {"type": "Occupation", "value": "Cordonnier"}
+        new_attribute = {"type": "Occupation", "value": "Meunier"}
+        existing = {"attribute_list": [existing_attribute]}
+        changes = {"attribute_list": [dict(new_attribute), dict(new_attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [existing_attribute, new_attribute]
+
+    def test_duplicate_within_incoming_list_is_collapsed_with_no_existing(self):
+        # Reason: the empty-existing-list path used to short-circuit to
+        # plain concatenation before any dedup logic ran.
+        attribute = {"type": "Occupation", "value": "Cordonnier"}
+        existing = {"attribute_list": []}
+        changes = {"attribute_list": [dict(attribute), dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
