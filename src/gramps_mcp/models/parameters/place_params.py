@@ -67,3 +67,11 @@ class PlaceSaveParams(BaseModel):
     note_list: list[str] | None = Field(None, description="List of note handles")
     tag_list: list[str] | None = Field(None, description="List of tag handles")
     private: bool | None = Field(None, description="Mark as private")
+    replace_lists: list[str] | None = Field(
+        None,
+        description=(
+            "List field names to overwrite rather than add to, for example "
+            "['placeref_list'] to move a place to a different parent instead "
+            "of giving it a second one. Omit to add to existing lists."
+        ),
+    )

@@ -102,6 +102,12 @@ async def _handle_crud_operation(
             mutate validated_params before it's sent to the Gramps API.
     """
     try:
+        # Reason: replace_lists is an instruction for make_api_call (which
+        # list fields to overwrite rather than merge), not entity data. Pop
+        # it before building the params model so it never reaches the
+        # Gramps API request body via model_dump.
+        replace_lists = params.pop("replace_lists", None)
+
         # Validate parameters
         validated_params = param_class(**params)
 
@@ -122,6 +128,7 @@ async def _handle_crud_operation(
                 params=validated_params,
                 tree_id=tree_id,
                 handle=validated_params.handle,
+                replace_lists=replace_lists,
             )
             operation = "updated"
         else:
