@@ -52,6 +52,7 @@ No more manual data entry, no context switching between apps, no generic genealo
 - [Usage Examples](#usage-examples)
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
 - [License](#license)
 - [Related Projects](#related-projects)
 - [Contributing](#contributing)
@@ -380,6 +381,19 @@ To enable debug logging, check your application logs with:
 ```bash
 docker-compose logs -f
 ```
+
+## Documentation
+
+- [User guide](docs/user-guide.md) - how to work with the tools through an
+  assistant: searching, reading records, the source-citation-event chain,
+  attaching media, relationships and timelines.
+- [Product requirements](docs/prd.md) - what the product is as of v1.7.0, what
+  it deliberately does not do, and its known limitations.
+- [Architecture decision records](docs/adr/) - the six structural decisions
+  behind the project, with the costs each one carries.
+- [User management](docs/user-management.md) - creating and listing Gramps Web
+  accounts with the `manage_users` tool.
+- [Contributing](CONTRIBUTING.md) - development setup, testing and conventions.
 
 ## License
 
