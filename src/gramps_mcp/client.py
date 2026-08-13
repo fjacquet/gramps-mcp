@@ -365,7 +365,7 @@ class GrampsWebAPIClient:
         except httpx.HTTPStatusError as e:
             error_msg = self._format_http_error(e)
             raise GrampsAPIError(error_msg) from e
-        return response.json()
+        return self._parse_response_body(response)
 
 
 # Export the main classes for easy import
