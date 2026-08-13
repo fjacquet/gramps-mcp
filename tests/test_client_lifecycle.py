@@ -10,6 +10,8 @@ from src.gramps_mcp.auth import AuthManager
 from src.gramps_mcp.tools.records_tools import get_facts_tool
 from src.gramps_mcp.tools.user_tools import manage_users_tool
 
+pytestmark = pytest.mark.integration
+
 
 class TestSharedClientLifecycle:
     """The AuthManager singleton owns one client for the process lifetime."""

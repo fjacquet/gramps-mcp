@@ -14,6 +14,8 @@ from src.gramps_mcp.tools.data_management import create_note_tool, create_person
 from src.gramps_mcp.tools.search_basic import find_type_tool
 from src.gramps_mcp.tools.search_details import get_person_tool, get_type_tool
 
+pytestmark = pytest.mark.integration
+
 # Load environment variables
 load_dotenv()
 

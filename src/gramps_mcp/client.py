@@ -23,6 +23,7 @@ for all Gramps Web API operations through the make_api_call method.
 
 import logging
 import re
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -113,20 +114,10 @@ class GrampsWebAPIClient:
                     return {}, dict(response.headers)
                 return {}
 
-            try:
-                data = response.json()
-                if return_headers:
-                    return data, dict(response.headers)
-                return data
-            except Exception as e:
-                logger.warning(f"Failed to parse JSON response: {e}")
-                error_response = {
-                    "error": "Invalid JSON response",
-                    "raw_content": response.text,
-                }
-                if return_headers:
-                    return error_response, dict(response.headers)
-                return error_response
+            data = self._parse_response_body(response)
+            if return_headers:
+                return data, dict(response.headers)
+            return data
 
         except httpx.HTTPStatusError as e:
             error_msg = self._format_http_error(e)
@@ -137,6 +128,36 @@ class GrampsWebAPIClient:
             raise GrampsAPIError(f"Request timeout: {e}") from e
         except Exception as e:
             raise GrampsAPIError(f"Unexpected error: {e}") from e
+
+    def _parse_response_body(self, response: httpx.Response) -> Any:
+        """
+        Parse a successful (2xx) response body as JSON.
+
+        Args:
+            response (httpx.Response): The response to parse.
+
+        Returns:
+            Any: The parsed JSON body - a dict for most endpoints, but a
+                bare list for the Gramps collection and transaction
+                endpoints (and the media path), since ``response.json()``
+                returns whatever JSON value the server sent. When the body
+                does not parse as JSON, a dict describing the failure is
+                returned instead, whose ``raw_content`` is bounded by
+                MAX_ERROR_DETAIL for the same reason error bodies are
+                bounded above: Gramps can echo the submitted payload, which
+                may hold genealogy data about living people.
+        """
+        try:
+            return response.json()
+        except Exception as e:
+            logger.warning(f"Failed to parse JSON response: {e}")
+            raw_content = response.text
+            if len(raw_content) > MAX_ERROR_DETAIL:
+                raw_content = raw_content[:MAX_ERROR_DETAIL] + "..."
+            return {
+                "error": "Invalid JSON response",
+                "raw_content": raw_content,
+            }
 
     def _extract_error_detail(self, error: httpx.HTTPStatusError) -> str:
         """
@@ -322,7 +343,21 @@ class GrampsWebAPIClient:
     async def upload_media_file(
         self, file_content: bytes, mime_type: str, tree_id: str = "default"
     ):
-        """Upload a media file to Gramps."""
+        """
+        Upload a media file to Gramps.
+
+        Args:
+            file_content (bytes): The raw file bytes to upload.
+            mime_type (str): The file's MIME type, sent as Content-Type.
+            tree_id (str): Family tree identifier (default: "default").
+
+        Returns:
+            dict: The parsed JSON response describing the created media object.
+
+        Raises:
+            GrampsAPIError: If the upload fails, formatted the same way as
+                every other request made through _make_request.
+        """
         url = self._build_url(tree_id, "media/")
         headers = await self._get_headers()
         headers["Content-Type"] = mime_type
@@ -330,8 +365,12 @@ class GrampsWebAPIClient:
         response = await self.auth_manager.client.request(
             method="POST", url=url, content=file_content, headers=headers
         )
-        response.raise_for_status()
-        return response.json()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            error_msg = self._format_http_error(e)
+            raise GrampsAPIError(error_msg) from e
+        return self._parse_response_body(response)
 
 
 # Export the main classes for easy import

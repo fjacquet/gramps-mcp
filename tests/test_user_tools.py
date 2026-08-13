@@ -159,6 +159,8 @@ class TestFormatUserRows:
 class TestListAndGet:
     """Live-server tests for the read-only actions."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_list_users(self):
         result = await manage_users_tool({"action": "list"})
@@ -198,6 +200,8 @@ class TestListAndGet:
 
 class TestCreate:
     """Live-server tests for the writing action."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_create_without_users_returns_error(self):
@@ -261,11 +265,21 @@ class TestCreate:
         reaches the API after the first entry has already created the
         account, drawing a real 409.
 
-        This also proves the fix for the mid-batch-abort finding: the row
-        for the user that succeeded (first entry) is still present in the
-        output alongside the row for the one that did not (second entry),
-        rather than the whole batch aborting and losing the first entry's
-        password.
+        This proves the 409 from that race is reported as a skip
+        ("already exists"), not as a batch-ending failure - the row for the
+        user that succeeded (first entry) is still present alongside the
+        skipped row for the second entry.
+
+        It does NOT cover the separate mid-batch-abort fix (the outer
+        try/except in manage_users_tool that preserves already-accumulated
+        rows when something escapes _create_one's own broad exception
+        handler, e.g. a cancellation on client disconnect). _create_one
+        already turns a 409 into a normal ("skipped", ...) return without
+        raising, so this test never reaches that outer handler. Reaching it
+        would require injecting a BaseException-derived failure (such as
+        asyncio.CancelledError) mid-batch against a live server, which is
+        not reproducible without a mock - this project does not use mocks,
+        so that path has no automated coverage.
         """
         name = f"pytest_{uuid.uuid4().hex[:8]}"
         client = GrampsWebAPIClient()

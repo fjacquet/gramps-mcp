@@ -38,6 +38,8 @@ from src.gramps_mcp.tools.search_basic import (
     find_source_tool,
 )
 
+pytestmark = pytest.mark.integration
+
 
 class TestCompleteWorkflow:
     """

@@ -8,11 +8,13 @@ These tests require a working Gramps Web API instance with valid credentials.
 import pytest
 from dotenv import load_dotenv
 
-from src.gramps_mcp.client import GrampsWebAPIClient
+from src.gramps_mcp.client import GrampsAPIError, GrampsWebAPIClient
 from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.models.parameters.base_params import BaseGetMultipleParams
 from src.gramps_mcp.models.parameters.facts_params import FactsParams, LivingProxy
+
+pytestmark = pytest.mark.integration
 
 # Load environment variables from .env file
 load_dotenv()
@@ -22,7 +24,7 @@ class TestGetPersonCall:
     """Test GET_PERSON API call directly."""
 
     @pytest.mark.asyncio
-    async def test_get_person_by_handle(self):
+    async def test_get_person_by_handle(self) -> None:
         """Test getting a person by handle using make_api_call."""
         settings = get_settings()
         client = GrampsWebAPIClient()
@@ -97,7 +99,7 @@ class TestGetObjectGrampsId:
     """Test get_object functionality."""
 
     @pytest.mark.asyncio
-    async def test_get_person_by_handle_via_api_call(self):
+    async def test_get_person_by_handle_via_api_call(self) -> None:
         """Test getting a person by handle using make_api_call."""
         client = GrampsWebAPIClient()
 
@@ -141,7 +143,7 @@ class TestMediaFileUpload:
     """Test media file upload functionality."""
 
     @pytest.mark.asyncio
-    async def test_upload_media_file(self):
+    async def test_upload_media_file(self) -> None:
         """Test uploading a media file to Gramps."""
         client = GrampsWebAPIClient()
         settings = get_settings()
@@ -180,12 +182,36 @@ class TestMediaFileUpload:
         finally:
             await client.close()
 
+    @pytest.mark.asyncio
+    async def test_upload_media_file_failure_raises_gramps_api_error(self) -> None:
+        """A failed upload must raise GrampsAPIError with the formatted message,
+        not a raw httpx.HTTPStatusError.
+
+        An empty file body combined with a bogus mime type and a nonexistent
+        tree causes the live Gramps Web server to respond with a 500, which
+        is enough to exercise the failure path without a mock.
+        """
+        client = GrampsWebAPIClient()
+
+        try:
+            with pytest.raises(GrampsAPIError) as exc_info:
+                await client.upload_media_file(
+                    file_content=b"",
+                    mime_type="application/x-bogus-mime",
+                    tree_id="no-such-tree",
+                )
+            # The GrampsAPIError message must carry the formatted "Error"
+            # shape produced by _format_http_error, not httpx's own message.
+            assert "Server error" in str(exc_info.value)
+        finally:
+            await client.close()
+
 
 class TestPutMergeRequirement:
     """Test that PUT operations need to merge with existing data to prevent field loss."""
 
     @pytest.mark.asyncio
-    async def test_media_put_should_preserve_existing_file_data(self):
+    async def test_media_put_should_preserve_existing_file_data(self) -> None:
         """Test that PUT operations should preserve existing file data when updating metadata."""
         client = GrampsWebAPIClient()
         settings = get_settings()
@@ -237,7 +263,7 @@ class TestEnumParamSerialization:
     """Test that enum-typed parameter fields serialize to plain strings."""
 
     @pytest.mark.asyncio
-    async def test_get_facts_with_default_living_proxy_succeeds(self):
+    async def test_get_facts_with_default_living_proxy_succeeds(self) -> None:
         """GET_FACTS must not 422 due to LivingProxy enum leaking into the query string."""
         settings = get_settings()
         client = GrampsWebAPIClient()

@@ -39,11 +39,14 @@
 - **Run tests frequently during development** using `uv run pytest` or `uv run pytest -xvs` for verbose output.
 - **Most tests need a live Gramps Web server** (`GRAMPS_API_URL` etc. from `.env`)
   and fail with connection errors offline - this is expected, not a regression.
-  The `integration` marker in `pytest.ini` is currently unused by any test, so
-  `-m "not integration"` will NOT skip them. To run only the tests that work
-  offline: `uv run pytest tests/test_merge.py tests/test_config.py
-  tests/test_client_merge.py tests/test_utils.py
-  tests/test_http_error_detail.py`.
+  Server-dependent test modules (or, within a mixed module, the classes that
+  need it) carry `pytestmark = pytest.mark.integration`. To run only the
+  tests that work offline: `uv run pytest -m "not integration"`. The offline
+  suite currently reports three known failures in
+  `tests/test_parameter_alignment.py` from a `media_path` mismatch that
+  predates this work - expected until fixed. CI does not use the marker for
+  that reason: `.github/workflows/ci.yml` runs a narrower explicit file list,
+  a strict subset of what the marker selects.
 - **Live tests run from the macOS host need `GRAMPS_API_URL=http://localhost:80`**
   as an env override, not the `.env` value. `.env` points at
   `host.docker.internal`, which only resolves inside the container. Do not

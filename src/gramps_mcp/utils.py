@@ -145,6 +145,13 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | N
     Returns:
         The person's handle if a matching person is found, otherwise None
     """
+    # Reason: unescaped interpolation, same construction fixed with escaping
+    # in search_details.py (see its `escaped = ...` comment around lines
+    # 140-147). Safe here only because both callers - relationship_tools.py
+    # _resolve_person/_resolve_family - gate gramps_id against the anchored
+    # GRAMPS_ID_PATTERN (^[A-Z]+[0-9]+$) before reaching this function. A
+    # future caller that skips that gate would reopen GQL filter injection
+    # (e.g. a crafted value closing the quoted literal early).
     result = await client.make_api_call(
         api_call=ApiCalls.GET_PEOPLE,
         params={"gql": f'gramps_id="{gramps_id}"', "pagesize": 1},
@@ -167,6 +174,13 @@ async def resolve_family_handle(client, tree_id: str, gramps_id: str) -> str | N
     Returns:
         The family's handle if a matching family is found, otherwise None
     """
+    # Reason: unescaped interpolation, same construction fixed with escaping
+    # in search_details.py (see its `escaped = ...` comment around lines
+    # 140-147). Safe here only because both callers - relationship_tools.py
+    # _resolve_person/_resolve_family - gate gramps_id against the anchored
+    # GRAMPS_ID_PATTERN (^[A-Z]+[0-9]+$) before reaching this function. A
+    # future caller that skips that gate would reopen GQL filter injection
+    # (e.g. a crafted value closing the quoted literal early).
     result = await client.make_api_call(
         api_call=ApiCalls.GET_FAMILIES,
         params={"gql": f'gramps_id="{gramps_id}"', "pagesize": 1},

@@ -11,6 +11,8 @@ from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.models.parameters.place_params import PlaceSaveParams
 
+pytestmark = pytest.mark.integration
+
 
 class TestPlaceMedia:
     """A place must accept a media reference in the shape the API expects."""

@@ -14,6 +14,8 @@ from src.gramps_mcp.tools.relationship_tools import (
     get_timeline_tool,
 )
 
+pytestmark = pytest.mark.integration
+
 
 class TestGetRelationshipTool:
     """Test the get_relationship_tool against a live Gramps Web server."""

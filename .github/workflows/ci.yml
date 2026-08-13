@@ -39,7 +39,7 @@ jobs:
           GRAMPS_USERNAME: "ci"
           GRAMPS_PASSWORD: "ci"
           GRAMPS_TREE_ID: "ci"
-        run: uv run pytest --cov=src/gramps_mcp --cov-report=xml tests/test_merge.py tests/test_config.py tests/test_client_merge.py tests/test_utils.py
+        run: uv run pytest --cov=src/gramps_mcp --cov-report=xml tests/test_merge.py tests/test_config.py tests/test_client_merge.py tests/test_utils.py tests/test_http_error_detail.py
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

@@ -281,6 +281,9 @@ async def format_person_detail(client, tree_id: str, handle: str) -> str:
     result += "\nAttached notes:\n"
     note_list = person_data.get("note_list", [])
     for note_handle in note_list:
+        # Reason: a dangling handle 404s, and such data can arrive from
+        # outside this server (Gramps Desktop, an import). Losing one note
+        # line is acceptable; losing the whole person detail is not.
         try:
             note_data = await client.make_api_call(
                 ApiCalls.GET_NOTE, tree_id=tree_id, handle=note_handle

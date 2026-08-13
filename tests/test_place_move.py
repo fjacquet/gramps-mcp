@@ -11,6 +11,8 @@ from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.data_management import create_place_tool
 
+pytestmark = pytest.mark.integration
+
 
 class TestPlaceMove:
     """Replacing placeref_list must move a place, not add a second parent."""

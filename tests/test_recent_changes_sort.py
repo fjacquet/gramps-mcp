@@ -11,6 +11,8 @@ from src.gramps_mcp.tools.analysis import (
     get_recent_changes_tool,
 )
 
+pytestmark = pytest.mark.integration
+
 
 class TestRecentChangesSort:
     """The caller's sort choice must survive, and their dict must not change."""

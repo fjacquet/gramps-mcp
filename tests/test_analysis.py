@@ -16,6 +16,8 @@ from src.gramps_mcp.tools.analysis import (
     get_tree_info_tool,
 )
 
+pytestmark = pytest.mark.integration
+
 # Load environment variables from .env file
 load_dotenv()
 

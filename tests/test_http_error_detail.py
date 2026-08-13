@@ -3,7 +3,10 @@ Unit tests for HTTP error formatting. These construct real httpx objects and
 need no server.
 """
 
+from unittest.mock import AsyncMock, patch
+
 import httpx
+import pytest
 
 from src.gramps_mcp.client import MAX_ERROR_DETAIL, GrampsWebAPIClient
 
@@ -112,3 +115,68 @@ class TestErrorDetail:
 
         assert "place_type" in formatted
         assert "should not appear" not in formatted
+
+
+class TestNonJsonSuccessBody:
+    """A 2xx body that fails to parse as JSON must be bounded too."""
+
+    def test_non_json_2xx_body_is_truncated(self):
+        client = GrampsWebAPIClient()
+        request = httpx.Request("GET", "http://example.org/api/places/")
+        response = httpx.Response(200, request=request, text="y" * 5000)
+
+        parsed = client._parse_response_body(response)
+
+        assert parsed["error"] == "Invalid JSON response"
+        # The body must actually have been included (not silently dropped)...
+        assert "y" * 50 in parsed["raw_content"]
+        # ...cut off with a visible marker rather than just happening to be
+        # short...
+        assert parsed["raw_content"].endswith("...")
+        # ...and cut exactly at MAX_DETAIL, so the assertion is pinned to the
+        # source constant rather than to an arbitrary length.
+        expected = "y" * MAX_DETAIL + "..."
+        assert parsed["raw_content"] == expected
+
+
+class TestUploadMediaNonJsonSuccessBody:
+    """upload_media_file's success path must bound a non-JSON 2xx body the
+    same way every other request does, instead of letting json.JSONDecodeError
+    escape unwrapped (see _parse_response_body above)."""
+
+    @pytest.mark.asyncio
+    async def test_non_json_2xx_upload_response_does_not_raise(self):
+        client = GrampsWebAPIClient()
+        request = httpx.Request("POST", "http://example.org/api/media/")
+        # Reason: a real httpx.Response standing in for what a reverse proxy
+        # would send back on a 200 with an HTML interstitial instead of the
+        # expected JSON transaction body.
+        response = httpx.Response(200, request=request, text="y" * 5000)
+
+        # Reason: only the network boundary (the actual HTTP call and the
+        # token round-trip that precedes it) is replaced; the response body
+        # is real and travels through the client's own parsing code
+        # unmodified.
+        with (
+            patch.object(
+                client.auth_manager, "get_token", new=AsyncMock(return_value="token")
+            ),
+            patch.object(
+                client.auth_manager,
+                "get_headers",
+                return_value={"Authorization": "Bearer token"},
+            ),
+            patch.object(
+                client.auth_manager.client,
+                "request",
+                new=AsyncMock(return_value=response),
+            ),
+        ):
+            result = await client.upload_media_file(
+                file_content=b"fake bytes", mime_type="image/jpeg"
+            )
+
+        assert result["error"] == "Invalid JSON response"
+        assert result["raw_content"].endswith("...")
+        expected = "y" * MAX_DETAIL + "..."
+        assert result["raw_content"] == expected
