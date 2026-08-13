@@ -57,7 +57,7 @@ def with_client(func: Callable) -> Callable:
     Decorator that provides a GrampsWebAPIClient instance and handles cleanup.
 
     The decorated function will receive 'client' as the first argument.
-    Client is automatically closed after function execution.
+    The client is owned by the AuthManager singleton and is not closed here.
 
     Args:
         func: Async function to decorate
@@ -68,11 +68,13 @@ def with_client(func: Callable) -> Callable:
 
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
+        # Reason: the client delegates to the process-wide AuthManager
+        # singleton, so closing it here would tear the connection pool out
+        # from under any other tool call in flight, and force a fresh
+        # authentication on every nested call. The singleton owns the
+        # client for the lifetime of the process.
         client = GrampsWebAPIClient()
-        try:
-            return await func(client, *args, **kwargs)
-        finally:
-            await client.close()
+        return await func(client, *args, **kwargs)
 
     return wrapper
 
