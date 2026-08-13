@@ -56,8 +56,43 @@ class TestGetTypeResolution:
 
     @pytest.mark.asyncio
     async def test_handle_still_works(self):
-        by_id = await get_type_tool({"type": "person", "gramps_id": "I0076"})
-        assert "not yet implemented" not in by_id[0].text
+        # Reason: resolves I0076 to a real handle first (rather than
+        # hardcoding one), then calls get_type_tool with that handle
+        # directly, so this exercises the handle branch instead of
+        # duplicating the gramps_id resolution test above it.
+        handle = await _resolve_gramps_id("person", "I0076")
+        assert handle is not None
+
+        result = await get_type_tool({"type": "person", "handle": handle})
+        text = result[0].text
+
+        assert not text.startswith("Error: ")
+        assert "not yet implemented" not in text
+        assert "I0076" in text
+
+    @pytest.mark.asyncio
+    async def test_missing_type_and_identifier_names_the_problem(self):
+        # Reason: neither handle nor gramps_id is supplied, so the tool
+        # falls through both branches to the final message. An earlier lot
+        # removed a literal "not yet implemented" string here in favor of a
+        # message naming what was wrong; this pins that replacement.
+        result = await get_type_tool({"type": "person"})
+        text = result[0].text
+
+        assert "not yet implemented" not in text
+        assert "person" in text
+        assert "handle" in text or "gramps_id" in text
+
+    @pytest.mark.asyncio
+    async def test_unsupported_type_names_the_problem(self):
+        # Reason: "banana" is not a supported type, so gramps_id resolution
+        # cannot find an API call for it and the tool falls through to a
+        # message naming the type. Pins the other fallthrough replacement.
+        result = await get_type_tool({"type": "banana", "gramps_id": "I0076"})
+        text = result[0].text
+
+        assert "not yet implemented" not in text
+        assert "banana" in text
 
     @pytest.mark.asyncio
     async def test_family_gramps_id_resolves(self):
