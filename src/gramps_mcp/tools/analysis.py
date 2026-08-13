@@ -373,10 +373,11 @@ async def get_recent_changes_tool(client, arguments: dict) -> list[TextContent]:
         # Import and validate parameters
         from ..models.parameters.transactions_params import TransactionHistoryParams
 
-        # Validate parameters and ensure we get most recent changes first
-        if not arguments:
-            arguments = {}
-        arguments["sort"] = "-id"
+        # Reason: most recent first is a sensible default, but the schema
+        # documents sort as the caller's to choose, and writing into the
+        # caller's dict is a side effect no other tool here has.
+        arguments = dict(arguments or {})
+        arguments.setdefault("sort", "-id")
         params = TransactionHistoryParams(**arguments)
 
         # Get tree_id from settings
