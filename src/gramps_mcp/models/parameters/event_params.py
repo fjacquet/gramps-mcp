@@ -26,11 +26,10 @@ API calls supported in this category:
 - GET_EVENT_SPAN: Get elapsed time span between two events
 """
 
-from typing import Any
-
 from pydantic import BaseModel, Field
 
 from .base_params import BaseGetMultipleParams
+from .date_params import DateValue
 
 
 class EventSearchParams(BaseGetMultipleParams):
@@ -48,15 +47,7 @@ class EventSaveParams(BaseModel):
         None, description="Event's handle (for updates; omit for new event)"
     )
     type: str = Field(description="Event type (Birth, Death, Marriage, etc.)")
-    date: dict[str, Any] | None = Field(
-        None,
-        description=(
-            "Event date object with dateval array [day, month, year, False], "
-            "quality (0=regular, 1=estimated, 2=calculated), and modifier "
-            "(0=regular, 1=before, 2=after, 3=about, 4=range, 5=span, "
-            "6=textonly, 7=from, 8=to)"
-        ),
-    )
+    date: DateValue | None = Field(None, description="Event date")
     description: str | None = Field(None, description="Event description")
     place: str | None = Field(None, description="Place handle where event occurred")
     citation_list: list[str] = Field(..., description="List of citation handles")

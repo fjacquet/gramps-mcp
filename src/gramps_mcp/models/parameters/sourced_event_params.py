@@ -21,9 +21,9 @@ Chains source + citation + event creation into one call, auto-wiring the
 citation onto the event so callers never retype a handle between steps.
 """
 
-from typing import Any
-
 from pydantic import BaseModel, Field
+
+from .date_params import DateValue
 
 
 class SourcedEventData(BaseModel):
@@ -38,21 +38,13 @@ class SourcedEventData(BaseModel):
     citation_page: str | None = Field(
         None, description="Page or location within the source"
     )
-    citation_date: dict[str, Any] | None = Field(
-        None,
-        description=(
-            "Citation date object with dateval array [day, month, year, "
-            "False], quality (0=regular, 1=estimated, 2=calculated), and "
-            "modifier (0=regular, 1=before, 2=after, 3=about, 4=range, "
-            "5=span, 6=textonly, 7=from, 8=to)"
-        ),
-    )
+    citation_date: DateValue | None = Field(None, description="Citation date")
 
     # Event fields
     event_type: str = Field(
         ..., description="Event type (Birth, Death, Marriage, etc.)"
     )
-    event_date: dict[str, Any] | None = Field(None, description="Event date object")
+    event_date: DateValue | None = Field(None, description="Event date object")
     event_place: str | None = Field(None, description="Place handle")
     event_description: str | None = Field(None, description="Event description")
 
