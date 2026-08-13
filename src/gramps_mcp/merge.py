@@ -80,8 +80,22 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     Returns:
         List: The merged list.
     """
-    # Reason: if either side is empty there is nothing to deduplicate
-    if not existing_items or not new_items:
+    if not existing_items and not new_items:
+        return []
+
+    # Reason: a ref-less dict update can arrive with no existing list to
+    # merge against (e.g. the first attribute_list update on a record), but
+    # the incoming list itself can still carry the same dict twice. That
+    # case needs the same whole-content dedup as the non-empty path below,
+    # so it is routed there instead of the plain-concatenation shortcut.
+    if not existing_items:
+        sample_new = new_items[0]
+        if isinstance(sample_new, dict) and "ref" not in sample_new:
+            return _dedupe_dicts_without_ref(existing_items, new_items)
+        return existing_items + new_items
+
+    # Reason: if there is nothing new, there is nothing to deduplicate
+    if not new_items:
         return existing_items + new_items
 
     sample_existing = existing_items[0]
@@ -111,12 +125,31 @@ def _merge_list(existing_items: list, new_items: list) -> list:
         # Reason: attribute_list entries are {type, value} dicts with no ref,
         # so they miss the ref branch above. Without this they concatenate,
         # and N identical updates leave N copies.
-        additions = [
-            item
-            for item in new_items
-            if isinstance(item, dict) and item not in existing_items
-        ]
-        return existing_items + additions
+        return _dedupe_dicts_without_ref(existing_items, new_items)
 
     # Reason: mixed/unknown item types - concatenation is the safe fallback
     return existing_items + new_items
+
+
+def _dedupe_dicts_without_ref(existing_items: list, new_items: list) -> list:
+    """
+    Append new ref-less dict items, deduplicating on whole content.
+
+    Deduplicates each incoming item against both the existing items and
+    the items already accepted from this same incoming list, so a single
+    update carrying the same dict twice only stores it once.
+
+    Args:
+        existing_items (List): Items already stored in Gramps.
+        new_items (List): Items requested in the update.
+
+    Returns:
+        List: existing_items followed by the deduplicated additions.
+    """
+    seen = list(existing_items)
+    additions = []
+    for item in new_items:
+        if isinstance(item, dict) and item not in seen:
+            additions.append(item)
+            seen.append(item)
+    return existing_items + additions

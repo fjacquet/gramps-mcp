@@ -178,3 +178,26 @@ class TestAttributeDeduplication:
         merged = merge_put_data(existing, changes)
 
         assert merged["attribute_list"] == [attribute]
+
+    def test_duplicate_within_incoming_list_is_collapsed(self):
+        # Reason: comparing only against existing_items missed the case
+        # where a single update carries the same attribute twice - both
+        # passed the check and both got appended.
+        attribute = {"type": "Occupation", "value": "Cordonnier"}
+        existing = {"attribute_list": [attribute]}
+        changes = {"attribute_list": [dict(attribute), dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
+
+    def test_duplicate_within_incoming_list_is_collapsed_with_no_existing(self):
+        # Reason: the empty-existing-list path used to short-circuit to
+        # plain concatenation before any dedup logic ran.
+        attribute = {"type": "Occupation", "value": "Cordonnier"}
+        existing = {"attribute_list": []}
+        changes = {"attribute_list": [dict(attribute), dict(attribute)]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["attribute_list"] == [attribute]
