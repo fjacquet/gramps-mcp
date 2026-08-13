@@ -1003,7 +1003,82 @@ uv run git commit -m "fix: refuse a place name where a handle is required"
 
 ---
 
-### Task 7: Align the place list types with the API
+### Task 7: Align the place model with the API
+
+This task has two halves, both in `place_params.py`, and produces **two**
+commits — one per defect, as the lot's convention requires.
+
+**Half B was added during execution**, after Task 2 showed that the list
+replacement it had just delivered was awkward to use: moving a place through
+`create_place_tool` also required resupplying `place_type`, because
+`PUT_PLACE` and `POST_PLACES` share `PlaceSaveParams` and the field is
+declared required. The repository owner approved folding it into this lot
+rather than deferring it, on the grounds that it is the same class of defect
+as half A — a Pydantic model that does not match what the API accepts.
+
+#### Half B: `place_type` must not be required for a partial update
+
+- [ ] **Step B1: Write the failing test**
+
+Append to `tests/test_place_media.py`:
+
+```python
+class TestPartialPlaceUpdate:
+    """A partial update must not demand fields it is not changing."""
+
+    def test_place_type_is_optional(self):
+        params = PlaceSaveParams(
+            handle="103c4094f2414e2400974f979824",
+            placeref_list=[{"ref": "103c732d2adc19424a3fad17954c"}],
+        )
+
+        assert params.place_type is None
+
+    def test_creation_still_carries_a_type(self):
+        params = PlaceSaveParams(name={"value": "Somewhere"}, place_type="City")
+
+        assert params.place_type == "City"
+```
+
+- [ ] **Step B2: Run it to verify it fails**
+
+Run: `uv run pytest tests/test_place_media.py::TestPartialPlaceUpdate -v`
+Expected: `test_place_type_is_optional` FAILS — `place_type` is currently required.
+
+- [ ] **Step B3: Implement**
+
+In `src/gramps_mcp/models/parameters/place_params.py`, change:
+
+```python
+    place_type: str = Field(..., description="Place type")
+```
+
+to:
+
+```python
+    place_type: str | None = Field(
+        None,
+        description=(
+            "Place type, for example City or Parish. Required when creating a "
+            "place; omit it when updating one, so a partial update does not "
+            "have to resupply it."
+        ),
+    )
+```
+
+- [ ] **Step B4: Check nothing relied on the field being required**
+
+Run: `GRAMPS_API_URL=http://localhost:80 uv run pytest tests/test_place_media.py tests/test_place_move.py tests/test_data_management.py -q`
+Expected: no NEW failures. `tests/test_place_move.py` currently passes `place_type` on its PUT calls to work around this very requirement; it should still pass, and the redundant argument may now be removed from its two PUT calls. Remove it and confirm the test still passes — that removal is the proof this half worked.
+
+- [ ] **Step B5: Commit**
+
+```bash
+rtk git add src/gramps_mcp/models/parameters/place_params.py tests/test_place_media.py tests/test_place_move.py
+uv run git commit -m "fix: stop requiring place_type on a partial place update"
+```
+
+#### Half A: the list types
 
 `place_params.py:63` declares `media_list: list[str]` while the API expects
 MediaRef objects, which is what `base_params.py:157` (`list[dict[str, Any]]`)

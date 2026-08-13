@@ -27,6 +27,7 @@ Six defects across five areas.
 | The `date` field is unvalidated and accepts structures that break the XML export | new `DateValue` model; the five date fields in `event_params.py:51`, `citation_params.py:46`, `media_params.py:77`, `sourced_event_params.py:41,55` |
 | `place` accepts a name and silently overwrites a valid handle | `models/parameters/event_params.py:61` |
 | `place_params` declares list types the API rejects | `models/parameters/place_params.py:59,63` |
+| `place_type` is required even for a partial update | `models/parameters/place_params.py:55` |
 
 Out of scope, belonging to later lots: search result totals, the 422 error
 messages that discard the response body, `sort` handling in `analysis.py`, and
@@ -139,6 +140,25 @@ objects.
 
 Fix: align both declarations with what the API accepts and with the rest of the
 models.
+
+### 7. `place_type` is required even for a partial update
+
+Added during execution, not present when this spec was first approved.
+
+`place_params.py:55` declares `place_type: str = Field(...)`, and `PUT_PLACE`
+shares `PlaceSaveParams` with `POST_PLACES`. A field that a creation genuinely
+needs is therefore demanded of every update too: changing one field of a place
+means resupplying its type, or the call fails validation before it leaves the
+process.
+
+This surfaced while implementing defect 1: the list replacement had just made
+moving a place possible, and the move still failed unless the caller also sent
+`place_type`. The repository owner approved folding the fix into this lot
+rather than deferring it, on the grounds that it is the same class of defect as
+the two above — a model that does not match what the API accepts.
+
+Fix: make the field optional, so it is supplied on creation and omitted on a
+partial update.
 
 ## Testing
 
