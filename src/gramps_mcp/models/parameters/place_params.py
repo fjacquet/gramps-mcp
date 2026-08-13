@@ -57,10 +57,10 @@ class PlaceSaveParams(BaseModel):
     place_type: str | None = Field(
         None,
         description=(
-            "Place type, for example City or Parish. Required when creating a "
-            "place; omit it when updating one, so a partial update does not "
-            "have to resupply it. If omitted on creation, Gramps stores the "
-            "place with type 'Unknown' rather than rejecting the request."
+            "Place type, for example City or Parish. Optional in both "
+            "directions: supply it when creating a place, since otherwise "
+            "Gramps records the type as 'Unknown'; it can be omitted when "
+            "updating one, so a partial update does not have to resupply it."
         ),
     )
     placeref_list: list[dict] | None = Field(
