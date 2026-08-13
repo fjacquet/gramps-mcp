@@ -85,10 +85,14 @@ class TestGetTypeResolution:
 
     @pytest.mark.asyncio
     async def test_unsupported_type_names_the_problem(self):
-        # Reason: "banana" is not a supported type, so gramps_id resolution
-        # cannot find an API call for it and the tool falls through to a
-        # message naming the type. Pins the other fallthrough replacement.
-        result = await get_type_tool({"type": "banana", "gramps_id": "I0076"})
+        # Reason: no gramps_id or handle is supplied, so this reaches the
+        # final fallthrough (search_details.py:206-213) rather than the
+        # "No {type} found with gramps_id" exit that a supplied identifier
+        # would trigger (already covered by test_missing_gramps_id_says_
+        # not_found). An earlier version of this test passed a gramps_id
+        # alongside "banana" and landed in that other, already-covered
+        # branch instead - fixed per review.
+        result = await get_type_tool({"type": "banana"})
         text = result[0].text
 
         assert "not yet implemented" not in text
