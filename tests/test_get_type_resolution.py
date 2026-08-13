@@ -67,6 +67,21 @@ class TestGetTypeResolution:
         assert "not yet implemented" not in text
         assert KNOWN_FAMILY_GRAMPS_ID in text
 
+    @pytest.mark.asyncio
+    async def test_quote_in_gramps_id_reports_formatted_error(self):
+        # Reason: gramps_id is interpolated into a GQL filter string
+        # unescaped (see the "Reason:" comment on the gql= call in
+        # _resolve_gramps_id), so an id containing a double quote builds a
+        # malformed filter the live server rejects with a real 422 error.
+        # This exercises the try/except around _resolve_gramps_id through
+        # the actual API, with no mock, and pins the shape of what a
+        # caller sees on failure.
+        result = await get_type_tool({"type": "person", "gramps_id": 'I0076"'})
+        text = result[0].text
+
+        assert text.startswith("Error: ")
+        assert "not yet implemented" not in text
+
 
 class TestResolveGrampsIdIndependentOfRendering:
     """
