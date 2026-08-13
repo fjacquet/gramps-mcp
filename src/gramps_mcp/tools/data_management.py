@@ -111,38 +111,32 @@ async def _handle_crud_operation(
 
         # Create client and make unified API call
         client = GrampsWebAPIClient()
-        try:
-            if pre_save_hook is not None:
-                validated_params = await pre_save_hook(
-                    client, tree_id, validated_params
-                )
+        if pre_save_hook is not None:
+            validated_params = await pre_save_hook(client, tree_id, validated_params)
 
-            # Choose API call based on whether handle is provided (update vs create)
-            if hasattr(validated_params, "handle") and validated_params.handle:
-                # Update existing entity
-                result = await client.make_api_call(
-                    api_call=put_api_call,
-                    params=validated_params,
-                    tree_id=tree_id,
-                    handle=validated_params.handle,
-                )
-                operation = "updated"
-            else:
-                # Create new entity
-                result = await client.make_api_call(
-                    api_call=post_api_call, params=validated_params, tree_id=tree_id
-                )
-                operation = "created"
-
-            # Extract entity data from API response
-            entity_data = _extract_entity_data(result, entity_type)
-            formatted_response = await _format_save_response(
-                client, entity_data, entity_type, operation, tree_id
+        # Choose API call based on whether handle is provided (update vs create)
+        if hasattr(validated_params, "handle") and validated_params.handle:
+            # Update existing entity
+            result = await client.make_api_call(
+                api_call=put_api_call,
+                params=validated_params,
+                tree_id=tree_id,
+                handle=validated_params.handle,
             )
-            return [TextContent(type="text", text=formatted_response)]
+            operation = "updated"
+        else:
+            # Create new entity
+            result = await client.make_api_call(
+                api_call=post_api_call, params=validated_params, tree_id=tree_id
+            )
+            operation = "created"
 
-        finally:
-            await client.close()
+        # Extract entity data from API response
+        entity_data = _extract_entity_data(result, entity_type)
+        formatted_response = await _format_save_response(
+            client, entity_data, entity_type, operation, tree_id
+        )
+        return [TextContent(type="text", text=formatted_response)]
 
     except Exception as e:
         return _format_error_response(e, f"{entity_type} save")
@@ -234,33 +228,29 @@ async def create_family_tool(arguments: dict) -> list[TextContent]:
 
         # Create client and make unified API call
         client = GrampsWebAPIClient()
-        try:
-            # Choose API call based on whether handle is provided (update vs create)
-            if params.handle:
-                # Update existing family
-                result = await client.make_api_call(
-                    api_call=ApiCalls.PUT_FAMILY,
-                    params=params,
-                    tree_id=tree_id,
-                    handle=params.handle,
-                )
-                operation = "updated"
-            else:
-                # Create new family
-                result = await client.make_api_call(
-                    api_call=ApiCalls.POST_FAMILIES, params=params, tree_id=tree_id
-                )
-                operation = "created"
-
-            # Extract entity data from API response (handles family special case)
-            entity_data = _extract_entity_data(result, "family")
-            formatted_response = await _format_save_response(
-                client, entity_data, "family", operation, tree_id
+        # Choose API call based on whether handle is provided (update vs create)
+        if params.handle:
+            # Update existing family
+            result = await client.make_api_call(
+                api_call=ApiCalls.PUT_FAMILY,
+                params=params,
+                tree_id=tree_id,
+                handle=params.handle,
             )
-            return [TextContent(type="text", text=formatted_response)]
+            operation = "updated"
+        else:
+            # Create new family
+            result = await client.make_api_call(
+                api_call=ApiCalls.POST_FAMILIES, params=params, tree_id=tree_id
+            )
+            operation = "created"
 
-        finally:
-            await client.close()
+        # Extract entity data from API response (handles family special case)
+        entity_data = _extract_entity_data(result, "family")
+        formatted_response = await _format_save_response(
+            client, entity_data, "family", operation, tree_id
+        )
+        return [TextContent(type="text", text=formatted_response)]
 
     except Exception as e:
         return _format_error_response(e, "family save")
@@ -349,50 +339,46 @@ async def create_media_tool(arguments: dict) -> list[TextContent]:
         tree_id = settings.gramps_tree_id
 
         client = GrampsWebAPIClient()
-        try:
-            # If a handle is provided, we are updating an existing media object
-            if params and params.handle:
-                result = await client.make_api_call(
-                    api_call=ApiCalls.PUT_MEDIA_ITEM,
-                    params=params,
-                    tree_id=tree_id,
-                    handle=params.handle,
-                )
-                operation = "updated"
-                entity_data = _extract_entity_data(result)
-            else:
-                # If no handle, we are creating a new media object,
-                # which requires a file
-                if not file_location:
-                    raise ValueError("media_path is required to create new media.")
-
-                # 1. Upload the file to create the initial media object
-                initial_media_object = await upload_media_from_path(
-                    client, file_location, tree_id
-                )
-                media_handle = initial_media_object["handle"]
-
-                # 2. Merge initial object with metadata and update via PUT
-                final_media_data = initial_media_object.copy()
-                if params:
-                    final_media_data.update(params.model_dump(exclude_none=True))
-
-                result = await client.make_api_call(
-                    api_call=ApiCalls.PUT_MEDIA_ITEM,
-                    params=final_media_data,
-                    tree_id=tree_id,
-                    handle=media_handle,
-                )
-                operation = "created"
-                entity_data = _extract_entity_data(result)
-
-            formatted_response = await _format_save_response(
-                client, entity_data, "media", operation, tree_id
+        # If a handle is provided, we are updating an existing media object
+        if params and params.handle:
+            result = await client.make_api_call(
+                api_call=ApiCalls.PUT_MEDIA_ITEM,
+                params=params,
+                tree_id=tree_id,
+                handle=params.handle,
             )
-            return [TextContent(type="text", text=formatted_response)]
+            operation = "updated"
+            entity_data = _extract_entity_data(result)
+        else:
+            # If no handle, we are creating a new media object,
+            # which requires a file
+            if not file_location:
+                raise ValueError("media_path is required to create new media.")
 
-        finally:
-            await client.close()
+            # 1. Upload the file to create the initial media object
+            initial_media_object = await upload_media_from_path(
+                client, file_location, tree_id
+            )
+            media_handle = initial_media_object["handle"]
+
+            # 2. Merge initial object with metadata and update via PUT
+            final_media_data = initial_media_object.copy()
+            if params:
+                final_media_data.update(params.model_dump(exclude_none=True))
+
+            result = await client.make_api_call(
+                api_call=ApiCalls.PUT_MEDIA_ITEM,
+                params=final_media_data,
+                tree_id=tree_id,
+                handle=media_handle,
+            )
+            operation = "created"
+            entity_data = _extract_entity_data(result)
+
+        formatted_response = await _format_save_response(
+            client, entity_data, "media", operation, tree_id
+        )
+        return [TextContent(type="text", text=formatted_response)]
 
     except Exception as e:
         return _format_error_response(e, "media save")
@@ -430,33 +416,29 @@ async def create_repository_tool(arguments: dict) -> list[TextContent]:
 
         # Create client and make unified API call
         client = GrampsWebAPIClient()
-        try:
-            # Choose API call based on whether handle is provided (update vs create)
-            if params.handle:
-                # Update existing repository
-                result = await client.make_api_call(
-                    api_call=ApiCalls.PUT_REPOSITORY,
-                    params=params,
-                    tree_id=tree_id,
-                    handle=params.handle,
-                )
-                operation = "updated"
-            else:
-                # Create new repository
-                result = await client.make_api_call(
-                    api_call=ApiCalls.POST_REPOSITORIES, params=params, tree_id=tree_id
-                )
-                operation = "created"
-
-            # Extract entity data from API response
-            entity_data = _extract_entity_data(result)
-            formatted_response = await _format_save_response(
-                client, entity_data, "repository", operation, tree_id
+        # Choose API call based on whether handle is provided (update vs create)
+        if params.handle:
+            # Update existing repository
+            result = await client.make_api_call(
+                api_call=ApiCalls.PUT_REPOSITORY,
+                params=params,
+                tree_id=tree_id,
+                handle=params.handle,
             )
-            return [TextContent(type="text", text=formatted_response)]
+            operation = "updated"
+        else:
+            # Create new repository
+            result = await client.make_api_call(
+                api_call=ApiCalls.POST_REPOSITORIES, params=params, tree_id=tree_id
+            )
+            operation = "created"
 
-        finally:
-            await client.close()
+        # Extract entity data from API response
+        entity_data = _extract_entity_data(result)
+        formatted_response = await _format_save_response(
+            client, entity_data, "repository", operation, tree_id
+        )
+        return [TextContent(type="text", text=formatted_response)]
 
     except Exception as e:
         return _format_error_response(e, "repository save")

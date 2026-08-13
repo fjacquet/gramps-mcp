@@ -53,76 +53,73 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
         tree_id = settings.gramps_tree_id
 
         client = GrampsWebAPIClient()
-        try:
-            # 1. Source
-            source_kwargs: dict[str, Any] = {
-                "title": params.source_title,
-                "author": params.source_author,
-                "pubinfo": params.source_pubinfo,
-            }
-            source_params = SourceSaveParams(**source_kwargs)
-            source_result = await client.make_api_call(
-                api_call=ApiCalls.POST_SOURCES, params=source_params, tree_id=tree_id
+        # 1. Source
+        source_kwargs: dict[str, Any] = {
+            "title": params.source_title,
+            "author": params.source_author,
+            "pubinfo": params.source_pubinfo,
+        }
+        source_params = SourceSaveParams(**source_kwargs)
+        source_result = await client.make_api_call(
+            api_call=ApiCalls.POST_SOURCES, params=source_params, tree_id=tree_id
+        )
+        source_data = _extract_entity_data(source_result)
+        source_handle = source_data["handle"]
+
+        # 2. Media (optional) - shared upload helper, not create_media_tool
+        media_list = None
+        media_info = None
+        if params.media_path:
+            media_info = await upload_media_from_path(
+                client, params.media_path, tree_id
             )
-            source_data = _extract_entity_data(source_result)
-            source_handle = source_data["handle"]
+            media_list = [{"ref": media_info["handle"]}]
 
-            # 2. Media (optional) - shared upload helper, not create_media_tool
-            media_list = None
-            media_info = None
-            if params.media_path:
-                media_info = await upload_media_from_path(
-                    client, params.media_path, tree_id
-                )
-                media_list = [{"ref": media_info["handle"]}]
+        # 3. Citation
+        citation_kwargs: dict[str, Any] = {
+            "source_handle": source_handle,
+            "page": params.citation_page,
+            "date": params.citation_date,
+            "media_list": media_list,
+            "note_list": params.note_list,
+        }
+        citation_params = CitationData(**citation_kwargs)
+        citation_result = await client.make_api_call(
+            api_call=ApiCalls.POST_CITATIONS,
+            params=citation_params,
+            tree_id=tree_id,
+        )
+        citation_data = _extract_entity_data(citation_result)
+        citation_handle = citation_data["handle"]
 
-            # 3. Citation
-            citation_kwargs: dict[str, Any] = {
-                "source_handle": source_handle,
-                "page": params.citation_page,
-                "date": params.citation_date,
-                "media_list": media_list,
-                "note_list": params.note_list,
-            }
-            citation_params = CitationData(**citation_kwargs)
-            citation_result = await client.make_api_call(
-                api_call=ApiCalls.POST_CITATIONS,
-                params=citation_params,
-                tree_id=tree_id,
-            )
-            citation_data = _extract_entity_data(citation_result)
-            citation_handle = citation_data["handle"]
+        # 4. Event, citation auto-wired
+        event_kwargs: dict[str, Any] = {
+            "type": params.event_type,
+            "date": params.event_date,
+            "description": params.event_description,
+            "place": params.event_place,
+            "citation_list": [citation_handle],
+        }
+        event_params = EventSaveParams(**event_kwargs)
+        event_result = await client.make_api_call(
+            api_call=ApiCalls.POST_EVENTS, params=event_params, tree_id=tree_id
+        )
+        event_data = _extract_entity_data(event_result)
+        event_handle = event_data["handle"]
 
-            # 4. Event, citation auto-wired
-            event_kwargs: dict[str, Any] = {
-                "type": params.event_type,
-                "date": params.event_date,
-                "description": params.event_description,
-                "place": params.event_place,
-                "citation_list": [citation_handle],
-            }
-            event_params = EventSaveParams(**event_kwargs)
-            event_result = await client.make_api_call(
-                api_call=ApiCalls.POST_EVENTS, params=event_params, tree_id=tree_id
-            )
-            event_data = _extract_entity_data(event_result)
-            event_handle = event_data["handle"]
+        # 5. Combined response - all handles visible in call order
+        source_fmt = await format_source(client, tree_id, source_handle)
+        citation_fmt = await format_citation(client, tree_id, citation_handle)
+        event_fmt = await format_event(client, tree_id, event_handle)
 
-            # 5. Combined response - all handles visible in call order
-            source_fmt = await format_source(client, tree_id, source_handle)
-            citation_fmt = await format_citation(client, tree_id, citation_handle)
-            event_fmt = await format_event(client, tree_id, event_handle)
+        response = (
+            "Successfully created sourced event:\n\n"
+            f"{source_fmt}\n{citation_fmt}\n{event_fmt}"
+        )
+        if media_info:
+            response += f"\nAttached media: {media_info.get('handle', 'N/A')}\n"
 
-            response = (
-                "Successfully created sourced event:\n\n"
-                f"{source_fmt}\n{citation_fmt}\n{event_fmt}"
-            )
-            if media_info:
-                response += f"\nAttached media: {media_info.get('handle', 'N/A')}\n"
-
-            return [TextContent(type="text", text=response)]
-        finally:
-            await client.close()
+        return [TextContent(type="text", text=response)]
 
     except Exception as e:
         return _format_error_response(e, "sourced event creation")
