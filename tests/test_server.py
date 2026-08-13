@@ -24,7 +24,10 @@ TIMEOUT = 5.0
 # Base URL for the live server
 BASE_URL = "http://localhost:8000"
 
-# Pytest timeout configuration
+# Pytest timeout configuration - applies to every test in this module.
+# The integration mark moves to the classes that genuinely need the live
+# server; TestServerBuild, TestParameterModels, and test_manage_users_registered
+# touch no network and stay unmarked.
 pytestmark = pytest.mark.timeout(TIMEOUT)
 
 
@@ -53,6 +56,8 @@ class TestServerBuild:
 
 class TestMCPServerSetup:
     """Test MCP server initialization and setup."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_server_is_running(self):
@@ -137,6 +142,8 @@ class TestMCPServerSetup:
 class TestHTTPRoutes:
     """Test standard HTTP routes."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_root_endpoint(self):
         """Test root endpoint returns server information."""
@@ -160,6 +167,8 @@ class TestHTTPRoutes:
 
 class TestMCPProtocolCompliance:
     """Test MCP protocol compliance and communication."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_mcp_tools_list_request(self):
@@ -241,6 +250,8 @@ class TestMCPProtocolCompliance:
 class TestToolIntegrationRealAPI:
     """Test tool integration with real Gramps Web API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_type_with_specific_query(self):
         """Test find_type tool with specific query."""
@@ -293,6 +304,8 @@ class TestToolIntegrationRealAPI:
 
 class TestErrorHandling:
     """Test error handling and edge cases."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_invalid_tree_id(self):
@@ -368,6 +381,8 @@ class TestParameterModels:
 
 class TestMCPResources:
     """Test MCP resource functionality."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_list_resources(self):

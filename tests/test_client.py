@@ -14,6 +14,8 @@ from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.models.parameters.base_params import BaseGetMultipleParams
 from src.gramps_mcp.models.parameters.facts_params import FactsParams, LivingProxy
 
+pytestmark = pytest.mark.integration
+
 # Load environment variables from .env file
 load_dotenv()
 

@@ -11,6 +11,8 @@ from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.handlers.person_detail_handler import format_person_detail
 from src.gramps_mcp.models.api_calls import ApiCalls
 
+pytestmark = pytest.mark.integration
+
 
 class TestPersonDetailResilience:
     """A dangling media reference must not destroy the whole detail."""

@@ -25,6 +25,8 @@ from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.search_details import _resolve_gramps_id, get_type_tool
 
+pytestmark = pytest.mark.integration
+
 # A real family gramps_id from the live tree, found via a direct
 # ApiCalls.GET_FAMILIES probe (F0308 -> handle 103f77ffdd8f25ec1684cd0236c4),
 # the same way I0076 was confirmed for the person case.

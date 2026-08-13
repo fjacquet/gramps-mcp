@@ -24,6 +24,8 @@ from src.gramps_mcp.tools.data_management import (
 )
 from src.gramps_mcp.tools.sourced_event import create_sourced_event_tool
 
+pytestmark = pytest.mark.integration
+
 # Store handles for chaining tests following proper Gramps workflow
 test_note_handle = None
 test_media_handle = None

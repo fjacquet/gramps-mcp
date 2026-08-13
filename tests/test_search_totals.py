@@ -8,6 +8,8 @@ import pytest
 
 from src.gramps_mcp.tools.search_basic import find_type_tool
 
+pytestmark = pytest.mark.integration
+
 
 class TestSearchTotals:
     """A truncated search must report the real match count."""

@@ -26,6 +26,8 @@ load_dotenv()
 class TestFindPersonTool:
     """Test find_type_tool functionality for person with real API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_person(self):
         """Test people search with GQL."""
@@ -84,6 +86,8 @@ class TestSimplePaginationParams:
 class TestFindFamilyTool:
     """Test find_type_tool functionality for family with real API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_family(self):
         """Test families search with GQL."""
@@ -116,6 +120,8 @@ class TestFindFamilyTool:
 class TestFindEventTool:
     """Test find_type_tool functionality for event with real API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_event(self):
         """Test events search with GQL."""
@@ -143,6 +149,8 @@ class TestFindEventTool:
 
 class TestFindPlaceTool:
     """Test find_type_tool functionality for place with real API."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_find_place(self):
@@ -172,6 +180,8 @@ class TestFindPlaceTool:
 class TestFindSourceTool:
     """Test find_type_tool functionality for source with real API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_source(self):
         """Test sources search with GQL."""
@@ -199,6 +209,8 @@ class TestFindSourceTool:
 
 class TestFindRepositoryTool:
     """Test find_type_tool functionality for repository with real API."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_find_repository(self):
@@ -228,6 +240,8 @@ class TestFindRepositoryTool:
 class TestFindCitationTool:
     """Test find_type_tool functionality for citation with real API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_citation(self):
         """Test citations search with GQL."""
@@ -256,6 +270,8 @@ class TestFindCitationTool:
 class TestFindMediaTool:
     """Test find_type_tool functionality for media with real API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_media(self):
         """Test media search with GQL."""
@@ -283,6 +299,8 @@ class TestFindMediaTool:
 
 class TestFindNoteTool:
     """Test find_type_tool functionality for note with real API."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     @pytest.mark.skip(
@@ -320,6 +338,8 @@ class TestFindNoteTool:
 class TestFindAnythingTool:
     """Test find_anything_tool functionality with real API."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_find_anything(self):
         """Test search across all object types with query."""
@@ -352,6 +372,8 @@ class TestFindAnythingPagination:
     distinguish fixed-vs-broken `find_anything_tool` behavior rather than
     passing vacuously regardless of whether the fix is applied.
     """
+
+    pytestmark = pytest.mark.integration
 
     @staticmethod
     async def _create_marker_notes(marker: str, count: int) -> list[str]:

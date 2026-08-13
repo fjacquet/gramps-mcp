@@ -159,6 +159,8 @@ class TestFormatUserRows:
 class TestListAndGet:
     """Live-server tests for the read-only actions."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_list_users(self):
         result = await manage_users_tool({"action": "list"})
@@ -198,6 +200,8 @@ class TestListAndGet:
 
 class TestCreate:
     """Live-server tests for the writing action."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_create_without_users_returns_error(self):

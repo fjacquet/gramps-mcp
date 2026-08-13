@@ -8,6 +8,8 @@ import pytest
 
 from src.gramps_mcp.tools.records_tools import get_facts_tool, manage_tags_tool
 
+pytestmark = pytest.mark.integration
+
 
 class TestManageTagsTool:
     """Test the manage_tags_tool against a live Gramps Web server."""

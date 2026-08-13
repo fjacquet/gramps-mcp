@@ -9,6 +9,8 @@ from src.gramps_mcp.config import get_settings
 from src.gramps_mcp.handlers.person_handler import format_person
 from src.gramps_mcp.models.api_calls import ApiCalls
 
+pytestmark = pytest.mark.integration
+
 
 async def _find_person_with_media(client, tree_id: str) -> dict | None:
     """
