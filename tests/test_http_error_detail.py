@@ -112,3 +112,25 @@ class TestErrorDetail:
 
         assert "place_type" in formatted
         assert "should not appear" not in formatted
+
+
+class TestNonJsonSuccessBody:
+    """A 2xx body that fails to parse as JSON must be bounded too."""
+
+    def test_non_json_2xx_body_is_truncated(self):
+        client = GrampsWebAPIClient()
+        request = httpx.Request("GET", "http://example.org/api/places/")
+        response = httpx.Response(200, request=request, text="y" * 5000)
+
+        parsed = client._parse_response_body(response)
+
+        assert parsed["error"] == "Invalid JSON response"
+        # The body must actually have been included (not silently dropped)...
+        assert "y" * 50 in parsed["raw_content"]
+        # ...cut off with a visible marker rather than just happening to be
+        # short...
+        assert parsed["raw_content"].endswith("...")
+        # ...and cut exactly at MAX_DETAIL, so the assertion is pinned to the
+        # source constant rather than to an arbitrary length.
+        expected = "y" * MAX_DETAIL + "..."
+        assert parsed["raw_content"] == expected

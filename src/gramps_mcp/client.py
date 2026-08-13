@@ -113,20 +113,10 @@ class GrampsWebAPIClient:
                     return {}, dict(response.headers)
                 return {}
 
-            try:
-                data = response.json()
-                if return_headers:
-                    return data, dict(response.headers)
-                return data
-            except Exception as e:
-                logger.warning(f"Failed to parse JSON response: {e}")
-                error_response = {
-                    "error": "Invalid JSON response",
-                    "raw_content": response.text,
-                }
-                if return_headers:
-                    return error_response, dict(response.headers)
-                return error_response
+            data = self._parse_response_body(response)
+            if return_headers:
+                return data, dict(response.headers)
+            return data
 
         except httpx.HTTPStatusError as e:
             error_msg = self._format_http_error(e)
@@ -137,6 +127,32 @@ class GrampsWebAPIClient:
             raise GrampsAPIError(f"Request timeout: {e}") from e
         except Exception as e:
             raise GrampsAPIError(f"Unexpected error: {e}") from e
+
+    def _parse_response_body(self, response: httpx.Response) -> dict:
+        """
+        Parse a successful (2xx) response body as JSON.
+
+        Args:
+            response (httpx.Response): The response to parse.
+
+        Returns:
+            dict: The parsed JSON body. When the body does not parse as
+                JSON, a dict describing the failure, whose ``raw_content``
+                is bounded by MAX_ERROR_DETAIL for the same reason error
+                bodies are bounded above: Gramps can echo the submitted
+                payload, which may hold genealogy data about living people.
+        """
+        try:
+            return response.json()
+        except Exception as e:
+            logger.warning(f"Failed to parse JSON response: {e}")
+            raw_content = response.text
+            if len(raw_content) > MAX_ERROR_DETAIL:
+                raw_content = raw_content[:MAX_ERROR_DETAIL] + "..."
+            return {
+                "error": "Invalid JSON response",
+                "raw_content": raw_content,
+            }
 
     def _extract_error_detail(self, error: httpx.HTTPStatusError) -> str:
         """
