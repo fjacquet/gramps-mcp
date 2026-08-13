@@ -42,7 +42,8 @@
   The `integration` marker in `pytest.ini` is currently unused by any test, so
   `-m "not integration"` will NOT skip them. To run only the tests that work
   offline: `uv run pytest tests/test_merge.py tests/test_config.py
-  tests/test_client_merge.py tests/test_utils.py`.
+  tests/test_client_merge.py tests/test_utils.py
+  tests/test_http_error_detail.py`.
 - **Live tests run from the macOS host need `GRAMPS_API_URL=http://localhost:80`**
   as an env override, not the `.env` value. `.env` points at
   `host.docker.internal`, which only resolves inside the container. Do not
