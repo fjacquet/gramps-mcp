@@ -54,7 +54,13 @@ exclude_docs: |
 
 nav:
   - Home: index.md
-  - User guide: user-guide.md
+  - User guide:
+      - Overview: user-guide/index.md
+      - Searching and reading records: user-guide/searching.md
+      - Recording a sourced fact: user-guide/recording.md
+      - Relationships, timelines and recent changes: user-guide/exploring.md
+      - Managing accounts: user-guide/administration.md
+      - Things that will surprise you: user-guide/gotchas.md
   - User management: user-management.md
   - Product requirements: prd.md
   - Decisions:

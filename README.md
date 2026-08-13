@@ -384,7 +384,7 @@ docker-compose logs -f
 
 ## Documentation
 
-- [User guide](docs/user-guide.md) - how to work with the tools through an
+- [User guide](docs/user-guide/index.md) - how to work with the tools through an
   assistant: searching, reading records, the source-citation-event chain,
   attaching media, relationships and timelines.
 - [Product requirements](docs/prd.md) - what the product is as of v1.7.0, what

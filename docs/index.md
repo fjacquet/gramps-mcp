@@ -9,7 +9,7 @@ The assistant does the reasoning. This server does the data.
 
 ## Where to start
 
-- **[User guide](user-guide.md)** - working with the tools through an assistant:
+- **[User guide](user-guide/index.md)** - working with the tools through an assistant:
   finding people and families, reading a record in depth, recording a sourced
   fact, attaching media, exploring relationships and timelines.
 - **[Product requirements](prd.md)** - what the product is as of v1.7.0, what it
