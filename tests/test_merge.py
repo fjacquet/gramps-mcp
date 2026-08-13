@@ -182,14 +182,18 @@ class TestAttributeDeduplication:
     def test_duplicate_within_incoming_list_is_collapsed(self):
         # Reason: comparing only against existing_items missed the case
         # where a single update carries the same attribute twice - both
-        # passed the check and both got appended.
-        attribute = {"type": "Occupation", "value": "Cordonnier"}
-        existing = {"attribute_list": [attribute]}
-        changes = {"attribute_list": [dict(attribute), dict(attribute)]}
+        # passed the check and both got appended. The duplicated incoming
+        # attribute must differ from the existing entry, or the old code
+        # would filter both copies out anyway (each equal to the existing
+        # entry) and this test would pass without discriminating anything.
+        existing_attribute = {"type": "Occupation", "value": "Cordonnier"}
+        new_attribute = {"type": "Occupation", "value": "Meunier"}
+        existing = {"attribute_list": [existing_attribute]}
+        changes = {"attribute_list": [dict(new_attribute), dict(new_attribute)]}
 
         merged = merge_put_data(existing, changes)
 
-        assert merged["attribute_list"] == [attribute]
+        assert merged["attribute_list"] == [existing_attribute, new_attribute]
 
     def test_duplicate_within_incoming_list_is_collapsed_with_no_existing(self):
         # Reason: the empty-existing-list path used to short-circuit to
