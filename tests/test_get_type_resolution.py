@@ -82,6 +82,30 @@ class TestGetTypeResolution:
         assert text.startswith("Error: ")
         assert "not yet implemented" not in text
 
+    @pytest.mark.asyncio
+    async def test_well_formed_quote_injection_is_refused(self):
+        # Reason: the benign half above (a stray quote making the filter
+        # malformed) is not the dangerous case. A quote crafted to keep the
+        # filter well-formed - verified live to resolve to a real,
+        # unrelated person - would otherwise have get_type silently
+        # present someone else's record as the answer. This pins the
+        # refusal added to _resolve_gramps_id rather than exercising the
+        # injection itself.
+        result = await get_type_tool(
+            {"type": "person", "gramps_id": 'x" or gramps_id!="'}
+        )
+        text = result[0].text
+
+        assert text.startswith("Error: ")
+        assert "not yet implemented" not in text
+
+    @pytest.mark.asyncio
+    async def test_backslash_in_gramps_id_is_refused(self):
+        result = await get_type_tool({"type": "person", "gramps_id": "I0076\\"})
+        text = result[0].text
+
+        assert text.startswith("Error: ")
+
 
 class TestResolveGrampsIdIndependentOfRendering:
     """

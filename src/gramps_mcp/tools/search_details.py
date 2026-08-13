@@ -118,6 +118,21 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
     if api_call is None:
         return None
 
+    # Reason: gramps_id is interpolated into the gql filter below without
+    # escaping. A stray double quote can close the quoted value early, and
+    # a well-formed injection like `x" or gramps_id!="` then resolves to an
+    # arbitrary, unrelated record instead of failing loudly - the dangerous
+    # half of this, versus a quote that merely produces a malformed filter
+    # the server rejects. A backslash is rejected too, since it is the
+    # other character that changes what a quoted GQL string means. This is
+    # a narrow refusal, not general GQL escaping - full escaping is out of
+    # scope here.
+    if '"' in gramps_id or "\\" in gramps_id:
+        raise ValueError(
+            f"gramps_id {gramps_id!r} contains a quote or backslash, "
+            "which is not allowed"
+        )
+
     settings = get_settings()
     tree_id = settings.gramps_tree_id
 
