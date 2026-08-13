@@ -75,6 +75,37 @@ class TestPlaceMedia:
                 )
 
 
+class TestPlaceCreationWithoutType:
+    """Creation without place_type must not error, and its default must be pinned."""
+
+    @pytest.mark.asyncio
+    async def test_creating_without_place_type_defaults_to_unknown(self):
+        """Omitting place_type on create must succeed with a Gramps default."""
+        client = GrampsWebAPIClient()
+        tree_id = get_settings().gramps_tree_id
+        suffix = uuid.uuid4().hex[:8]
+        place_handle = None
+
+        try:
+            created = await client.make_api_call(
+                api_call=ApiCalls.POST_PLACES,
+                params={"name": {"value": f"PytestNoType{suffix}"}},
+                tree_id=tree_id,
+            )
+            place_handle = created[0]["new"]["handle"]
+
+            fetched = await client.make_api_call(
+                api_call=ApiCalls.GET_PLACE, tree_id=tree_id, handle=place_handle
+            )
+
+            assert fetched.get("place_type") == "Unknown"
+        finally:
+            if place_handle:
+                await client.make_api_call(
+                    api_call=ApiCalls.DELETE_PLACE, tree_id=tree_id, handle=place_handle
+                )
+
+
 class TestPartialPlaceUpdate:
     """A partial update must not demand fields it is not changing."""
 

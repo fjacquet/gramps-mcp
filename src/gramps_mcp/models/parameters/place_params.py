@@ -59,7 +59,8 @@ class PlaceSaveParams(BaseModel):
         description=(
             "Place type, for example City or Parish. Required when creating a "
             "place; omit it when updating one, so a partial update does not "
-            "have to resupply it."
+            "have to resupply it. If omitted on creation, Gramps stores the "
+            "place with type 'Unknown' rather than rejecting the request."
         ),
     )
     placeref_list: list[dict] | None = Field(
