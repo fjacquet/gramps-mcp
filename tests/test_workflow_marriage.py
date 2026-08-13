@@ -439,7 +439,7 @@ class TestCompleteWorkflow:
 
         if existing_handle:
             # Update existing person with event link
-            create_result = await create_person_tool(
+            await create_person_tool(
                 {
                     "handle": existing_handle,
                     "event_handle": event_handle,

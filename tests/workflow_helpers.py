@@ -161,8 +161,6 @@ async def create_or_find_place(
             ],
         }
 
-        # Note: place_type is now used in the place_data dictionary
-
         # Add enclosed_by_handle if provided (not for top-level Country)
         if enclosed_by_handle:
             place_data["placeref_list"] = [{"ref": enclosed_by_handle}]

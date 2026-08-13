@@ -93,12 +93,6 @@ class TestCreateMediaTool:
         print(repr(result[0].text))
         print("--- END ---\n")
 
-        # Debug: Show what we sent
-        print("\n--- DEBUG: Parameters sent ---")
-        print("media_path: tests/sample/33SQ-GP8N-NLK.jpg")
-        print("desc: Birth register page showing John Smith entry")
-        print("--- END DEBUG ---\n")
-
         text = result[0].text
         assert "Error:" not in text, f"Expected success but got error: {text}"
         assert "successfully" in text.lower()
