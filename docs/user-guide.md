@@ -74,16 +74,29 @@ with a filter on `gramps_id` or `handle` is the way in.
 
 Two tools give context around a record rather than the record itself.
 `get_timeline` builds a chronology, and `get_facts` returns tree-wide
-statistics that can be narrowed to one person's ancestors or descendants:
+statistics:
 
 ```
 get_timeline(scope="person", target="I0123")
 get_timeline(scope="family", target="F0044", discard_empty=true)
-get_facts(gramps_id="I0123", living="LastNameOnly")
+get_timeline(scope="person", target="I0123", dates="1850/1/1-1900/1/1")
+get_facts(living="LastNameOnly", rank=3)
+get_facts(person="Ancestors", gramps_id="I0123")
 ```
 
 `scope` is one of `person`, `family`, `people` or `families`. The last two take
-a comma-delimited `handles` string instead of a single target.
+a comma-delimited `handles` string instead of a single target. `dates` bounds
+the chronology (`y/m/d-y/m/d`, and either end may be left open), and `events`
+or `event_classes` restrict it to given event types.
+
+`get_facts` is tree-wide by default. Narrowing it to one branch needs both
+halves: a filter name in `person` - the built-ins are `Ancestors`,
+`Descendants`, `DescendantFamilies` and `CommonAncestor` - and the
+`gramps_id` or `handle` the filter applies to. A `gramps_id` on its own
+changes nothing. `living` controls how living people appear
+(`IncludeAll`, `FullNameOnly`, `LastNameOnly`, `ReplaceCompleteName`,
+`ExcludeAll`), `private=true` drops records marked private, and `rank` sets
+how many entries each ranked statistic returns.
 
 ## Adding a sourced fact
 
@@ -233,10 +246,29 @@ get_descendants(gramps_id="I0123", max_generations=4)
 `get_relationship` and `check_living` accept a handle or a `gramps_id`;
 `get_ancestors` and `get_descendants` take `gramps_id` only.
 
-Treat the two traversal tools with care. They are token-heavy - the default of
-five generations already returns a large amount of text, and raising it can
-consume the whole context window on one call. When you only want to know how
-two people connect, `get_relationship` answers that directly and cheaply.
+`get_relationship` returns the most direct relationship by default. Pass
+`all_relationships=true` when two people are related by more than one path -
+common in a village tree - and `depth` to change how many generations the
+search walks (the API default is 15).
+
+`check_living` does not report a recorded fact. It asks Gramps whether the
+person is *probably* alive, which is a calculation from the surrounding dates:
+their own, their relatives', and three tunable bounds -
+`max_age_probably_alive`, `average_generation_gap` and
+`max_sibling_age_difference`. The answer comes back as Living yes/no with
+estimated birth and death dates and a line explaining which record drove the
+estimate; `include_dates=false` suppresses the estimates and returns the
+verdict alone. Someone with no death event and no dated descendants will be
+reported as living. Use it before publishing or exporting anything, because
+that verdict is what the privacy proxies elsewhere - `get_facts`'s `living`
+argument, for instance - act on.
+
+Treat the two traversal tools with care. They render a full Gramps ancestor or
+descendant report, and they are token-heavy - the default of five generations
+already returns a large amount of text. `max_generations` is not capped, so
+raising it can consume the whole context window on one call. When you only want
+to know how two people connect, `get_relationship` answers that directly and
+cheaply.
 
 ## Reviewing recent changes
 
@@ -252,15 +284,58 @@ recent_changes(after=1754870400)
 raw object data on either side of each change, which is verbose but is how you
 see exactly what a call wrote.
 
+Two defaults are applied for you when you do not set them: `sort="-id"`, so
+the newest transactions come first, and `page=1`, which bounds the answer to
+one page instead of rendering the tree's entire history. Both give way to a
+value you supply - `sort="id"` walks forward from the oldest change, and
+`pagesize` only takes effect alongside a `page`.
+
 `manage_tags` covers the other half of housekeeping:
 
 ```
 manage_tags(action="list")
-manage_tags(action="create", name="A verifier", color="#FF0000")
+manage_tags(action="get", handle="<tag handle>")
+manage_tags(action="create", name="A verifier", color="#FF0000", priority=1)
 ```
 
-`action` is `list`, `get` or `create`. `create` with a `handle` updates an
-existing tag. There is no delete.
+`action` is `list`, `get` or `create`. `get` requires a `handle`. On `create`,
+supplying a `handle` updates that tag instead of making a new one, and `name`
+is otherwise required. There is no delete. Tags are attached to records through
+the `tag_list` of the create tools, and like every list field that attachment
+only ever adds.
+
+## Managing accounts
+
+`manage_users` is the one administrative tool in the set. It exists because
+opening a tree to a family means creating accounts one web form at a time, and
+a batch of thirty is a tedious afternoon:
+
+```
+manage_users(action="list")
+manage_users(action="get", name="jdupont")
+manage_users(action="create",
+             users=[{"name": "jdupont",
+                     "email": "j.dupont@example.org",
+                     "full_name": "Jeanne Dupont",
+                     "role": "contributor"}])
+```
+
+`action` is `list`, `get` or `create`; `get` needs a `name`, and `create` needs
+`users`, up to fifty per call. Each entry needs `name` and `email`; `full_name`
+is optional and `role` defaults to `member`. The four roles it will grant are
+`guest`, `member`, `contributor` and `editor` - owner and admin are refused by
+design, so this tool cannot escalate anyone to its own level. The account in
+your `.env` must itself be owner or admin, or every action returns a permission
+error.
+
+There is no update, no delete and no password reset: correcting a role or
+retiring an account is Gramps Web UI work. The password generated for each new
+account is printed in the tool result, which means it lands in the session
+transcript - treat those as first-login credentials and have people change
+them.
+
+[User management](user-management.md) covers the roles, the batch behaviour and
+the failure modes in full.
 
 ## Things that will surprise you
 
@@ -297,15 +372,9 @@ characters. The truncation is deliberate: Gramps echoes the submitted payload
 on some errors, and that payload can hold genealogy data about living people.
 A message ending in an ellipsis is not a bug.
 
-**Some operations need elevated rights.** `manage_users` requires the
-configured account to be owner or admin, and even then it will only create
-accounts up to the `editor` role - it cannot mint an owner or an admin, by
-design. It supports `list`, `get` and `create` only; there is no update, no
-delete and no password reset. Generated passwords are printed in the tool
-result, which means they land in the session transcript: treat them as
-first-login credentials and have people change them.
-
-**`tree_stats` may fail even for an owner account.** On the reference
-deployment it returns a permission error regardless of role. That is an
-environment fact about Gramps Web, not something wrong with your setup. Use
-`get_facts` when you want tree-level numbers.
+**`tree_stats` fails even for an owner account.** It is registered, it takes an
+`include_statistics` flag, and on the reference deployment it answers
+"Permission denied for this operation" whatever role the configured account
+holds. That is an environment fact about Gramps Web, not something wrong with
+your setup, and no argument works around it. Use `get_facts` when you want
+tree-level numbers.
