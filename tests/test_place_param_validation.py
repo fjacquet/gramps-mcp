@@ -22,6 +22,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.gramps_mcp.models.parameters.event_params import EventSaveParams
+from src.gramps_mcp.models.parameters.place_params import PlaceSaveParams
 
 
 class TestPlaceValidation:
@@ -64,3 +65,58 @@ class TestPlaceValidation:
         params = EventSaveParams(type="Birth", citation_list=[])
 
         assert params.place is None
+
+
+class TestPlaceListShapeValidation:
+    """alt_names and media_list take PlaceName/MediaRef objects, not strings.
+
+    Both fields moved from list[str] to list[dict[str, Any]] on this
+    branch, so a caller following the old shape now hits a generic
+    Pydantic dict-coercion error. These assert the refusal names the
+    expected object shape instead.
+    """
+
+    def test_media_list_string_entry_is_rejected(self):
+        with pytest.raises(ValidationError):
+            PlaceSaveParams(
+                name={"value": "Somewhere"},
+                media_list=["103c4094f2414e2400974f979824"],
+            )
+
+    def test_media_list_rejection_message_carries_guidance(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PlaceSaveParams(
+                name={"value": "Somewhere"},
+                media_list=["103c4094f2414e2400974f979824"],
+            )
+
+        message = str(exc_info.value)
+        assert "ref" in message
+        assert "103c4094f2414e2400974f979824" in message
+
+    def test_alt_names_string_entry_is_rejected(self):
+        with pytest.raises(ValidationError):
+            PlaceSaveParams(name={"value": "Somewhere"}, alt_names=["Lugdunum"])
+
+    def test_alt_names_rejection_message_carries_guidance(self):
+        with pytest.raises(ValidationError) as exc_info:
+            PlaceSaveParams(name={"value": "Somewhere"}, alt_names=["Lugdunum"])
+
+        message = str(exc_info.value)
+        assert "value" in message
+        assert "Lugdunum" in message
+
+    def test_media_list_with_ref_objects_is_accepted(self):
+        params = PlaceSaveParams(
+            name={"value": "Somewhere"},
+            media_list=[{"ref": "103c4094f2414e2400974f979824"}],
+        )
+
+        assert params.media_list == [{"ref": "103c4094f2414e2400974f979824"}]
+
+    def test_alt_names_with_value_objects_is_accepted(self):
+        params = PlaceSaveParams(
+            name={"value": "Somewhere"}, alt_names=[{"value": "Lugdunum"}]
+        )
+
+        assert params.alt_names == [{"value": "Lugdunum"}]

@@ -27,7 +27,7 @@ API calls supported in this category:
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .base_params import BaseGetMultipleParams, BaseGetSingleParams
 
@@ -98,3 +98,71 @@ class PlaceSaveParams(BaseModel):
             "appears in the tool's advertised input schema."
         ),
     )
+
+    @field_validator("alt_names", mode="before")
+    @classmethod
+    def validate_alt_names_shape(
+        cls, value: list[dict[str, Any]] | None
+    ) -> list[dict[str, Any]] | None:
+        """Reject non-object entries with a message naming the expected shape.
+
+        A bare ``list[dict[str, Any]]`` constraint raises Pydantic's generic
+        "Input should be a valid dictionary or object to extract fields
+        from", which drops the field's description and never mentions the
+        PlaceName object shape a caller needs. This validator raises
+        instead, showing what was received and what is expected - the same
+        treatment ``EventSaveParams.validate_place_is_handle`` gives a bad
+        place value.
+
+        Args:
+            value (list[dict[str, Any]] | None): The proposed alt_names value.
+
+        Returns:
+            list[dict[str, Any]] | None: The value unchanged, if every entry
+                is already a dict.
+
+        Raises:
+            ValueError: If any entry is not a dict.
+        """
+        if value is not None:
+            for entry in value:
+                if not isinstance(entry, dict):
+                    raise ValueError(
+                        "alt_names entries must be PlaceName objects, not "
+                        f"bare strings. Got: {entry!r}. Use a shape like "
+                        "[{'value': 'Lugdunum'}]."
+                    )
+        return value
+
+    @field_validator("media_list", mode="before")
+    @classmethod
+    def validate_media_list_shape(
+        cls, value: list[dict[str, Any]] | None
+    ) -> list[dict[str, Any]] | None:
+        """Reject non-object entries with a message naming the expected shape.
+
+        Mirrors ``validate_alt_names_shape``: a bare handle string used to
+        be accepted here (before this branch changed the type to
+        ``list[dict[str, Any]]``), so callers following the old shape now
+        hit a generic Pydantic error with no mention of the new one. This
+        raises with the expected object shape instead.
+
+        Args:
+            value (list[dict[str, Any]] | None): The proposed media_list value.
+
+        Returns:
+            list[dict[str, Any]] | None: The value unchanged, if every entry
+                is already a dict.
+
+        Raises:
+            ValueError: If any entry is not a dict.
+        """
+        if value is not None:
+            for entry in value:
+                if not isinstance(entry, dict):
+                    raise ValueError(
+                        "media_list entries must be MediaRef objects, not "
+                        f"bare handle strings. Got: {entry!r}. Use a shape "
+                        "like [{'ref': '<handle>'}]."
+                    )
+        return value
