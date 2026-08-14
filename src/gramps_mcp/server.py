@@ -63,24 +63,46 @@ app = MCPServer("gramps")
 
 
 # Register all tools dynamically from the registry
+def _make_tool_handler(handler, tool_name: str, schema, description: str):
+    """
+    Build the MCPServer-facing callable for one registry entry.
+
+    Args:
+        handler: The tool implementation taking a plain dict of arguments.
+        tool_name (str): Name the tool is published under.
+        schema: Pydantic model describing the tool's arguments.
+        description (str): Tool description shown to clients.
+
+    Returns:
+        Callable: An async callable taking only `arguments`.
+    """
+
+    # Reason: handler is captured by closure rather than bound as a default
+    # kwarg. FastMCP derives each tool's inputSchema from the signature, so
+    # a `handler=...` default was published on all 27 tools as an optional
+    # string - a client sending it replaced the bound callable with a string
+    # and the call died (upstream issue #30).
+    async def tool_handler(arguments):
+        return await handler(arguments.model_dump())
+
+    tool_handler.__name__ = tool_name
+    tool_handler.__doc__ = description
+    tool_handler.__annotations__ = {"arguments": schema}
+    return tool_handler
+
+
 def register_tools():
     """Register all tools from the registry with MCPServer."""
     for tool_name, tool_config in TOOL_REGISTRY.items():
-        schema = tool_config["schema"]
-        handler_func = tool_config["handler"]
         description = tool_config["description"]
-
-        # Create the async handler function with proper schema annotation
-        async def create_handler(arguments, handler=handler_func):
-            return await handler(arguments.model_dump())
-
-        # Set proper metadata
-        create_handler.__name__ = tool_name
-        create_handler.__doc__ = description
-        create_handler.__annotations__ = {"arguments": schema}
-
-        # Register with MCPServer
-        app.tool(description=description)(create_handler)
+        app.tool(description=description)(
+            _make_tool_handler(
+                tool_config["handler"],
+                tool_name,
+                tool_config["schema"],
+                description,
+            )
+        )
 
 
 register_tools()
