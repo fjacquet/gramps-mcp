@@ -392,9 +392,17 @@ class TestCreateSourcedEventTool:
     @pytest.mark.asyncio
     async def test_reuses_an_existing_source_by_handle(self, gramps_client, tree_id):
         """A second fact from the same document shares one source."""
+        # Reason: a fixed title would collide with itself on a second run of
+        # this suite against the same tree, once create_sourced_event
+        # refuses a duplicate title - failing on the refusal below before
+        # this test's real assertions run at all. The uuid suffix keeps the
+        # test's own fixture data from colliding across runs; PREFIX keeps
+        # leftovers findable for manual cleanup. Do not "simplify" this back
+        # to a fixed string.
+        title = f"{PREFIX} Reuse Register {uuid.uuid4().hex[:8]}"
         first = await create_sourced_event_tool(
             {
-                "source_title": f"{PREFIX} Reuse Register",
+                "source_title": title,
                 "citation_page": "Page 1, birth",
                 "event_type": "Birth",
             }
@@ -428,7 +436,13 @@ class TestCreateSourcedEventTool:
     async def test_refuses_a_duplicate_source_title(self):
         """Creating a second source with an existing title is refused, not
         guessed: two documents can legitimately share a title."""
-        title = f"{PREFIX} Collision Register"
+        # Reason: the uuid suffix makes this run's title distinct from any
+        # earlier run's leftovers, so the collision below is proven to come
+        # from the two create_sourced_event_tool calls in this test - not
+        # from a stale same-titled source a previous run left behind. Do not
+        # revert to a fixed string; that would make this test collide with
+        # itself on rerun instead of testing the collision it names.
+        title = f"{PREFIX} Collision Register {uuid.uuid4().hex[:8]}"
         first = await create_sourced_event_tool(
             {
                 "source_title": title,
@@ -456,9 +470,13 @@ class TestCreateSourcedEventTool:
     @pytest.mark.asyncio
     async def test_refuses_both_source_title_and_source_handle(self):
         """The two are mutually exclusive."""
+        # Reason: the mutual-exclusivity validator rejects the call before
+        # any API call is made, so this title never reaches the tree - no
+        # rerun hazard exists here. The uuid suffix is kept anyway so all
+        # five tests in this class follow one convention.
         result = await create_sourced_event_tool(
             {
-                "source_title": f"{PREFIX} Both Register",
+                "source_title": f"{PREFIX} Both Register {uuid.uuid4().hex[:8]}",
                 "source_handle": "103f77fe86ec4c13f3fac1a420ec",
                 "event_type": "Birth",
             }
