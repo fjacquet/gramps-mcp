@@ -115,8 +115,11 @@ Rules:
 - `max_generations` keeps its default of 5 and gains an upper bound of 20 in
   `AncestorsParams` / `DescendantsParams`, which have no bound today.
 - A failed fetch for one person does not abort the walk. That node renders as
-  `(I0107) [unavailable: <reason>]` and its branch stops. On a 500-person walk a
-  single server error must not discard 499 successful fetches.
+  `(handle 103bce...) [unavailable: <reason>]` - the handle, not the gramps_id,
+  because the gramps_id only arrives with the fetch that just failed; all the
+  walk has is the handle it read out of the family object. The branch stops
+  there. On a 500-person walk a single server error must not discard 499
+  successful fetches.
 - Errors still surface through the existing `_format_error_response`.
 
 ## Testing
