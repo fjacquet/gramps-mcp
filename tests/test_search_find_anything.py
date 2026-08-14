@@ -168,7 +168,7 @@ class TestFindAnythingPagination:
     pytestmark = pytest.mark.integration
 
     @staticmethod
-    async def _create_marker_notes(marker: str, count: int) -> list[str]:
+    async def _create_marker_notes(marker: str, count: int) -> list[tuple[str, str]]:
         """Create fixture notes embedding distinct per-note markers.
 
         Args:
@@ -177,10 +177,12 @@ class TestFindAnythingPagination:
             count (int): Number of fixture notes to create.
 
         Returns:
-            List[str]: The distinct per-note marker strings
-                (f"{marker}-{i}") embedded in each created note's text.
+            list[tuple[str, str]]: (handle, note_marker) pairs, where
+                note_marker is the distinct per-note string (f"{marker}-{i}")
+                embedded in that note's text - callers need the handle to
+                delete the fixture afterwards, per #20.
         """
-        note_markers = []
+        created = []
         for i in range(count):
             note_marker = f"{marker}-{i}"
             result = await create_note_tool(
@@ -191,8 +193,8 @@ class TestFindAnythingPagination:
             )
             text = result[0].text
             assert "Error:" not in text, f"Fixture note creation failed: {text}"
-            note_markers.append(note_marker)
-        return note_markers
+            created.append((extract_handle(result), note_marker))
+        return created
 
     @staticmethod
     async def _find_anything_until(
@@ -226,7 +228,7 @@ class TestFindAnythingPagination:
         return result
 
     @pytest.mark.asyncio
-    async def test_find_anything_respects_max_results(self):
+    async def test_find_anything_respects_max_results(self, gramps_client, tree_id):
         """max_results must cap the number of displayed fixture records.
 
         Creates 3 notes sharing a unique marker (each with a distinct
@@ -236,34 +238,57 @@ class TestFindAnythingPagination:
         prefix, which only appears in not-found/fallback formatter output
         and never in successful format_note output - proves the cap is
         enforced on the displayed content.
+
+        # Reason: the fixture notes must not leak into the live tree on
+        # every run - the same defect this branch fixed for
+        # TestFindAnythingTool's people fixtures (see #20) applied
+        # unfixed to this neighbouring class, which created 3+2 marker
+        # notes per run with no teardown.
         """
         marker = uuid.uuid4().hex
-        note_markers = await self._create_marker_notes(marker, 3)
+        created = await self._create_marker_notes(marker, 3)
+        note_markers = [nm for _handle, nm in created]
 
-        result = await self._find_anything_until(marker, expected_min=3, max_results=2)
-        text = result[0].text
+        try:
+            result = await self._find_anything_until(
+                marker, expected_min=3, max_results=2
+            )
+            text = result[0].text
 
-        print("\n--- FIND ANYTHING MAX_RESULTS RESULT ---")
-        print(text)
-        print("--- END ---\n")
+            print("\n--- FIND ANYTHING MAX_RESULTS RESULT ---")
+            print(text)
+            print("--- END ---\n")
 
-        assert "error" not in text.lower(), f"Error found in response: {text}"
+            assert "error" not in text.lower(), f"Error found in response: {text}"
 
-        count_match = re.search(r"Found (\d+) records", text)
-        assert count_match, f"Expected a 'Found N records' header, got: {text}"
-        assert int(count_match.group(1)) >= 3, (
-            "Expected all 3 fixture notes to be indexed and matched "
-            f"(this is an indexing-lag issue, not a fix regression), got: {text}"
-        )
+            count_match = re.search(r"Found (\d+) records", text)
+            assert count_match, f"Expected a 'Found N records' header, got: {text}"
+            assert int(count_match.group(1)) >= 3, (
+                "Expected all 3 fixture notes to be indexed and matched "
+                f"(this is an indexing-lag issue, not a fix regression), got: {text}"
+            )
 
-        displayed = [nm for nm in note_markers if nm in text]
-        assert len(displayed) == 2, (
-            f"Expected exactly 2 of 3 markers displayed with max_results=2, "
-            f"got {len(displayed)} ({displayed}): {text}"
-        )
+            displayed = [nm for nm in note_markers if nm in text]
+            assert len(displayed) == 2, (
+                f"Expected exactly 2 of 3 markers displayed with max_results=2, "
+                f"got {len(displayed)} ({displayed}): {text}"
+            )
+        finally:
+            for handle, _note_marker in created:
+                try:
+                    await gramps_client.make_api_call(
+                        api_call=ApiCalls.DELETE_NOTE, tree_id=tree_id, handle=handle
+                    )
+                except Exception:
+                    # Reason: a teardown failure must not turn a passing
+                    # test red. PREFIX-less notes here are still findable
+                    # by their unique marker if a teardown is ever missed.
+                    pass
 
     @pytest.mark.asyncio
-    async def test_find_anything_page_returns_different_content(self):
+    async def test_find_anything_page_returns_different_content(
+        self, gramps_client, tree_id
+    ):
         """page must change which fixture record is displayed.
 
         Creates 2 notes sharing a unique marker, requests page 1 and page 2
@@ -271,46 +296,61 @@ class TestFindAnythingPagination:
         different per-note markers - proving `page` actually changes the
         returned content instead of merely being accepted without error
         (which a silent regression dropping `page` again would still do).
+
+        # Reason: same leak and same fix as
+        # test_find_anything_respects_max_results above - see #20.
         """
         marker = uuid.uuid4().hex
-        note_markers = await self._create_marker_notes(marker, 2)
+        created = await self._create_marker_notes(marker, 2)
+        note_markers = [nm for _handle, nm in created]
 
-        page1_result = await self._find_anything_until(
-            marker, expected_min=2, max_results=1, page=1
-        )
-        page1_text = page1_result[0].text
+        try:
+            page1_result = await self._find_anything_until(
+                marker, expected_min=2, max_results=1, page=1
+            )
+            page1_text = page1_result[0].text
 
-        print("\n--- FIND ANYTHING PAGE 1 RESULT ---")
-        print(page1_text)
-        print("--- END ---\n")
+            print("\n--- FIND ANYTHING PAGE 1 RESULT ---")
+            print(page1_text)
+            print("--- END ---\n")
 
-        assert "error" not in page1_text.lower(), (
-            f"Error found in response: {page1_text}"
-        )
+            assert "error" not in page1_text.lower(), (
+                f"Error found in response: {page1_text}"
+            )
 
-        page2_result = await find_anything_tool(
-            {"query": marker, "max_results": 1, "page": 2}
-        )
-        page2_text = page2_result[0].text
+            page2_result = await find_anything_tool(
+                {"query": marker, "max_results": 1, "page": 2}
+            )
+            page2_text = page2_result[0].text
 
-        print("\n--- FIND ANYTHING PAGE 2 RESULT ---")
-        print(page2_text)
-        print("--- END ---\n")
+            print("\n--- FIND ANYTHING PAGE 2 RESULT ---")
+            print(page2_text)
+            print("--- END ---\n")
 
-        assert "error" not in page2_text.lower(), (
-            f"Error found in response: {page2_text}"
-        )
+            assert "error" not in page2_text.lower(), (
+                f"Error found in response: {page2_text}"
+            )
 
-        page1_seen = {nm for nm in note_markers if nm in page1_text}
-        page2_seen = {nm for nm in note_markers if nm in page2_text}
+            page1_seen = {nm for nm in note_markers if nm in page1_text}
+            page2_seen = {nm for nm in note_markers if nm in page2_text}
 
-        assert len(page1_seen) == 1, (
-            f"Expected exactly 1 marker on page 1, got {page1_seen}: {page1_text}"
-        )
-        assert len(page2_seen) == 1, (
-            f"Expected exactly 1 marker on page 2, got {page2_seen}: {page2_text}"
-        )
-        assert page1_seen != page2_seen, (
-            "Expected page 1 and page 2 to show different fixture records, "
-            f"got page1={page1_seen} page2={page2_seen}"
-        )
+            assert len(page1_seen) == 1, (
+                f"Expected exactly 1 marker on page 1, got {page1_seen}: {page1_text}"
+            )
+            assert len(page2_seen) == 1, (
+                f"Expected exactly 1 marker on page 2, got {page2_seen}: {page2_text}"
+            )
+            assert page1_seen != page2_seen, (
+                "Expected page 1 and page 2 to show different fixture records, "
+                f"got page1={page1_seen} page2={page2_seen}"
+            )
+        finally:
+            for handle, _note_marker in created:
+                try:
+                    await gramps_client.make_api_call(
+                        api_call=ApiCalls.DELETE_NOTE, tree_id=tree_id, handle=handle
+                    )
+                except Exception:
+                    # Reason: a teardown failure must not turn a passing
+                    # test red.
+                    pass

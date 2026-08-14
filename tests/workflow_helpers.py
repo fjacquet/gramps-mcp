@@ -21,7 +21,6 @@ from src.gramps_mcp.tools.data_management import (
     create_place_tool,
 )
 from src.gramps_mcp.tools.search_basic import (
-    find_place_tool,
     find_type_tool,
 )
 from tests.constants import PREFIX
@@ -146,19 +145,46 @@ async def create_or_find_place(
     Returns:
         Place handle
     """
-    # First: Use find_place to search for existing place
-    find_result = await find_place_tool({"query": name, "pagesize": 5})
+    # First: Use an exact GQL lookup to search for an existing place.
+    # `find_place_tool`'s `PlaceSearchParams` has no `query` field either,
+    # so the free-text `query` this helper used to pass was silently
+    # dropped by Pydantic's default extra="ignore", the search returned an
+    # unfiltered page of places, and none of "United States",
+    # "Massachusetts", "Boston" or "St. Mary's Catholic Church" reliably
+    # landed in the first 5 - confirmed live: 80 duplicate "St. Mary's
+    # Catholic Church" places already in the tree, in pairs matching the
+    # two call sites (create_place_hierarchy runs once from
+    # _step_4_event_creation and once from test_place_hierarchy_creation
+    # per suite run). Same root cause and fix as the source, citation,
+    # event and person lookups elsewhere in this branch.
+    #
+    # Reason: `name` is interpolated unescaped below. Safe today only
+    # because every caller passes one of the four fixed literals in
+    # `create_place_hierarchy` - one of which, "St. Mary's Catholic
+    # Church", carries an apostrophe and is safe only because this GQL
+    # literal is double-quoted. A caller passing free text would need the
+    # escaping helper in `src/gramps_mcp/utils.py` - that is the part of
+    # this pattern that breaks if copied.
+    find_result = await find_type_tool(
+        {
+            "type": "place",
+            "gql": f'class = place and name.value = "{name}"',
+            "max_results": 5,
+        }
+    )
 
     assert isinstance(find_result, list) and len(find_result) == 1
     result_text = find_result[0].text
 
-    # Check for potential matches
+    # Check for potential matches. `handle_on_line` (rather than a
+    # first-match regex over the whole response) matters here because
+    # places render hierarchically ("Boston, Massachusetts, United
+    # States"): once the page holds any place whose full name ends in
+    # "...United States", a bare substring/regex check would pick up the
+    # first handle in the blob, which need not be the matching place.
     existing_handle = None
-    if "No places found" not in result_text:
-        if name.lower() in result_text.lower():
-            handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-            if handle_match:
-                existing_handle = handle_match.group(1)
+    if "No places found" not in result_text and name.lower() in result_text.lower():
+        existing_handle = handle_on_line(result_text, name)
 
     if existing_handle:
         # Use existing place

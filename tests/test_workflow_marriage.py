@@ -26,7 +26,6 @@ from src.gramps_mcp.tools.data_management import (
 )
 from src.gramps_mcp.tools.search_basic import (
     find_family_tool,
-    find_repository_tool,
     find_type_tool,
 )
 from tests.workflow_helpers import (
@@ -34,6 +33,7 @@ from tests.workflow_helpers import (
     create_place_hierarchy,
     create_test_media,
     create_test_note,
+    handle_on_line,
 )
 
 pytestmark = pytest.mark.integration
@@ -132,23 +132,48 @@ class TestCompleteWorkflow:
     async def _step_1_repository_creation(self, workflow_data: dict[str, Any]):
         """Step 1: Repository Creation following usage guide."""
 
-        # First: Use find_repository to search for existing repository
-        find_result = await find_repository_tool(
-            {"query": "St. Mary's Catholic Church Boston", "pagesize": 5}
+        # First: Use an exact GQL lookup to search for an existing
+        # repository. `find_repository_tool`'s `RepositoriesParams` has no
+        # `query` field, so the free-text `query` this step used to pass
+        # was silently dropped by Pydantic's default extra="ignore", and
+        # the search returned an unfiltered page of repositories - same
+        # root cause as the source, citation, event, person and place
+        # lookups elsewhere in this branch. It went unnoticed here longer
+        # than at those sites only because "St. Mary's Catholic Church,
+        # Boston" (created as R0000) sorts first among the tree's
+        # repositories today; delete R0000 or add one that sorts ahead of
+        # it and this would silently bind the source's `reporef_list` to
+        # the wrong repository.
+        #
+        # Reason: "St. Mary's Catholic Church, Boston" carries an
+        # apostrophe and is safe to interpolate only because it is a fixed
+        # test literal in a double-quoted GQL string, not caller-supplied
+        # free text - free text would need the escaping helper in
+        # `src/gramps_mcp/utils.py`.
+        find_result = await find_type_tool(
+            {
+                "type": "repository",
+                "gql": 'class = repository and name = "St. Mary\'s Catholic Church, Boston"',
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
         result_text = find_result[0].text
 
-        # Check if repository already exists and is complete
+        # Check if repository already exists and is complete. The empty
+        # message for a repository search is "No repositories found" - the
+        # old "No sources found" check was a copy-paste from the source
+        # step and always true against this search, so this guard was a
+        # no-op. `handle_on_line` (rather than a first-match regex over
+        # the whole response) avoids picking up an unrelated handle when
+        # the page holds more than one entry.
         existing_handle = None
         if (
-            "No sources found" not in result_text
+            "No repositories found" not in result_text
             and "St. Mary's Catholic Church" in result_text
         ):
-            handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-            if handle_match:
-                existing_handle = handle_match.group(1)
+            existing_handle = handle_on_line(result_text, "St. Mary's Catholic Church")
 
         if existing_handle:
             # Use existing repository as-is
@@ -334,6 +359,14 @@ class TestCompleteWorkflow:
         # Finding the existing event, instead of changing merge semantics,
         # is the fix - the reference appended on each rerun is then the one
         # already there.
+        #
+        # Reason: the interpolated value below carries an apostrophe
+        # ("O'Sullivan") and is safe here only because it is a fixed test
+        # literal inside a double-quoted GQL string, not caller-controlled
+        # free text. A value that could contain a double quote would need
+        # the escaping helper in `src/gramps_mcp/utils.py` - that is the
+        # part of this pattern that breaks if copied to interpolate
+        # untrusted input.
         find_result = await find_type_tool(
             {
                 "type": "event",

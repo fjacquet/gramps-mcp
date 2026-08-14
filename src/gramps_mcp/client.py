@@ -156,6 +156,15 @@ class GrampsWebAPIClient:
             # text to MAX_ERROR_DETAIL for privacy reasons that do not apply
             # to a legitimate, successful, non-JSON response.
             if as_text:
+                # Reason: a 2xx with an empty body (e.g. a report request
+                # that produced nothing) would otherwise return "" here,
+                # which html_to_markdown turns into an empty string that
+                # callers wrap in a successful TextContent - the one
+                # degenerate success as_text cannot tell apart from a real
+                # empty report. Raising surfaces it as an error instead of
+                # a silent no-op success.
+                if not response.text.strip():
+                    raise GrampsAPIError("Empty response body")
                 if return_headers:
                     return response.text, dict(response.headers)
                 return response.text
@@ -178,6 +187,12 @@ class GrampsWebAPIClient:
             raise GrampsAPIError(f"Cannot connect to Gramps API: {e}") from e
         except httpx.TimeoutException as e:
             raise GrampsAPIError(f"Request timeout: {e}") from e
+        except GrampsAPIError:
+            # Reason: raised directly above (e.g. the empty-body case for
+            # as_text) - re-raise as-is instead of letting the generic
+            # handler below wrap it a second time behind an "Unexpected
+            # error:" prefix that would obscure the real message.
+            raise
         except Exception as e:
             raise GrampsAPIError(f"Unexpected error: {e}") from e
 
