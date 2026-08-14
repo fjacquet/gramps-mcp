@@ -29,11 +29,13 @@ from ..client import GrampsAPIError
 from ..config import get_settings
 from ..destructive import TYPE_ENDPOINTS, remove_from_list, should_refuse_delete
 from ..handlers.destructive_handler import format_merge_preview
+from ..models.api_calls import ApiCalls
 from ..models.api_mapping import get_param_model
 from ..models.parameters.destructive_params import (
     DeleteTypeParams,
     DetachReferenceParams,
     MergeTypeParams,
+    UndoChangeParams,
 )
 from .search_basic import with_client
 
@@ -74,8 +76,6 @@ async def resolve_target_handle(
         return handle
     if not gramps_id:
         raise ValueError("Either handle or gramps_id is required")
-
-    from ..models.api_calls import ApiCalls
 
     plural = {
         "person": ApiCalls.GET_PEOPLE,
@@ -299,3 +299,34 @@ async def merge_type_tool(client, arguments: dict) -> list[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "merge")
+
+
+@with_client
+async def undo_change_tool(client, arguments: dict) -> list[TextContent]:
+    """Undo one recorded transaction."""
+    try:
+        params = UndoChangeParams(**arguments)
+        tree_id = get_settings().gramps_tree_id
+
+        # Reason: params stays None. The endpoint reads its only optional
+        # argument from the query string, while make_api_call sends a JSON
+        # body for POST, so the server would ignore it anyway and apply its
+        # own default message.
+        await client.make_api_call(
+            api_call=ApiCalls.POST_TRANSACTION_UNDO,
+            tree_id=tree_id,
+            transaction_id=params.transaction_id,
+        )
+
+        return [
+            TextContent(
+                type="text",
+                text=(
+                    f"Transaction {params.transaction_id} undone. "
+                    "Run recent_changes to confirm the tree is as expected."
+                ),
+            )
+        ]
+
+    except Exception as e:
+        return _format_error_response(e, "undo")

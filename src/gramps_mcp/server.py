@@ -55,6 +55,7 @@ from .models.parameters.destructive_params import (
     DeleteTypeParams,
     DetachReferenceParams,
     MergeTypeParams,
+    UndoChangeParams,
 )
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
@@ -92,7 +93,12 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
-from .tools.destructive import delete_type_tool, detach_reference_tool, merge_type_tool
+from .tools.destructive import (
+    delete_type_tool,
+    detach_reference_tool,
+    merge_type_tool,
+    undo_change_tool,
+)
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
@@ -303,6 +309,15 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
         "schema": MergeTypeParams,
         "handler": merge_type_tool,
+    },
+    "undo_change": {
+        "description": (
+            "Undo one recorded transaction by id, reversing every object "
+            "change it made. Use recent_changes to find the id. This is the "
+            "recovery path for a delete or merge that went the wrong way"
+        ),
+        "schema": UndoChangeParams,
+        "handler": undo_change_tool,
     },
 }
 

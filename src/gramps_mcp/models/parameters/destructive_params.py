@@ -148,6 +148,17 @@ class FamilyMergeBody(StrictModel):
     )
 
 
+class UndoChangeParams(StrictModel):
+    """Parameters for undoing a recorded transaction."""
+
+    transaction_id: int = Field(
+        description=(
+            "Transaction id to undo, as listed by recent_changes. Undoing "
+            "reverses every object change that transaction made."
+        )
+    )
+
+
 class PersonMergeBody(StrictModel):
     """
     Optional JSON body for a person merge (MERGE_PERSON).
