@@ -144,7 +144,11 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
             f"{source_fmt}\n{citation_fmt}\n{event_fmt}"
         )
         if media_info:
-            response += f"\nAttached media: {media_info.get('handle', 'N/A')}\n"
+            # Reason: every other site emits a gramps_id here
+            # (source_handler.py:116, citation_handler.py:117,
+            # person_handler.py:171, family_handler.py:206). media_info is
+            # the raw new-media object from the upload, which carries both.
+            response += f"\nAttached media: {media_info.get('gramps_id', 'N/A')}\n"
 
         return [TextContent(type="text", text=response)]
 

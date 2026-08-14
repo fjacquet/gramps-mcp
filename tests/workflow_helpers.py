@@ -28,6 +28,18 @@ from src.gramps_mcp.tools.search_basic import (
 from tests.constants import PREFIX
 
 
+def _handle_on_line(text: str, marker: str) -> str:
+    """Find the [handle] on the line containing marker - avoids picking up
+    an unrelated handle (e.g. a repository or media ref) from elsewhere in
+    a concatenated multi-entity response."""
+    for line in text.splitlines():
+        if marker in line:
+            match = re.search(r"\[([a-f0-9]+)\]", line)
+            if match:
+                return match.group(1)
+    raise AssertionError(f"No handle found on a line containing {marker!r} in: {text}")
+
+
 def extract_handle(create_result: Any) -> str:
     """
     Pull the handle out of a creation tool's formatted response.
