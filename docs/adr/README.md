@@ -17,10 +17,11 @@ Context section says so rather than inventing a deliberation.
 |---|---|---|---|
 | [0001](0001-mcp-python-sdk-2x.md) | Build on MCP Python SDK 2.x, pinned below 3 | Accepted | 2026-08-02 |
 | [0002](0002-test-against-a-real-gramps-web-server.md) | Test against a real Gramps Web server, with no mocks | Accepted | 2025-09-11 |
-| [0003](0003-merge-semantics-for-put-updates.md) | Merge changes into the existing record before a PUT | Accepted | 2025-09-11 |
+| [0003](0003-merge-semantics-for-put-updates.md) | Merge changes into the existing record before a PUT | Superseded by ADR 0007 | 2025-09-11 |
 | [0004](0004-two-transports-http-and-stdio.md) | Carry both HTTP and stdio transports | Accepted | 2025-09-11 |
 | [0005](0005-manage-users-role-whitelist.md) | Cap `manage_users` below owner and admin | Accepted | 2026-08-11 |
 | [0006](0006-500-line-limit-and-pre-commit-hooks.md) | Enforce a 500-line file limit and a pre-commit hook chain | Accepted | 2025-09-11 |
+| [0007](0007-expose-destructive-operations.md) | Expose destructive operations: delete, merge, detach, undo | Accepted | 2026-08-14 |
 
 ## When to write a new ADR
 

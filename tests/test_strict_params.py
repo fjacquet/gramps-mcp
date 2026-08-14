@@ -44,6 +44,7 @@ from src.gramps_mcp.models.parameters.sourced_event_params import (
 from src.gramps_mcp.models.parameters.tag_params import (
     ManageTagsParams,
     TagSaveParams,
+    TagSearchParams,
 )
 
 HANDLE = "103f77fe86ec4c13f3fac1a420ec"
@@ -132,3 +133,20 @@ def test_base_get_multiple_params_still_accepts_gql():
     the field query= should have been, still works."""
     params = BaseGetMultipleParams(gql="first_name = 'Jean'")
     assert params.gql == "first_name = 'Jean'"
+
+
+def test_tag_search_params_rejects_a_filter_it_cannot_honour():
+    """
+    The tags endpoint supports no gql filter and tags have no gramps_id, so
+    extra='ignore' used to drop both keys and return the first page of every
+    tag. delete_type's gramps_id lookup then resolved to an arbitrary tag.
+    """
+    for bad_key in ("gql", "gramps_id", "query"):
+        with pytest.raises(ValidationError):
+            TagSearchParams(**{bad_key: "anything"})
+
+
+def test_tag_search_params_still_accepts_its_real_fields():
+    """The rejection above must not break the one live caller, manage_tags."""
+    params = TagSearchParams(page=1, pagesize=10, sort=["name"])
+    assert params.pagesize == 10

@@ -26,6 +26,11 @@ from pydantic import BaseModel
 from .api_calls import ApiCalls
 from .parameters.base_params import BaseGetMultipleParams, BaseGetSingleParams
 from .parameters.citation_params import CitationData, GetCitationsParams
+from .parameters.destructive_params import (
+    FamilyMergeBody,
+    PersonMergeBody,
+    UndoTransactionQueryParams,
+)
 from .parameters.event_params import EventSaveParams, EventSearchParams, EventSpanParams
 from .parameters.facts_params import FactsParams
 from .parameters.family_params import FamilySaveParams, FamilyTimelineParams
@@ -69,6 +74,7 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     ApiCalls.GET_PERSON: BaseGetSingleParams,
     ApiCalls.PUT_PERSON: PersonData,
     ApiCalls.DELETE_PERSON: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_PERSON: PersonMergeBody,  # Handles in URL, optional JSON body
     ApiCalls.GET_PERSON_TIMELINE: PersonTimelineParams,
     ApiCalls.GET_PERSON_DNA_MATCHES: PersonDnaMatchesParams,
     # FAMILIES operations
@@ -77,6 +83,7 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     ApiCalls.GET_FAMILY: BaseGetSingleParams,
     ApiCalls.PUT_FAMILY: FamilySaveParams,
     ApiCalls.DELETE_FAMILY: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_FAMILY: FamilyMergeBody,  # Handles in URL, optional JSON body
     ApiCalls.GET_FAMILY_TIMELINE: FamilyTimelineParams,
     # EVENTS operations
     ApiCalls.GET_EVENTS: EventSearchParams,
@@ -84,6 +91,7 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     ApiCalls.GET_EVENT: BaseGetSingleParams,
     ApiCalls.PUT_EVENT: EventSaveParams,
     ApiCalls.DELETE_EVENT: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_EVENT: None,  # Handles travel in the URL
     ApiCalls.GET_EVENT_SPAN: EventSpanParams,
     # PLACES operations
     ApiCalls.GET_PLACES: BaseGetMultipleParams,
@@ -91,30 +99,35 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     ApiCalls.GET_PLACE: BaseGetSingleParams,
     ApiCalls.PUT_PLACE: PlaceSaveParams,
     ApiCalls.DELETE_PLACE: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_PLACE: None,  # Handles travel in the URL
     # CITATIONS operations
     ApiCalls.GET_CITATIONS: GetCitationsParams,
     ApiCalls.POST_CITATIONS: CitationData,
     ApiCalls.GET_CITATION: BaseGetSingleParams,
     ApiCalls.PUT_CITATION: CitationData,
     ApiCalls.DELETE_CITATION: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_CITATION: None,  # Handles travel in the URL
     # SOURCES operations
     ApiCalls.GET_SOURCES: SourceSearchParams,
     ApiCalls.POST_SOURCES: SourceSaveParams,
     ApiCalls.GET_SOURCE: SourceDetailsParams,
     ApiCalls.PUT_SOURCE: SourceSaveParams,
     ApiCalls.DELETE_SOURCE: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_SOURCE: None,  # Handles travel in the URL
     # REPOSITORIES operations
     ApiCalls.GET_REPOSITORIES: RepositoriesParams,
     ApiCalls.POST_REPOSITORIES: RepositoryData,
     ApiCalls.GET_REPOSITORY: RepositoryParams,
     ApiCalls.PUT_REPOSITORY: RepositoryData,
     ApiCalls.DELETE_REPOSITORY: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_REPOSITORY: None,  # Handles travel in the URL
     # MEDIA operations
     ApiCalls.GET_MEDIA: MediaSearchParams,
     ApiCalls.POST_MEDIA: None,  # File upload only, no JSON params
     ApiCalls.GET_MEDIA_ITEM: BaseGetSingleParams,
     ApiCalls.PUT_MEDIA_ITEM: MediaSaveParams,
     ApiCalls.DELETE_MEDIA_ITEM: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_MEDIA: None,  # Handles travel in the URL
     ApiCalls.GET_MEDIA_FILE: MediaFileParams,
     ApiCalls.PUT_MEDIA_FILE: MediaFileParams,
     # NOTES operations
@@ -123,10 +136,13 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     ApiCalls.GET_NOTE: NoteParams,
     ApiCalls.PUT_NOTE: NoteSaveParams,
     ApiCalls.DELETE_NOTE: None,  # Only needs handle (via URL)
+    ApiCalls.MERGE_NOTE: None,  # Handles travel in the URL
     # TAGS operations
     ApiCalls.GET_TAGS: TagSearchParams,
     ApiCalls.POST_TAGS: TagSaveParams,
-    ApiCalls.GET_TAG: None,  # Only needs handle (via URL)
+    # Reason: delete_type needs backlinks on tags (GET /tags/{handle}?backlinks=1),
+    # so GET_TAG must accept params like every other GET_<TYPE> single-item call.
+    ApiCalls.GET_TAG: BaseGetSingleParams,
     ApiCalls.PUT_TAG: TagSaveParams,
     ApiCalls.DELETE_TAG: None,  # Only needs handle (via URL)
     # SEARCH operations
@@ -145,6 +161,9 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     # TRANSACTIONS operations
     ApiCalls.GET_TRANSACTIONS_HISTORY: TransactionHistoryParams,
     ApiCalls.GET_TRANSACTION_HISTORY: TransactionHistoryByIdParams,
+    # transaction_id travels in the URL; force travels in the query string -
+    # see the ApiCalls.POST_TRANSACTION_UNDO carve-out in client.py.
+    ApiCalls.POST_TRANSACTION_UNDO: UndoTransactionQueryParams,
     # TYPES operations
     ApiCalls.GET_TYPES: None,
     ApiCalls.GET_TYPES_DEFAULT: None,

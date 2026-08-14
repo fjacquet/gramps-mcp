@@ -33,7 +33,24 @@ from .base_params import StrictModel
 
 
 class TagSearchParams(BaseModel):
-    """Parameters for searching tags."""
+    """
+    Parameters for listing tags.
+
+    Unlike the other collection endpoints, this model does not inherit
+    BaseGetMultipleParams: Gramps Web's tags endpoint supports neither a
+    `gql` filter nor a `gramps_id` (tags have no gramps_id at all), so those
+    fields would be a lie if declared.
+
+    That made it the same trap issue #18 described. With pydantic's default
+    extra="ignore", a caller passing gql= or gramps_id= had the filter
+    silently dropped and got the first page of *every* tag back, believing
+    it was filtered - which, on the lookup feeding delete_type, resolved to
+    an arbitrary tag. Unknown keys are therefore refused here rather than
+    ignored, so the mistake fails loudly at the model instead of quietly at
+    the server.
+    """
+
+    model_config = {"extra": "forbid"}
 
     page: int | None = Field(None, description="Page number for pagination", ge=0)
     pagesize: int | None = Field(

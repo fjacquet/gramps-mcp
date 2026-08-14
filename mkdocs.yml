@@ -71,3 +71,4 @@ nav:
       - 0004 Two transports: adr/0004-two-transports-http-and-stdio.md
       - 0005 manage_users role whitelist: adr/0005-manage-users-role-whitelist.md
       - 0006 500-line limit and hooks: adr/0006-500-line-limit-and-pre-commit-hooks.md
+      - 0007 Expose destructive operations: adr/0007-expose-destructive-operations.md

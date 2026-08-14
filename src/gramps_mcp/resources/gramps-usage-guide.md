@@ -476,6 +476,114 @@ no delete.**
   Relay them to the user immediately and tell them to change the password on
   first login.
 
+## Destructive Operations
+
+Four tools can remove data: `delete_type`, `merge_type`, `detach_reference`
+and `undo_change`. Each one is guarded, and each guard is documented below -
+read it before calling with `force=true` or `confirm=true`. `recent_changes`
+is how you find a transaction id afterwards, for `undo_change` or just to
+confirm what actually happened.
+
+### `delete_type` - delete one record
+
+`delete_type(type=..., handle=... or gramps_id=..., force=False)`.
+
+- `type`: one of `person`, `family`, `event`, `place`, `source`, `citation`,
+  `repository`, `media`, `note`, `tag`.
+- `handle` or `gramps_id` identifies the record; give one.
+- The tool reads the record's backlinks first. If anything still references
+  it, the call is **refused** and every referencing object is listed by type
+  and gramps_id - nothing is deleted.
+- `force=true` deletes anyway and severs those references, the same
+  behaviour the Gramps Web UI has when it deletes a referenced record. Use it
+  deliberately, having read what it says it will sever.
+- Recoverable with `undo_change`, subject to the `force` requirement
+  described there.
+
+### `merge_type` - merge two records of the same type
+
+`merge_type(type=..., phoenix_handle=... or phoenix_gramps_id=...,
+titanic_handle=... or titanic_gramps_id=..., confirm=False)`.
+
+- `type`: `person`, `family`, `event`, `place`, `source`, `citation`,
+  `repository`, `media`, `note`. **Tags cannot be merged** - Gramps Web has no
+  tag-merge endpoint; use `delete_type` on the duplicate instead.
+- The **phoenix** survives; the **titanic** is absorbed and every reference to
+  it is repointed to the phoenix. Order matters - decide which record should
+  survive before calling.
+- With `confirm` unset (the default), the call changes nothing and returns a
+  preview of both records so you can check the phoenix/titanic choice before
+  committing. Call again with `confirm=true` to execute.
+- Family merges only: `phoenix_father_handle` / `phoenix_mother_handle`
+  choose which parent the merged family keeps, when the two families being
+  merged disagree. Omit either to keep the phoenix family's existing parent.
+- There is no backlink guard here - both records are legitimately referenced
+  right up to the merge, so `confirm` is the only checkpoint. Recoverable
+  with `undo_change`, subject to the `force` requirement described there.
+
+### `detach_reference` - remove one element from one list
+
+`detach_reference(type=..., handle=... or gramps_id=..., list_name=...,
+ref_handle=...)`.
+
+- Removes `ref_handle` from `list_name` on the named record, and rewrites
+  only that one list. Every other list on the record keeps the normal
+  merge-on-update behaviour (ADR 0003) - this is the one place removal
+  happens through this server.
+- Refuses rather than silently doing nothing if `ref_handle` is not actually
+  in `list_name`.
+- **Not every (type, list_name) pair is reachable.** The write model for each
+  type has to declare the list before this tool can edit it, and the write
+  models were built for creation, not full read/write parity. This is the
+  complete reachable set, one line per type, derived from the write models
+  and pinned by `tests/test_alignment_destructive.py` - that test fails if
+  this list and the models ever disagree:
+
+  - `person`: `attribute_list`, `event_ref_list`, `family_list`, `media_list`, `note_list`, `parent_family_list`, `tag_list`
+  - `family`: `child_ref_list`, `event_ref_list`, `media_list`, `note_list`
+  - `event`: `citation_list`, `note_list`
+  - `place`: `citation_list`, `media_list`, `note_list`, `placeref_list`, `tag_list`
+  - `source`: `attribute_list`, `media_list`, `note_list`, `reporef_list`, `tag_list`
+  - `citation`: `attribute_list`, `media_list`, `note_list`, `tag_list`
+  - `repository`: `attribute_list`, `media_list`, `note_list`, `tag_list`
+  - `media`: `citation_list`, `note_list`
+  - `note`: none
+  - `tag`: none
+
+  The gaps that remain, all of them lists the read side exposes but the
+  write model does not declare: a person's person_ref_list, citation_list,
+  address_list and lds_ord_list; an event's media_list, attribute_list and
+  tag_list; a family's tag_list, attribute_list and citation_list; a media
+  object's attribute_list and tag_list; and notes and tags, which declare no
+  list fields at all, so a detach against either is always refused.
+
+  A refusal names the reason (the write model does not declare that list),
+  so a call against an unsupported combination fails loudly rather than
+  reporting success while changing nothing.
+
+### `undo_change` - reverse a recorded transaction
+
+`undo_change(transaction_id=..., force=False)`.
+
+- `transaction_id` comes from `recent_changes`.
+- Undoing reverses every object change that transaction made.
+- **`force=true` is currently required to undo a deletion.** This is an
+  upstream Gramps Web defect, not a gramps-mcp choice: the server records the
+  deleted side of a delete/add change as `{}` rather than `None`, and its
+  own conflict check treats `{}` as "the object has changed", so it refuses
+  every non-forced undo of a deletion with a false "Object has changed"
+  error - even when nothing else touched the record. `force=true` bypasses
+  that check and reliably restores the record. The risk `force` carries: if
+  the object genuinely *was* changed again after the transaction you are
+  undoing, forcing discards that later change without warning - so use it
+  because the delete-undo bug makes it necessary, not as a reflex.
+  `delete_type` and `merge_type` both point here as their recovery path, so
+  this applies whenever you are undoing either of them.
+  - The tool polls the background task the server queues for the undo and
+    reports what it actually observes (success, failure with the server's
+    own error text, or "still processing" after 5 seconds) rather than
+    claiming success the moment the request is accepted.
+
 ## Date Format Specification
 
 **IMPORTANT**: All dates in Gramps use a specific structure with multiple components:

@@ -27,10 +27,11 @@ from mcp.types import TextContent
 
 from ..client import GrampsAPIError
 from ..config import get_settings
+from ..destructive import TYPE_ENDPOINTS
 from ..handlers.family_detail_handler import format_family_detail
 from ..handlers.person_detail_handler import format_person_detail
-from ..models.api_calls import ApiCalls
 from ..models.parameters.base_params import BaseGetMultipleParams
+from ..utils import escape_gql_literal
 from .search_basic import with_client
 
 logger = logging.getLogger(__name__)
@@ -95,10 +96,10 @@ async def get_family_tool(client, arguments: dict) -> list[TextContent]:
         return _format_error_response(e, "family details retrieval")
 
 
-_GRAMPS_ID_API_CALLS = {
-    "person": ApiCalls.GET_PEOPLE,
-    "family": ApiCalls.GET_FAMILIES,
-}
+# Reason: get_type only serves these two types. The plural ApiCalls they map
+# to are not repeated here - TYPE_ENDPOINTS is the single source of truth for
+# the type-to-endpoint mapping, so a third copy cannot drift out of step.
+_GRAMPS_ID_TYPES = ("person", "family")
 
 
 @with_client
@@ -114,9 +115,9 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
         str | None: The handle, or None when no record matches or the
             entity type is unsupported.
     """
-    api_call = _GRAMPS_ID_API_CALLS.get(entity_type)
-    if api_call is None:
+    if entity_type not in _GRAMPS_ID_TYPES:
         return None
+    api_call = TYPE_ENDPOINTS[entity_type].plural
 
     settings = get_settings()
     tree_id = settings.gramps_tree_id
@@ -137,14 +138,10 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
     # Field(None, ...) with a positional default) as having defaults, so it
     # flags them as missing even though they are optional at runtime; see
     # the identical pattern in search_basic.py's find_anything_tool.
-    # Reason: escape for the GQL string literal - the backslash first, so
-    # the backslashes introduced when escaping quotes are not escaped
-    # again. This lets an identifier from another system legitimately
-    # containing a quote or backslash be searched for literally, instead of
-    # refusing it outright as a prior lot did; a crafted value like
-    # `x" or gramps_id!="` is escaped to a literal string that matches
-    # nothing rather than closing the quoted value early.
-    escaped = gramps_id.replace("\\", "\\\\").replace('"', '\\"')
+    # Reason: escape for the GQL string literal - see escape_gql_literal,
+    # which is shared with resolve_target_handle so there is exactly one
+    # escaping behaviour in the codebase.
+    escaped = escape_gql_literal(gramps_id)
     params = BaseGetMultipleParams(  # type: ignore[call-arg]
         gql=f'gramps_id="{escaped}"', pagesize=1
     )

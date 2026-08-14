@@ -23,6 +23,30 @@ from markdownify import markdownify as md
 from .models.api_calls import ApiCalls
 
 
+def escape_gql_literal(value: str) -> str:
+    """
+    Escape a value for embedding inside a double-quoted GQL string literal.
+
+    Any caller building a GQL filter by interpolation must route the value
+    through here. Without it, a value such as ``X" or gramps_id!="X`` closes
+    the literal early and matches every record in the tree - which, on a
+    lookup feeding a delete, resolves to an arbitrary record and destroys it.
+
+    Args:
+        value (str): The raw value to embed.
+
+    Returns:
+        str: The escaped value, safe to place between double quotes.
+    """
+    # Reason: the backslash first, so the backslashes introduced when
+    # escaping quotes are not escaped again. This lets an identifier from
+    # another system legitimately containing a quote or backslash be searched
+    # for literally, instead of refusing it outright; a crafted value like
+    # `x" or gramps_id!="` becomes a literal string matching nothing rather
+    # than closing the quoted value early.
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def html_to_markdown(html: str) -> str:
     """
     Convert HTML content to Markdown format.
