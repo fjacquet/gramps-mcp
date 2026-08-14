@@ -23,17 +23,34 @@ citation onto the event so callers never retype a handle between steps.
 
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
+from .base_params import StrictModel
 from .date_params import DateValue
 from .event_params import HANDLE_PATTERN
 
 
-class SourcedEventData(BaseModel):
+class SourcedEventData(StrictModel):
     """Composite parameters for create_sourced_event."""
 
     # Source fields
-    source_title: str = Field(..., description="Source document title", min_length=1)
+    source_title: str | None = Field(
+        None,
+        description=(
+            "Title of a new source to create. Mutually exclusive with "
+            "source_handle: supply exactly one."
+        ),
+        min_length=1,
+    )
+    source_handle: str | None = Field(
+        None,
+        description=(
+            "Handle of an existing source to attach the new citation to. "
+            "Mutually exclusive with source_title: supply exactly one. Use "
+            "this to record several facts from one document without "
+            "creating a duplicate source for each."
+        ),
+    )
     source_author: str | None = Field(None, description="Source author")
     source_pubinfo: str | None = Field(None, description="Source publication info")
 
@@ -96,3 +113,22 @@ class SourcedEventData(BaseModel):
                 "handle for this place."
             )
         return value
+
+    @model_validator(mode="after")
+    def check_exactly_one_source(self) -> "SourcedEventData":
+        """
+        Require exactly one of source_title or source_handle.
+
+        Returns:
+            SourcedEventData: The validated model.
+
+        Raises:
+            ValueError: If both are given or neither is.
+        """
+        if bool(self.source_title) == bool(self.source_handle):
+            raise ValueError(
+                "supply exactly one of source_title or source_handle: "
+                "source_title creates a new source, source_handle attaches "
+                "the citation to an existing one."
+            )
+        return self

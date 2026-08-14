@@ -27,9 +27,9 @@ API calls supported in this category:
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
-from .base_params import BaseGetMultipleParams, BaseGetSingleParams
+from .base_params import BaseGetMultipleParams, BaseGetSingleParams, StrictModel
 
 
 class PlaceSearchParams(BaseGetMultipleParams):
@@ -44,7 +44,7 @@ class PlaceDetailsParams(BaseGetSingleParams):
     pass
 
 
-class PlaceSaveParams(BaseModel):
+class PlaceSaveParams(StrictModel):
     """Parameters for creating or updating a place."""
 
     handle: str | None = Field(

@@ -27,7 +27,7 @@ from typing import Any
 
 from mcp.types import TextContent
 
-from ..client import GrampsWebAPIClient
+from ..client import GrampsAPIError, GrampsWebAPIClient
 from ..config import get_settings
 from ..handlers.citation_handler import format_citation
 from ..handlers.event_handler import format_event
@@ -37,6 +37,7 @@ from ..models.parameters.citation_params import CitationData
 from ..models.parameters.event_params import EventSaveParams
 from ..models.parameters.source_params import SourceSaveParams
 from ..models.parameters.sourced_event_params import SourcedEventData
+from ..utils import resolve_source_handles_by_title
 from .data_management import _extract_entity_data, _format_error_response
 from .media_upload import upload_media_from_path
 
@@ -53,18 +54,70 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
         tree_id = settings.gramps_tree_id
 
         client = GrampsWebAPIClient()
-        # 1. Source
-        source_kwargs: dict[str, Any] = {
-            "title": params.source_title,
-            "author": params.source_author,
-            "pubinfo": params.source_pubinfo,
-        }
-        source_params = SourceSaveParams(**source_kwargs)
-        source_result = await client.make_api_call(
-            api_call=ApiCalls.POST_SOURCES, params=source_params, tree_id=tree_id
-        )
-        source_data = _extract_entity_data(source_result)
-        source_handle = source_data["handle"]
+        # 1. Source - reuse an existing one, or create after a collision check
+        if params.source_handle:
+            # Reason: a stale or mistyped source_handle must be rejected
+            # here, before any write happens. Without this check the tool
+            # uploads media (step 2 below) and creates a citation before
+            # POST_CITATIONS finally rejects the missing source - leaving
+            # an orphaned media record in the tree with nothing pointing
+            # at it. Fail fast instead.
+            await client.make_api_call(
+                api_call=ApiCalls.GET_SOURCE,
+                tree_id=tree_id,
+                handle=params.source_handle,
+            )
+            source_handle = params.source_handle
+        else:
+            # Reason: check_exactly_one_source guarantees source_title is set
+            # whenever source_handle is not; mypy cannot see across the
+            # validator, so narrow the type explicitly instead of loosening
+            # resolve_source_handles_by_title's signature to Optional. An
+            # `assert` would be stripped under `python -O`, letting a None
+            # title reach resolve_source_handles_by_title and blow up with
+            # an opaque AttributeError on `.replace` - raise explicitly
+            # instead, which narrows identically for mypy and survives -O.
+            if params.source_title is None:
+                raise GrampsAPIError(
+                    "source_title is required when source_handle is not set."
+                )
+            existing = await resolve_source_handles_by_title(
+                client, tree_id, params.source_title
+            )
+            if existing:
+                # Reason: refuse rather than reuse. Source titles repeat
+                # heavily in genealogy ("Etat civil, Paris"), so silently
+                # attaching to a same-titled source would be invisible and
+                # wrong - worse than the visible duplicate this guards
+                # against. Only the caller knows if it is the same document.
+                # resolve_source_handles_by_title caps its search at 10
+                # matches, so note when the list may be a truncated subset
+                # rather than the exhaustive set of duplicates.
+                partial_note = (
+                    " (list may be partial - more than 10 matches exist)"
+                    if len(existing) >= 10
+                    else ""
+                )
+                raise GrampsAPIError(
+                    f"A source titled {params.source_title!r} already exists "
+                    f"({', '.join(existing)}){partial_note}. Call again with "
+                    "source_handle set to one of those to attach this "
+                    "citation to it, or use a distinct title if this is a "
+                    "different document."
+                )
+            source_kwargs: dict[str, Any] = {
+                "title": params.source_title,
+                "author": params.source_author,
+                "pubinfo": params.source_pubinfo,
+            }
+            source_params = SourceSaveParams(**source_kwargs)
+            source_result = await client.make_api_call(
+                api_call=ApiCalls.POST_SOURCES,
+                params=source_params,
+                tree_id=tree_id,
+            )
+            source_data = _extract_entity_data(source_result)
+            source_handle = source_data["handle"]
 
         # 2. Media (optional) - shared upload helper, not create_media_tool
         media_list = None
@@ -117,7 +170,11 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
             f"{source_fmt}\n{citation_fmt}\n{event_fmt}"
         )
         if media_info:
-            response += f"\nAttached media: {media_info.get('handle', 'N/A')}\n"
+            # Reason: every other site emits a gramps_id here
+            # (source_handler.py:116, citation_handler.py:117,
+            # person_handler.py:171, family_handler.py:206). media_info is
+            # the raw new-media object from the upload, which carries both.
+            response += f"\nAttached media: {media_info.get('gramps_id', 'N/A')}\n"
 
         return [TextContent(type="text", text=response)]
 

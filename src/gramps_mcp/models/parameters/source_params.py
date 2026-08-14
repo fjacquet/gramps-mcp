@@ -122,6 +122,14 @@ class SourceSaveParams(BaseDataModel):
     )
     author: str | None = Field(None, description="Source author")
     pubinfo: str | None = Field(None, description="Publication information")
+    abbrev: str | None = Field(
+        None,
+        description=(
+            "Short abbreviation for the source, for example 'AD18 BB 1820'. "
+            "Offered by the usage guide and stored on the Gramps Source "
+            "object."
+        ),
+    )
     media_path: str | None = Field(
         None,
         description=(

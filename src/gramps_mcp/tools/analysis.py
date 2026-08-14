@@ -248,19 +248,17 @@ async def get_descendants_tool(client, arguments: dict) -> list[TextContent]:
             options=None  # No options needed for download
         )
 
-        report_response = await client.make_api_call(
+        # Reason: the response is an HTML document, not JSON - as_text
+        # returns it whole instead of routing it through the JSON-failure
+        # path, which truncates non-JSON bodies to MAX_ERROR_DETAIL.
+        report_content = await client.make_api_call(
             api_call=ApiCalls.GET_REPORT_PROCESSED,
             params=download_params,
             tree_id=tree_id,
             report_id="descend_report",
             filename=filename,
+            as_text=True,
         )
-
-        # Extract HTML content from response
-        if isinstance(report_response, dict) and "raw_content" in report_response:
-            report_content = report_response["raw_content"]
-        else:
-            report_content = str(report_response)
 
         # Convert HTML to Markdown
         markdown_content = html_to_markdown(report_content)
@@ -341,19 +339,17 @@ async def get_ancestors_tool(client, arguments: dict) -> list[TextContent]:
             options=None  # No options needed for download
         )
 
-        report_response = await client.make_api_call(
+        # Reason: the response is an HTML document, not JSON - as_text
+        # returns it whole instead of routing it through the JSON-failure
+        # path, which truncates non-JSON bodies to MAX_ERROR_DETAIL.
+        report_content = await client.make_api_call(
             api_call=ApiCalls.GET_REPORT_PROCESSED,
             params=download_params,
             tree_id=tree_id,
             report_id="ancestor_report",
             filename=filename,
+            as_text=True,
         )
-
-        # Extract HTML content from response
-        if isinstance(report_response, dict) and "raw_content" in report_response:
-            report_content = report_response["raw_content"]
-        else:
-            report_content = str(report_response)
 
         # Convert HTML to Markdown
         markdown_content = html_to_markdown(report_content)

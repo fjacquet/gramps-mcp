@@ -20,7 +20,22 @@ from src.gramps_mcp.tools.data_management import (
     create_person_tool,
     create_place_tool,
 )
-from src.gramps_mcp.tools.search_basic import find_person_tool, find_place_tool
+from src.gramps_mcp.tools.search_basic import (
+    find_type_tool,
+)
+from tests.constants import PREFIX
+
+
+def handle_on_line(text: str, marker: str) -> str:
+    """Find the [handle] on the line containing marker - avoids picking up
+    an unrelated handle (e.g. a repository or media ref) from elsewhere in
+    a concatenated multi-entity response."""
+    for line in text.splitlines():
+        if marker in line:
+            match = re.search(r"\[([a-f0-9]+)\]", line)
+            if match:
+                return match.group(1)
+    raise AssertionError(f"No handle found on a line containing {marker!r} in: {text}")
 
 
 def extract_handle(create_result: Any) -> str:
@@ -130,19 +145,46 @@ async def create_or_find_place(
     Returns:
         Place handle
     """
-    # First: Use find_place to search for existing place
-    find_result = await find_place_tool({"query": name, "pagesize": 5})
+    # First: Use an exact GQL lookup to search for an existing place.
+    # `find_place_tool`'s `PlaceSearchParams` has no `query` field either,
+    # so the free-text `query` this helper used to pass was silently
+    # dropped by Pydantic's default extra="ignore", the search returned an
+    # unfiltered page of places, and none of "United States",
+    # "Massachusetts", "Boston" or "St. Mary's Catholic Church" reliably
+    # landed in the first 5 - confirmed live: 80 duplicate "St. Mary's
+    # Catholic Church" places already in the tree, in pairs matching the
+    # two call sites (create_place_hierarchy runs once from
+    # _step_4_event_creation and once from test_place_hierarchy_creation
+    # per suite run). Same root cause and fix as the source, citation,
+    # event and person lookups elsewhere in this branch.
+    #
+    # Reason: `name` is interpolated unescaped below. Safe today only
+    # because every caller passes one of the four fixed literals in
+    # `create_place_hierarchy` - one of which, "St. Mary's Catholic
+    # Church", carries an apostrophe and is safe only because this GQL
+    # literal is double-quoted. A caller passing free text would need the
+    # escaping helper in `src/gramps_mcp/utils.py` - that is the part of
+    # this pattern that breaks if copied.
+    find_result = await find_type_tool(
+        {
+            "type": "place",
+            "gql": f'class = place and name.value = "{name}"',
+            "max_results": 5,
+        }
+    )
 
     assert isinstance(find_result, list) and len(find_result) == 1
     result_text = find_result[0].text
 
-    # Check for potential matches
+    # Check for potential matches. `handle_on_line` (rather than a
+    # first-match regex over the whole response) matters here because
+    # places render hierarchically ("Boston, Massachusetts, United
+    # States"): once the page holds any place whose full name ends in
+    # "...United States", a bare substring/regex check would pick up the
+    # first handle in the blob, which need not be the matching place.
     existing_handle = None
-    if "No places found" not in result_text:
-        if name.lower() in result_text.lower():
-            handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-            if handle_match:
-                existing_handle = handle_match.group(1)
+    if "No places found" not in result_text and name.lower() in result_text.lower():
+        existing_handle = handle_on_line(result_text, name)
 
     if existing_handle:
         # Use existing place
@@ -170,11 +212,44 @@ async def create_or_find_place(
         return extract_handle(create_result)
 
 
-async def create_or_find_person(
-    given_name: str, surname: str, gender: int, birth_year: str, context: str
+async def create_or_find_person_with_attributes(
+    given_name: str,
+    surname: str,
+    gender: int,
+    birth_year: str,
+    context: str,
+    event_handle: str,
+    event_role: str,
 ) -> str:
     """
-    Create or find a person following the workflow guidelines (legacy method).
+    Create or find a person with complete attributes following the workflow guidelines.
+
+    The person's first name carries `PREFIX` (`tests/constants.py`), the same
+    marker `tests/conftest.py` uses. Two things depend on that: it keeps this
+    test's people out of the way of unrelated same-named records left by
+    other tests (there are unprefixed "John Smith" people in the live tree
+    from a different workflow test), and it is what makes a leftover from a
+    killed run findable by a prefix scan - see #16.
+
+    `find_person_tool` is not called directly even though it looks like the
+    natural search step: it is not MCP-exposed (only `find_type` and
+    `find_anything` are, per `TOOL_REGISTRY` in `server.py`). It is reached
+    here through `find_type_tool`, which always supplies `gql`, never
+    `query`. `query` is a latent trap on `find_person_tool` and its
+    siblings - accepted and silently ignored, because
+    `BaseGetMultipleParams` never declares a `query` field, so a caller that
+    passes it gets an unfiltered result page back with no error. This is not
+    hypothetical: `test_workflow_marriage.py`'s source, citation and event
+    steps were passing `query` to `find_source_tool`/`find_citation_tool`/
+    `find_event_tool` this same way before this fix, and the unfiltered
+    results meant find-before-create almost never found anything, so those
+    steps kept creating duplicates every run. `find_anything_tool` is the
+    tool that actually supports free-text `query` (see #18 for the full
+    writeup), but it mixes person, family, note, media and citation records
+    in one relevance-ranked result set - an exact `gql` match via
+    `find_type_tool` is used instead precisely so the person entry cannot be
+    pushed out of the result window by unrelated noise, without relying on
+    an ever-larger `max_results` to compensate.
 
     Args:
         given_name: Person's first name
@@ -182,40 +257,140 @@ async def create_or_find_person(
         gender: 0=Female, 1=Male, 2=Unknown
         birth_year: Estimated birth year for search
         context: Geographic context for search
+        event_handle: Handle of event to link to person
+        event_role: Role of person in the event (groom, bride, witness, etc.)
 
     Returns:
         Person handle
     """
-    # First: Use find_person to search for existing person
-    search_query = f"{given_name} {surname} {birth_year} {context}"
-    find_result = await find_person_tool({"query": search_query, "pagesize": 5})
+    prefixed_first_name = f"{PREFIX} {given_name}"
+    full_name = f"{prefixed_first_name} {surname}"
+
+    # First: Use find_type for an exact, person-only lookup by first name.
+    # find_type(type="person", ...) dispatches to find_person_tool, so
+    # every returned line is a person entry - no family/note/media/citation
+    # lines to filter out, unlike a mixed find_anything result set.
+    #
+    # Reason: the previous approach used find_anything_tool's free-text
+    # search with "max_results": 100 as a stopgap - find_anything mixes
+    # person, family, note, media and citation records in one relevance-
+    # ranked, unsorted result set, so max_results was really pagesize on
+    # that noise, and it only raised the ceiling without removing the
+    # underlying problem. The citation-step leak (see #16) was actively
+    # pushing more note/media noise into that same search, feeding the
+    # ceiling it was meant to guard against. An exact GQL match on
+    # primary_name.first_name returns only people and is unaffected by
+    # however much other tree noise accumulates.
+    #
+    # Note: GQL cannot traverse primary_name.surname_list.surname - the API
+    # answers "422 list indices must be integers or slices, not str" for a
+    # list-of-dict field addressed that way - so match on first_name only,
+    # which already carries PREFIX and the given name, then disambiguate on
+    # the full name (including surname) below via person_line_pattern, same
+    # as before.
+    find_result = await find_type_tool(
+        {
+            "type": "person",
+            "gql": f'primary_name.first_name="{prefixed_first_name}"',
+            "max_results": 5,
+        }
+    )
 
     assert isinstance(find_result, list) and len(find_result) == 1
     result_text = find_result[0].text
 
-    # Check for potential matches
+    person_line_pattern = re.compile(
+        rf"^{re.escape(full_name)} \([MFU]\) - I\d+ - \[([a-f0-9]+)\]",
+        re.MULTILINE,
+    )
     existing_handle = None
     if "No people found" not in result_text:
-        if (
-            given_name.lower() in result_text.lower()
-            and surname.lower() in result_text.lower()
-        ):
-            handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-            if handle_match:
-                # In real usage, we would ask user to confirm identity
-                # For this test, we assume it's a match
-                existing_handle = handle_match.group(1)
+        person_match = person_line_pattern.search(result_text)
+        if person_match:
+            # In real usage, we would ask user to confirm identity
+            # For this test, we assume it's a match
+            existing_handle = person_match.group(1)
 
     if existing_handle:
-        # Use existing person
+        # Update existing person with event link
+        update_result = await create_person_tool(
+            {
+                "handle": existing_handle,
+                # primary_name and gender are required on PersonData, so a
+                # partial update must resupply them. The old call passed
+                # only handle plus two undeclared keys, which left the
+                # model missing both required fields - it raised, the tool
+                # swallowed it into an "Error:" string, and nothing
+                # asserted on the result.
+                "primary_name": {
+                    "first_name": prefixed_first_name,
+                    "surname_list": [{"surname": surname}],
+                },
+                "gender": gender,
+                "event_ref_list": [{"ref": event_handle, "role": event_role}],
+            }
+        )
+        update_text = update_result[0].text
+        assert "Error:" not in update_text, (
+            f"create_person_tool update failed: {update_text}"
+        )
+        assert "Events:" in update_text, (
+            f"Marriage event was not linked on update: {update_text}"
+        )
         return existing_handle
     else:
-        # Create new person
+        # Create note and media for the new person only. Creating these
+        # unconditionally (as the old code did) leaked 2 orphan records per
+        # run on every update: the update branch above cannot attach them,
+        # so they end up in the live tree attached to nothing - see #16.
+        person_note_handle = await create_test_note(
+            f"Genealogy research note for {full_name}. Found in marriage records from St. Mary's Church, Boston.",
+            "Research",
+        )
+
+        person_media_handle = await create_test_media(
+            "tests/sample/33SQ-GP8N-NLK.jpg",
+            f"Portrait of {full_name}",
+            {"year": int(birth_year) + 25, "type": "about", "quality": "estimated"},
+        )
+
+        # Create new person with complete attributes
         create_result = await create_person_tool(
             {
-                "primary_name": {"given_name": given_name, "surname": surname},
+                "primary_name": {
+                    "first_name": prefixed_first_name,
+                    "surname_list": [{"surname": surname}],
+                },
                 "gender": gender,
+                "note_list": [person_note_handle],
+                "media_list": [{"ref": person_media_handle}],
+                "urls": [
+                    {
+                        "type": "Website",
+                        "path": (
+                            "https://findagrave.com/memorial/"
+                            f"{given_name.lower()}-{surname.lower()}"
+                        ),
+                        "description": f"Find A Grave memorial for {full_name}",
+                    }
+                ],
+                "event_ref_list": [{"ref": event_handle, "role": event_role}],
             }
         )
 
+        create_text = create_result[0].text
+        assert "Error:" not in create_text, f"create_person_tool failed: {create_text}"
+        # The five keys this test used to pass were silently dropped by
+        # Pydantic, so it went green while linking nothing. Assert the
+        # links, not just the handle.
+        assert full_name in create_text, (
+            f"Person was created without a name: {create_text}"
+        )
+        assert "Attached notes:" in create_text, (
+            f"Research note was not linked: {create_text}"
+        )
+        assert "Attached media:" in create_text, (
+            f"Portrait was not linked: {create_text}"
+        )
+        assert "Events:" in create_text, f"Marriage event was not linked: {create_text}"
         return extract_handle(create_result)

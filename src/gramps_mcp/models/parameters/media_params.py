@@ -29,7 +29,7 @@ API calls supported in this category:
 
 from pydantic import BaseModel, Field
 
-from .base_params import BaseGetMultipleParams
+from .base_params import BaseGetMultipleParams, StrictModel
 from .date_params import DateValue
 
 
@@ -51,7 +51,7 @@ class MediaFileParams(BaseModel):
     )
 
 
-class MediaSaveParams(BaseModel):
+class MediaSaveParams(StrictModel):
     """Parameters for creating or updating a media item."""
 
     handle: str | None = Field(None, description="Media handle for updates")

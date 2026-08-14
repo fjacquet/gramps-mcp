@@ -28,8 +28,10 @@ API calls supported in this category:
 
 from pydantic import BaseModel, Field
 
+from .base_params import StrictModel
 
-class FamilySaveParams(BaseModel):
+
+class FamilySaveParams(StrictModel):
     """Parameters for creating or updating a family."""
 
     handle: str | None = Field(

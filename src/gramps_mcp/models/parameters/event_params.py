@@ -30,7 +30,7 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
-from .base_params import BaseGetMultipleParams
+from .base_params import BaseGetMultipleParams, StrictModel
 from .date_params import DateValue
 
 # Reason: a Gramps handle is a lowercase hexadecimal string. Live-tree
@@ -56,7 +56,7 @@ class EventSearchParams(BaseGetMultipleParams):
     )
 
 
-class EventSaveParams(BaseModel):
+class EventSaveParams(StrictModel):
     """Parameters for creating or updating an event."""
 
     handle: str | None = Field(

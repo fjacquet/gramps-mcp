@@ -17,26 +17,25 @@ from typing import Any
 
 import pytest
 
+from src.gramps_mcp.client import GrampsWebAPIClient
+from src.gramps_mcp.config import get_settings
+from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.data_management import (
     create_citation_tool,
     create_event_tool,
     create_family_tool,
-    create_person_tool,
     create_repository_tool,
     create_source_tool,
 )
 from src.gramps_mcp.tools.search_basic import (
-    find_citation_tool,
-    find_event_tool,
-    find_family_tool,
-    find_person_tool,
-    find_repository_tool,
-    find_source_tool,
+    find_type_tool,
 )
 from tests.workflow_helpers import (
+    create_or_find_person_with_attributes,
     create_place_hierarchy,
     create_test_media,
     create_test_note,
+    handle_on_line,
 )
 
 pytestmark = pytest.mark.integration
@@ -135,23 +134,39 @@ class TestCompleteWorkflow:
     async def _step_1_repository_creation(self, workflow_data: dict[str, Any]):
         """Step 1: Repository Creation following usage guide."""
 
-        # First: Use find_repository to search for existing repository
-        find_result = await find_repository_tool(
-            {"query": "St. Mary's Catholic Church Boston", "pagesize": 5}
+        # First: exact GQL lookup. `RepositoriesParams` has no `query`
+        # field, so a free-text `query` here is silently dropped and the
+        # search returns an unfiltered page - same root cause as the other
+        # lookups in this branch.
+        #
+        # Reason: the apostrophe in "St. Mary's Catholic Church, Boston"
+        # is safe to interpolate only because it is a fixed test literal in
+        # a double-quoted GQL string, not caller-supplied free text - that
+        # would need the escaping helper in `src/gramps_mcp/utils.py`.
+        find_result = await find_type_tool(
+            {
+                "type": "repository",
+                "gql": 'class = repository and name = "St. Mary\'s Catholic Church, Boston"',
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
         result_text = find_result[0].text
 
-        # Check if repository already exists and is complete
+        # Check if repository already exists and is complete. The empty
+        # message for a repository search is "No repositories found" - the
+        # old "No sources found" check was a copy-paste from the source
+        # step and always true against this search, so this guard was a
+        # no-op. `handle_on_line` (rather than a first-match regex over
+        # the whole response) avoids picking up an unrelated handle when
+        # the page holds more than one entry.
         existing_handle = None
         if (
-            "No sources found" not in result_text
+            "No repositories found" not in result_text
             and "St. Mary's Catholic Church" in result_text
         ):
-            handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-            if handle_match:
-                existing_handle = handle_match.group(1)
+            existing_handle = handle_on_line(result_text, "St. Mary's Catholic Church")
 
         if existing_handle:
             # Use existing repository as-is
@@ -181,9 +196,17 @@ class TestCompleteWorkflow:
     async def _step_2_source_creation(self, workflow_data: dict[str, Any]):
         """Step 2: Source Document Creation following usage guide."""
 
-        # First: Use find_source to search for existing source document
-        find_result = await find_source_tool(
-            {"query": "Marriage Register 1875-1880", "pagesize": 5}
+        # First: exact GQL lookup. `SourceSearchParams` has no `query`
+        # field, so a free-text `query` here is silently dropped and the
+        # unfiltered page rarely surfaces "Marriage Register" in the first
+        # 5 - confirmed live: 38 duplicate sources before this fix. Same
+        # root cause as the event step below.
+        find_result = await find_type_tool(
+            {
+                "type": "source",
+                "gql": 'class = source and title = "Marriage Register 1875-1880"',
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
@@ -219,29 +242,26 @@ class TestCompleteWorkflow:
     async def _step_3_citation_creation(self, workflow_data: dict[str, Any]):
         """Step 3: Citation Creation following usage guide."""
 
-        # First create note and media for citation if needed
-        note_handle = await create_test_note(
-            "Research note: Found this record during genealogy research session on January 15, 2024. Quality of handwriting is excellent.",
-            "Research",
-        )
-        workflow_data["citation_note_handle"] = note_handle
-
-        media_handle = await create_test_media(
-            "tests/sample/33SQ-GP8N-NLK.jpg",
-            "Marriage Record - John Smith & Mary Jones",
+        # First: Use an exact GQL lookup to search for an existing citation.
+        # `find_citation_tool`'s `GetCitationsParams` has no `query` field
+        # either, so the free-text `query` this step used to pass was
+        # silently dropped, the search returned an unfiltered page, and
+        # "Page 67" almost never landed in it - confirmed live: 37-38
+        # duplicate citations for this exact page text already in the tree.
+        # An unfound citation also defeats the note/media fix just above:
+        # if the citation is never found, a fresh note and media get created
+        # (properly attached, but unboundedly) on every run, which would
+        # still fail the flat-count acceptance check for this step. Same
+        # root cause and fix as the source step above.
+        find_result = await find_type_tool(
             {
-                "year": 1878,
-                "month": 6,
-                "day": 15,
-                "type": "regular",
-                "quality": "regular",
-            },
-        )
-        workflow_data["citation_media_handle"] = media_handle
-
-        # First: Use find_citation to search for existing citation
-        find_result = await find_citation_tool(
-            {"query": "Page 67 Entry 15 John Smith Mary Jones", "pagesize": 5}
+                "type": "citation",
+                "gql": (
+                    'class = citation and page = "Page 67, Entry 15, '
+                    'Marriage of John Smith and Mary Jones, June 15, 1878"'
+                ),
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
@@ -254,10 +274,49 @@ class TestCompleteWorkflow:
             if handle_match:
                 existing_handle = handle_match.group(1)
 
+        # Many duplicate citations share this page text across historical
+        # runs; the GQL match can return one from a different run. Verify
+        # source_handle matches step 2's source before reusing it - a
+        # coherent chain, not two records that merely share page text.
+        if existing_handle:
+            client = GrampsWebAPIClient()
+            tree_id = get_settings().gramps_tree_id
+            citation_data = await client.make_api_call(
+                api_call=ApiCalls.GET_CITATION, tree_id=tree_id, handle=existing_handle
+            )
+            if citation_data.get("source_handle") != workflow_data["source_handle"]:
+                existing_handle = None
+
         if existing_handle:
             # Use existing citation
             workflow_data["citation_handle"] = existing_handle
         else:
+            # Create the note and media for the new citation only. Creating
+            # these unconditionally (as the old code did, before the
+            # existence check above) leaked 2 orphan records per rerun: the
+            # existing-handle branch above has no citation to attach them
+            # to, so they stayed in the live tree attached to nothing - the
+            # same defect fixed in create_or_find_person_with_attributes,
+            # here at the citation site. See #16.
+            note_handle = await create_test_note(
+                "Research note: Found this record during genealogy research session on January 15, 2024. Quality of handwriting is excellent.",
+                "Research",
+            )
+            workflow_data["citation_note_handle"] = note_handle
+
+            media_handle = await create_test_media(
+                "tests/sample/33SQ-GP8N-NLK.jpg",
+                "Marriage Record - John Smith & Mary Jones",
+                {
+                    "year": 1878,
+                    "month": 6,
+                    "day": 15,
+                    "type": "regular",
+                    "quality": "regular",
+                },
+            )
+            workflow_data["citation_media_handle"] = media_handle
+
             # Create new citation with complete attributes
             create_result = await create_citation_tool(
                 {
@@ -285,9 +344,26 @@ class TestCompleteWorkflow:
         # Create place hierarchy first (if event has place)
         await create_place_hierarchy(workflow_data)
 
-        # First: Use find_event to search for existing event
-        find_result = await find_event_tool(
-            {"query": "marriage John Smith Mary Jones 1878", "pagesize": 5}
+        # First: exact GQL lookup. `EventSearchParams` has no `query`
+        # field, so a free-text `query` here is silently dropped and the
+        # unfiltered page almost never contained this event - confirmed
+        # live: 37 duplicate marriage events (E1331..E1413), which is what
+        # pushed the found person's `event_ref_list` unbounded on rerun
+        # (see #16). Finding the existing event fixes it.
+        #
+        # Reason: the "O'Sullivan" apostrophe below is safe to interpolate
+        # only because it is a fixed test literal in a double-quoted GQL
+        # string, not caller-controlled free text - that would need the
+        # escaping helper in `src/gramps_mcp/utils.py`.
+        find_result = await find_type_tool(
+            {
+                "type": "event",
+                "gql": (
+                    'class = event and description = "Marriage ceremony '
+                    "performed by Rev. Patrick O'Sullivan\""
+                ),
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
@@ -295,10 +371,23 @@ class TestCompleteWorkflow:
 
         # Check if event already exists
         existing_handle = None
-        if "No events found" not in result_text and "marriage" in result_text:
+        if "No events found" not in result_text and "Marriage" in result_text:
             handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
             if handle_match:
                 existing_handle = handle_match.group(1)
+
+        # Same cross-run mixing hazard as the citation step: verify the
+        # candidate carries this run's citation before reusing it.
+        if existing_handle:
+            client = GrampsWebAPIClient()
+            tree_id = get_settings().gramps_tree_id
+            event_data = await client.make_api_call(
+                api_call=ApiCalls.GET_EVENT, tree_id=tree_id, handle=existing_handle
+            )
+            if workflow_data["citation_handle"] not in (
+                event_data.get("citation_list") or []
+            ):
+                existing_handle = None
 
         if existing_handle:
             # Use existing event
@@ -333,13 +422,13 @@ class TestCompleteWorkflow:
         """Step 5: Person Creation and Event Linking following usage guide."""
 
         # Create/Find John Smith (groom) with complete attributes
-        john_handle = await self._create_or_find_person_with_attributes(
+        john_handle = await create_or_find_person_with_attributes(
             "John", "Smith", 1, "1850", "Boston", workflow_data["event_handle"], "groom"
         )
         workflow_data["john_handle"] = john_handle
 
         # Create/Find Mary Jones (bride) with complete attributes
-        mary_handle = await self._create_or_find_person_with_attributes(
+        mary_handle = await create_or_find_person_with_attributes(
             "Mary", "Jones", 0, "1855", "Boston", workflow_data["event_handle"], "bride"
         )
         workflow_data["mary_handle"] = mary_handle
@@ -347,9 +436,27 @@ class TestCompleteWorkflow:
     async def _step_6_family_creation(self, workflow_data: dict[str, Any]):
         """Step 6: Family Unit Creation following usage guide."""
 
-        # First: Use find_family to search for existing family
-        find_result = await find_family_tool(
-            {"query": "John Smith Mary Jones", "pagesize": 5}
+        # `find_family_tool`'s params have no `query` field either, so the
+        # free-text `query` this step used to pass was silently dropped and
+        # the search always "found" an unrelated family (confirmed live:
+        # F0308), taking the found path without ever creating or
+        # validating this test's own family. Match on the two handles this
+        # step already holds instead - same fix as the other lookups in
+        # this branch.
+        #
+        # Reason: father_handle/mother_handle are hex handles, not
+        # caller-controlled free text, so no escaping question arises, and
+        # a match is exact by construction - nothing to disambiguate.
+        find_result = await find_type_tool(
+            {
+                "type": "family",
+                "gql": (
+                    "class = family and father_handle = "
+                    f'"{workflow_data["john_handle"]}" and mother_handle = '
+                    f'"{workflow_data["mary_handle"]}"'
+                ),
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
@@ -379,94 +486,3 @@ class TestCompleteWorkflow:
             handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
             assert handle_match, f"No handle found in: {create_text}"
             workflow_data["family_handle"] = handle_match.group(1)
-
-    async def _create_or_find_person_with_attributes(
-        self,
-        given_name: str,
-        surname: str,
-        gender: int,
-        birth_year: str,
-        context: str,
-        event_handle: str,
-        event_role: str,
-    ) -> str:
-        """
-        Create or find a person with complete attributes following the workflow guidelines.
-
-        Args:
-            given_name: Person's first name
-            surname: Person's last name
-            gender: 0=Female, 1=Male, 2=Unknown
-            birth_year: Estimated birth year for search
-            context: Geographic context for search
-            event_handle: Handle of event to link to person
-            event_role: Role of person in the event (groom, bride, witness, etc.)
-
-        Returns:
-            Person handle
-        """
-        # Create note and media for person
-        person_note_handle = await create_test_note(
-            f"Genealogy research note for {given_name} {surname}. Found in marriage records from St. Mary's Church, Boston.",
-            "Research",
-        )
-
-        person_media_handle = await create_test_media(
-            "tests/sample/33SQ-GP8N-NLK.jpg",
-            f"Portrait of {given_name} {surname}",
-            {"year": int(birth_year) + 25, "type": "about", "quality": "estimated"},
-        )
-
-        # First: Use find_person to search for existing person
-        search_query = f"{given_name} {surname} {birth_year} {context}"
-        find_result = await find_person_tool({"query": search_query, "pagesize": 5})
-
-        assert isinstance(find_result, list) and len(find_result) == 1
-        result_text = find_result[0].text
-
-        # Check for potential matches
-        existing_handle = None
-        if "No people found" not in result_text:
-            if (
-                given_name.lower() in result_text.lower()
-                and surname.lower() in result_text.lower()
-            ):
-                handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-                if handle_match:
-                    # In real usage, we would ask user to confirm identity
-                    # For this test, we assume it's a match
-                    existing_handle = handle_match.group(1)
-
-        if existing_handle:
-            # Update existing person with event link
-            await create_person_tool(
-                {
-                    "handle": existing_handle,
-                    "event_handle": event_handle,
-                    "event_role": event_role,
-                }
-            )
-            return existing_handle
-        else:
-            # Create new person with complete attributes
-            create_result = await create_person_tool(
-                {
-                    "primary_name": {"given_name": given_name, "surname": surname},
-                    "gender": gender,
-                    "note_handle": person_note_handle,
-                    "media_handle": person_media_handle,
-                    "url": {
-                        "type": "Website",
-                        "path": f"https://findagrave.com/memorial/{given_name.lower()}-{surname.lower()}",
-                        "description": f"Find A Grave memorial for {given_name} {surname}",
-                    },
-                    "event_handle": event_handle,
-                    "event_role": event_role,
-                }
-            )
-
-            assert isinstance(create_result, list) and len(create_result) == 1
-            create_text = create_result[0].text
-            handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
-            assert handle_match, f"No handle found in: {create_text}"
-            return handle_match.group(1)

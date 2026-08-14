@@ -280,6 +280,14 @@ citation to the event, which avoids copy-pasting handles between calls. Pass
 `media_path` to upload a local file and attach it to the citation in the same
 call. The find-first rule still applies before you call it.
 
+Pass exactly one of `source_title` (creates a new source) or `source_handle`
+(attaches the new citation to an existing source) - the two are mutually
+exclusive. Use `source_handle` when recording a second fact from a document
+already sourced in this tree, so the same document does not get a duplicate
+source per fact. If `source_title` collides with a title already in the
+tree, the call is refused rather than silently reused or duplicated; the
+error names the colliding handles so you can retry with `source_handle`.
+
 **Event Distribution:**
 - **Individual events** → Person records (birth, death, baptism, burial)
 - **Family events** → Family records (marriage, divorce, engagement)

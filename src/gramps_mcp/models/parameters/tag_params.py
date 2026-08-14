@@ -29,6 +29,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from .base_params import StrictModel
+
 
 class TagSearchParams(BaseModel):
     """Parameters for searching tags."""
@@ -40,7 +42,7 @@ class TagSearchParams(BaseModel):
     sort: list[str] | None = Field(None, description="Sort order for results")
 
 
-class TagSaveParams(BaseModel):
+class TagSaveParams(StrictModel):
     """Parameters for creating or updating a tag."""
 
     handle: str | None = Field(
@@ -52,7 +54,7 @@ class TagSaveParams(BaseModel):
     change: str | None = Field(None, description="Change timestamp")
 
 
-class ManageTagsParams(BaseModel):
+class ManageTagsParams(StrictModel):
     """Parameters for the consolidated manage_tags tool (list/get/create-or-update)."""
 
     action: Literal["list", "get", "create"] = Field(

@@ -61,9 +61,7 @@ class TestGetDescendantsTool:
         # First search for a person with children to get a valid handle for descendants test
         from src.gramps_mcp.tools.search_basic import find_person_tool
 
-        search_result = await find_person_tool(
-            {"query": "*", "pagesize": TEST_PAGESIZE}
-        )
+        search_result = await find_person_tool({"pagesize": TEST_PAGESIZE})
 
         # If we found a person, extract their gramps_id and use it directly
         if "[" in search_result[0].text and "]" in search_result[0].text:

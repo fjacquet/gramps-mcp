@@ -77,6 +77,34 @@ class BaseGetMultipleParams(BaseModel):
         None,
         description="Enables the return of summarized information about the object",
     )
+    # Reason: this field is declared only to be rejected. Without it,
+    # pydantic's default extra="ignore" would silently drop a "query" key
+    # instead of raising, leaving the caller with an unfiltered result set
+    # they believe is filtered - the exact bug traced across six call sites
+    # (issue #18). Declaring it lets validate_query() turn the mistake into
+    # a loud error that names the two real search paths.
+    query: str | None = Field(
+        None,
+        description=(
+            "Not a supported parameter - present only so it can be rejected. "
+            "Use gql= for an exact structured filter, or find_anything_tool "
+            "for free-text search."
+        ),
+    )
+
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v):
+        if v is not None:
+            raise ValueError(
+                "'query' is not a supported parameter here and was previously "
+                "silently ignored (extra='ignore'), so any prior call using it "
+                "ran unfiltered rather than doing what it looked like it did. "
+                "Use gql= for an exact structured GQL filter, or "
+                "find_anything_tool (find_anything) for genuine free-text "
+                "search - that is the only search surface that honours 'query'."
+            )
+        return v
 
     @field_validator("extend")
     @classmethod
@@ -146,7 +174,21 @@ class BaseGetSingleParams(BaseModel):
         return v
 
 
-class BaseDataModel(BaseModel):
+class StrictModel(BaseModel):
+    """
+    Base for write-path models: refuse unknown keys instead of dropping them.
+
+    Pydantic's default is extra="ignore", which silently discards any key a
+    model does not declare. On a write that means an incomplete record
+    reaches Gramps while the call reports success - the failure mode behind
+    issues #16 and #17. Read-path models keep the permissive default: a
+    dropped key there only widens a result set.
+    """
+
+    model_config = {"extra": "forbid", "populate_by_name": True}
+
+
+class BaseDataModel(StrictModel):
     """Base class for data models used in POST/PUT operations."""
 
     handle: str | None = Field(None, description="Object's unique handle identifier")
@@ -165,5 +207,3 @@ class BaseDataModel(BaseModel):
     change: int | None = Field(
         None, description="Time in epoch format the record was last modified"
     )
-
-    model_config = {"populate_by_name": True}

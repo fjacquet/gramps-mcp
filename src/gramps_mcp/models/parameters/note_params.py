@@ -26,9 +26,9 @@ API calls supported in this category:
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from .base_params import BaseGetMultipleParams, BaseGetSingleParams
+from .base_params import BaseGetMultipleParams, BaseGetSingleParams, StrictModel
 
 
 class NotesParams(BaseGetMultipleParams):
@@ -57,7 +57,7 @@ class NoteParams(BaseGetSingleParams):
     )
 
 
-class NoteSaveParams(BaseModel):
+class NoteSaveParams(StrictModel):
     """Parameters for creating or updating a note."""
 
     handle: str | None = Field(
