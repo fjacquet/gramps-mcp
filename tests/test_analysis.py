@@ -265,3 +265,35 @@ class TestGetTreeInfoTool:
 
 
 # Note: AnalysisClient tests removed as we now use unified GrampsWebAPIClient
+
+
+class TestBfsAncestorOutput:
+    """Live checks on the BFS output shape. Needs a populated tree."""
+
+    async def test_ancestors_of_i0001_name_the_known_parents(self):
+        result = await get_ancestors_tool({"gramps_id": "I0001", "max_generations": 3})
+        text = result[0].text
+        assert text.startswith("# Ancestors of")
+        # Reason: I0001 is the tree owner and has both parents recorded.
+        # If this ever fails, check the tree before the code.
+        assert text.count("\n  - ") >= 2
+
+    async def test_fewer_generations_return_strictly_fewer_lines(self):
+        shallow = await get_ancestors_tool({"gramps_id": "I0001", "max_generations": 1})
+        deep = await get_ancestors_tool({"gramps_id": "I0001", "max_generations": 3})
+        assert len(shallow[0].text.splitlines()) < len(deep[0].text.splitlines())
+
+    async def test_every_person_line_carries_a_gramps_id(self):
+        result = await get_ancestors_tool({"gramps_id": "I0001", "max_generations": 2})
+        person_lines = [
+            line
+            for line in result[0].text.splitlines()
+            if line.lstrip().startswith("- ")
+        ]
+        assert person_lines
+        for line in person_lines:
+            assert "(I" in line or "[unavailable" in line
+
+    async def test_unknown_gramps_id_reports_an_error(self):
+        result = await get_ancestors_tool({"gramps_id": "I999999"})
+        assert "Error:" in result[0].text
