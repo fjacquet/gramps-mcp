@@ -1268,7 +1268,64 @@ Count the citation-step notes and media again after each run. They must be flat
 between the second and third run. A passing test is not the deliverable; the
 flat count is.
 
-- [ ] **Step 4: Sweep the rest of the file**
+- [ ] **Step 4: Replace the `max_results: 100` ceiling with an exact lookup**
+
+The fix wave had to add `max_results: 100` to the `find_anything_tool` call in
+`create_or_find_person_with_attributes` (`tests/workflow_helpers.py`), because
+historical note and media records were pushing the person's line out of the
+default result window, so find-before-create never found the person. The
+re-review judged that a stopgap: `max_results` becomes `pagesize` on an
+unsorted full-text search mixing people, notes, media and citations, so it
+raises the ceiling without removing it. The citation leak fixed in step 2 was
+actively feeding that count.
+
+Replace it with an exact, person-only lookup. Verified working against the
+live server:
+
+```python
+find_type_tool({
+    "type": "person",
+    "gql": f'primary_name.first_name="{prefixed_first_name}"',
+    "max_results": 5,
+})
+```
+
+This returns people and nothing else, matches the prefixed first name exactly,
+and is unaffected by however much note and media noise the tree accumulates.
+Note that GQL cannot traverse `primary_name.surname_list.surname` - the API
+answers `422 list indices must be integers or slices, not str` - so match on
+the first name, which already carries `PREFIX` and the given name.
+
+Keep picking the handle off a person line as the current code does; with
+`find_type` every line is a person, so the parsing gets simpler, not harder.
+
+- [ ] **Step 5: Stop `event_ref_list` growing without bound on the found path**
+
+A second growth vector, visible in the live tree today:
+
+```
+Pytest Lot5 John Smith (M) - I1135
+Events: Marriage, groom (E1331), Marriage, groom (E1332), Marriage, groom (E1333),
+        Marriage, groom (E1334), Marriage, groom (E1335), Marriage, groom (E1343),
+        Marriage, groom (E1359), Marriage, groom (E1389), Marriage, groom (E1405), ...
+```
+
+Eleven marriage-as-groom references on one person. `_step_4_event_creation`
+creates a fresh marriage event every run, and the update path passes
+`event_ref_list=[{ref, role}]`, which `merge.py` merges into the existing list
+rather than replacing it. So each run appends one more reference to the same
+person forever.
+
+This does not create new records, so a record count stays flat and hides it -
+which is exactly how the note and media half of #16 escaped the first
+acceptance check. Fix the same way as the rest: the event step should find its
+existing marriage event before creating one, so the reference being added is
+the one already there.
+
+Report the reference count on the found person before and after two reruns. It
+must be flat.
+
+- [ ] **Step 6: Sweep the rest of the file**
 
 `_step_1_repository_creation`, `_step_2_source_creation` and
 `_step_4_event_creation` follow the same find-or-create shape. Check each for
@@ -1276,7 +1333,7 @@ the same pattern - anything created before the existence check that only the
 create path attaches. Fix any you find, and state in your report which steps
 you checked and what you found, so the sweep is on the record.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 uv run git add tests/test_workflow_marriage.py
