@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Never create a file longer than 500 lines.
-- Test against the real Gramps API. No fixtures, test clients or stubbed responses standing in for the server. Replacing the transport seam alone is permitted in offline unit tests; assertions must read the output of the code under test, never the stub's call arguments.
+- Test against the real Gramps API - do not fake its behaviour. No test clients, no stubbed responses standing in for the server. **Setup that creates real records against the real server is not faking**: that is what `tests/conftest.py` does in Task 1, and it is the approved design for this lot. Replacing the transport seam alone is permitted in offline unit tests, and is what `tests/test_client_merge.py` and `tests/test_http_error_detail.py` already do. Assertions must read the output of the code under test, never the stub's call arguments - a test that asserts on its own mock proves nothing.
 - No emojis anywhere. A pre-commit hook enforces this.
 - Google-style docstrings on every function.
 - Add an inline `# Reason:` comment when logic is non-obvious.

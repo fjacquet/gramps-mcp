@@ -43,10 +43,13 @@
 - **This project follows Test-Driven Development (TDD) practices**.
 - **Write tests FIRST before implementing functionality** - red, green, refactor cycle.
 - **Always create Pytest integration tests for new features** (functions, classes, routes, etc).
-- **Test against the real Gramps API - do not fake its behaviour.** No
-  fixtures, no test clients, no stubbed responses standing in for the server.
-  Replacing the transport seam alone is permitted in offline unit tests, and is
-  what `tests/test_client_merge.py` and `tests/test_http_error_detail.py` do.
+- **Test against the real Gramps API - do not fake its behaviour.** No test
+  clients and no stubbed responses standing in for the server. Setup that
+  creates real records against the real server is not faking - that is what
+  `tests/conftest.py` does, and tests take those records as fixture arguments
+  rather than depending on another test having run. Replacing the transport
+  seam alone is permitted in offline unit tests, and is what
+  `tests/test_client_merge.py` and `tests/test_http_error_detail.py` do.
   Assertions must read the output of the code under test, never the stub's
   call arguments - a test that asserts on its own mock proves nothing.
 - **After updating any logic**, check whether existing tests need to be updated. If so, do it.
@@ -66,18 +69,20 @@
 - **`tree_stats` returns a permission error even for the owner-role account
   in `.env`.** A `tree_stats` failure ("Permission denied for this
   operation") is an environment fact, not a regression.
-- **`tests/test_parameter_alignment.py` holds hardcoded field inventories that
-  must track `src/gramps_mcp/resources/gramps-usage-guide.md`.** Adding a field
-  to a parameter model without documenting it in that guide fails this test.
-  It is doing its job: the guide is served to MCP clients, so an undocumented
-  parameter is one the assistant can pass but was never told about. Fix the
-  guide, then the inventory - not the inventory alone.
-- **Several `tests/test_data_management.py` tests depend on running in order**,
-  passing handles from one to the next. Run alone they fail with "No repository
-  handle available from previous test". Run the module, not the single test.
-- **The 500-line rule is not enforced in `tests/`.** `.pre-commit-config.yaml`
-  excludes `^tests/` from `check_file_length`, and three test files already
-  exceed it. The rule still applies when you write there; nothing will stop you.
+- **The `tests/test_alignment_*.py` modules hold hardcoded field inventories
+  that must track `src/gramps_mcp/resources/gramps-usage-guide.md`.** Adding a
+  field to a parameter model without documenting it in that guide fails these
+  tests. They are doing their job: the guide is served to MCP clients, so an
+  undocumented parameter is one the assistant can pass but was never told
+  about. Fix the guide, then the inventory - not the inventory alone.
+- **The parameter models ignore unknown keys.** Pydantic's default
+  `extra="ignore"` applies, so a test passing a field name a model does not
+  declare has that field silently dropped - the call still succeeds and the
+  test can still pass while exercising nothing. Check a key against the model
+  in `src/gramps_mcp/models/parameters/` before trusting a test that uses it.
+- **The 500-line rule is enforced in `tests/` as well as `src/`.**
+  `.pre-commit-config.yaml`'s `check-file-length` hook covers the whole tree;
+  there is no exclusion for tests.
 
 
 ### Style & Conventions

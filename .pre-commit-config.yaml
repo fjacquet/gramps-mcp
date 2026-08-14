@@ -23,7 +23,6 @@ repos:
         entry: python scripts/check_file_length.py
         language: system
         files: \.py$
-        exclude: ^tests/
         pass_filenames: true
       - id: check-no-emojis
         name: Check no emojis in files

@@ -139,16 +139,33 @@ alongside ruff, formatting, copyright-header and no-emoji hooks (ADR 0006).
 
 These are specific, current and unfixed.
 
-- Several tests in `tests/test_data_management.py` depend on running in order,
-  passing handles from one test to the next. Run alone, they fail with "No
-  repository handle available from previous test".
 - `upload_media_file` in the client bypasses `_make_request`, so it has neither
   the shared 401 refresh-and-retry nor the connection and timeout wrapping every
   other call gets. A media upload that hits an expired token fails instead of
   retrying, and a network failure surfaces as a raw httpx exception.
-- The file-length pre-commit hook carries `exclude: ^tests/`, so the 500-line
-  rule that CLAUDE.md and CONTRIBUTING.md both state without qualification is
-  unenforced there. Three test files exceed it today.
+- `SourceSaveParams` declares no field for a source abbreviation, though the
+  usage guide lists one among a source's attributes. No tool call can set it.
+- `tests/test_workflow_marriage.py`, in the person-creation helper around lines
+  444 and 454, passes `event_handle`, `event_role`, `note_handle`,
+  `media_handle` and `url` to `create_person_tool`. `PersonData` declares
+  `event_ref_list`, `note_list`, `media_list` and `urls`, so Pydantic drops all
+  five silently. The end-to-end marriage test creates two people linked to
+  nothing and still passes.
+- The same calls pass `primary_name` as `{"given_name": ..., "surname": ...}`.
+  `PersonData.primary_name` is typed `dict[str, Any]`, so nothing validates its
+  shape, while every other call site and every handler uses `first_name` plus
+  `surname_list`. The people that test creates are very likely nameless.
+- As a consequence of the shape mismatch above, `find_person_tool` cannot match
+  those people on a later run, so every suite run adds two more people, a
+  family, a note and a media object to the live tree. None of them carry the
+  `Pytest Lot5` prefix that makes test leftovers findable.
+- Three tests assert a MIME type appears in output that structurally cannot
+  contain one; only `format_media` emits a MIME type, and the source, citation,
+  person and family formatters emit `Attached media: {gramps_ids}` instead.
+  Tracked as issue #13.
+- `create_sourced_event` always creates a new source and cannot reuse an
+  existing one, so recording two facts from one document produces duplicate
+  sources that no tool can merge or delete. Tracked as issue #12.
 - `tree_stats` returns a permission error even for the owner-role account used
   in the reference deployment. `get_facts` is the working alternative for
   tree-level numbers.
