@@ -26,6 +26,7 @@ model validation only.
 import pytest
 from pydantic import ValidationError
 
+from src.gramps_mcp.models.parameters.base_params import BaseGetMultipleParams
 from src.gramps_mcp.models.parameters.date_params import DateValue
 from src.gramps_mcp.models.parameters.event_params import EventSaveParams
 from src.gramps_mcp.models.parameters.family_params import FamilySaveParams
@@ -113,3 +114,21 @@ def test_person_data_refuses_the_keys_issue_16_used():
                 gender=1,
                 **{bad_key: "x"},
             )
+
+
+def test_base_get_multiple_params_rejects_query():
+    """'query' used to be silently dropped by extra='ignore', leaving a
+    caller believing an unfiltered result set was filtered (issue #18). It
+    must now raise and point at the two real search paths."""
+    with pytest.raises(ValidationError) as exc_info:
+        BaseGetMultipleParams(query="anything")
+    message = str(exc_info.value)
+    assert "gql" in message
+    assert "find_anything" in message
+
+
+def test_base_get_multiple_params_still_accepts_gql():
+    """The rejection above must not be a broken model - a real gql= filter,
+    the field query= should have been, still works."""
+    params = BaseGetMultipleParams(gql="first_name = 'Jean'")
+    assert params.gql == "first_name = 'Jean'"
