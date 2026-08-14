@@ -170,8 +170,12 @@ async def detach_reference_tool(client, arguments: dict) -> list[TextContent]:
         # endpoint's full write model, and that model has fields the API
         # requires on every write (e.g. PersonData needs primary_name and
         # gender) that a bare {list_name: value} payload would not carry.
-        # model_construct builds the model instance without running that
-        # required-field validation, from whatever the write model declares
+        # Normal construction was tried against live data and genuinely
+        # fails for reasons unrelated to required fields: EventSaveParams'
+        # nested date sub-model forbids extra keys the raw GET record
+        # carries, and its place validator rejects the handle shape GET
+        # returns. model_construct builds the model instance without
+        # running that validation, from whatever the write model declares
         # out of the record as read plus the edited list - every value but
         # the edited list is therefore identical to what is already stored.
         # replace_lists=[list_name] is what actually removes the element, and
@@ -179,7 +183,15 @@ async def detach_reference_tool(client, arguments: dict) -> list[TextContent]:
         # call cannot drop unrelated data.
         write_model = get_param_model(endpoints.put)
         if write_model is None:
+            # Reason: unreachable today - every TYPE_ENDPOINTS.put value is
+            # registered in API_CALL_PARAMS with a real model. Guarded so a
+            # future endpoint added without one fails loudly, not silently.
             raise ValueError(f"No write model registered for {params.type}")
+        if params.list_name not in write_model.model_fields:
+            raise ValueError(
+                f"{params.list_name} cannot be edited on {params.type} records: "
+                "the write model does not declare it."
+            )
         payload = {k: v for k, v in updated.items() if k in write_model.model_fields}
         validated_params = write_model.model_construct(**payload)
 

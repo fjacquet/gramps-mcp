@@ -71,7 +71,10 @@ class DetachReferenceParams(StrictModel):
 
     type: RecordType = Field(description="Type of the record holding the list")
     handle: str | None = Field(None, description="Object handle")
-    gramps_id: str | None = Field(None, description="Gramps ID (alternative to handle)")
+    gramps_id: str | None = Field(
+        None,
+        description="Gramps ID (alternative to handle)",
+    )
     list_name: str = Field(
         description=(
             "Name of the list to edit, for example event_ref_list, "
