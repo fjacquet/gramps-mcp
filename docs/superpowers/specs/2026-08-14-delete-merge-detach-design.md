@@ -1,7 +1,15 @@
 # Design: destructive operations - `delete_type`, `merge_type`, `detach_reference`, `undo_change`
 
 Date: 2026-08-14
-Status: approved, not yet implemented
+Status: implemented in v1.9.0
+
+Two things this design got wrong, corrected during implementation and recorded
+here so the document is not read as an accurate account of the shipped code:
+`undo_change` needs `force=true` to undo a deletion because of an upstream
+Gramps Web bug, and `detach_reference` reaches fewer type/list pairs than
+assumed below. The shipped behaviour is described in
+`src/gramps_mcp/resources/gramps-usage-guide.md`, whose reachability table is
+derived from the models by an alignment test.
 
 ## Problem
 
@@ -128,9 +136,16 @@ Parameters: `type`, `handle`, `list_name`, `ref_handle`.
 
 `type` accepts any record type that carries lists, which is all nine plus tag.
 `list_name` is validated against the fields the target type actually declares,
-so a typo is refused rather than silently doing nothing. The lists this is
-expected to serve are `event_ref_list`, `child_ref_list`, `media_list`,
-`note_list`, `citation_list` and `tag_list`.
+so a typo is refused rather than silently doing nothing.
+
+This paragraph originally assumed every type could serve `event_ref_list`,
+`child_ref_list`, `media_list`, `note_list`, `citation_list` and `tag_list`.
+That is not the case: a list is reachable only when the type's **write** model
+declares it, and the write models are narrower than the read models -
+`EventSaveParams` carries only `citation_list` and `note_list`, for instance.
+The tool refuses an unreachable pair rather than reporting a success that did
+nothing. The authoritative per-type table lives in the usage guide and is
+derived from `model_fields` by `tests/test_alignment_destructive.py`.
 
 No Gramps Web endpoint removes a list element. The tool reads the object,
 removes the handle from the named list, and writes it back requesting

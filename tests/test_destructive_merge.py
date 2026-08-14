@@ -266,3 +266,37 @@ class TestMergeLive:
             await delete_entity(
                 gramps_client, tree_id, ApiCalls.DELETE_PERSON, father_b
             )
+
+
+class TestMergePreviewNames:
+    """The preview must name the records, not repeat their identifiers."""
+
+    def test_a_person_preview_shows_the_name_not_just_the_id(self):
+        text = format_merge_preview(
+            {
+                "gramps_id": "I0001",
+                "primary_name": {
+                    "first_name": "Marguerite",
+                    "surname_list": [{"surname": "COCU"}],
+                },
+            },
+            {
+                "gramps_id": "I0002",
+                "primary_name": {
+                    "first_name": "Marguerite Victoire",
+                    "surname_list": [{"surname": "COCU"}],
+                },
+            },
+            "person",
+        )
+        assert "Marguerite COCU" in text
+        assert "Marguerite Victoire COCU" in text
+
+    def test_a_person_without_a_name_does_not_repeat_the_id(self):
+        text = format_merge_preview(
+            {"gramps_id": "I0001", "primary_name": {"surname_list": []}},
+            {"gramps_id": "I0002"},
+            "person",
+        )
+        assert "I0001 - I0001" not in text
+        assert "(no label)" in text

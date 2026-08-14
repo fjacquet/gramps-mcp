@@ -397,12 +397,30 @@ async def undo_change_tool(client, arguments: dict) -> list[TextContent]:
                     )
                 ]
 
+            return [
+                TextContent(
+                    type="text",
+                    text=(
+                        f"Transaction {params.transaction_id} undone. "
+                        "Run recent_changes to confirm the tree is as "
+                        "expected."
+                    ),
+                )
+            ]
+
+        # Reason: no task id means the polling above never ran, so nothing
+        # here observed the undo reaching a terminal state. Claiming it was
+        # undone would assert exactly what the comment above says the POST
+        # cannot prove - and a delete-undo, the case that most needs a
+        # truthful answer, is the one the upstream bug already makes fragile.
         return [
             TextContent(
                 type="text",
                 text=(
-                    f"Transaction {params.transaction_id} undone. "
-                    "Run recent_changes to confirm the tree is as expected."
+                    f"Transaction {params.transaction_id} undo was queued, "
+                    "but the server returned no task to follow, so this tool "
+                    "did not observe the outcome. Run recent_changes to "
+                    "confirm whether the tree was actually reverted."
                 ),
             )
         ]

@@ -25,7 +25,15 @@ from src.gramps_mcp.tools.destructive import undo_change_tool
 
 
 class TestUndoOffline:
-    async def test_reports_the_transaction_it_undid(self):
+    async def test_does_not_claim_success_when_no_task_came_back(self):
+        """
+        A response with no task leaves the outcome unobserved.
+
+        The POST only confirms the undo was queued. When the server returns
+        no task to poll, nothing has seen the undo reach a terminal state,
+        so the tool must not report it as undone - a delete-undo is exactly
+        the case where a false success is most damaging.
+        """
         with patch(
             "src.gramps_mcp.client.GrampsWebAPIClient.make_api_call",
             new_callable=AsyncMock,
@@ -33,8 +41,11 @@ class TestUndoOffline:
             call.return_value = {}
             result = await undo_change_tool({"transaction_id": 42})
 
-        assert "42" in result[0].text
-        assert "ndone" in result[0].text
+        text = result[0].text
+        assert "42" in text
+        assert "queued" in text
+        assert "did not observe" in text
+        assert "undone." not in text
 
     async def test_rejects_a_non_numeric_transaction_id(self):
         result = await undo_change_tool({"transaction_id": "not-a-number"})

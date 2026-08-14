@@ -1,5 +1,13 @@
 # Destructive Operations Implementation Plan
 
+> **Historical record — this plan was executed in full and shipped in v1.9.0.**
+> The unchecked boxes below are the plan as written, not outstanding work.
+> Three of its prescriptions turned out to be wrong against the live server
+> and were corrected during execution: the PUT payload for `detach_reference`,
+> the family-merge parameters, and the assumption that `undo_change` needed no
+> `force`. Read `docs/adr/0007-expose-destructive-operations.md` and the usage
+> guide for what actually shipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give the MCP server parity with the Gramps Web UI for destructive
@@ -55,8 +63,10 @@ pytest-asyncio, uv for everything.
 - Consumes: nothing.
 - Produces:
   - `TYPE_ENDPOINTS: dict[str, TypeEndpoints]` where `TypeEndpoints` is a
-    `NamedTuple` with fields `get: ApiCalls`, `delete: ApiCalls`,
-    `merge: ApiCalls | None`.
+    `NamedTuple` with fields `get: ApiCalls`, `put: ApiCalls`,
+    `delete: ApiCalls`, `merge: ApiCalls | None`. (`put` is what
+    `detach_reference` writes through; the shipped tuple also carries
+    `plural`, added when the type-to-collection mapping was consolidated.)
   - `should_refuse_delete(backlinks: dict[str, list[str]]) -> str | None`
   - `remove_from_list(obj: dict, list_name: str, ref_handle: str) -> dict`
 

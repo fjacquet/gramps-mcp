@@ -39,7 +39,12 @@ jobs:
           GRAMPS_USERNAME: "ci"
           GRAMPS_PASSWORD: "ci"
           GRAMPS_TREE_ID: "ci"
-        run: uv run pytest -m "not integration" --cov=src/gramps_mcp --cov-report=xml tests/test_merge.py tests/test_config.py tests/test_client_merge.py tests/test_utils.py tests/test_http_error_detail.py tests/test_destructive_logic.py tests/test_destructive_resolve.py tests/test_alignment_destructive.py tests/test_destructive_delete.py tests/test_destructive_detach.py tests/test_destructive_merge.py tests/test_destructive_undo.py
+        # The marker filter alone keeps this run offline: verified by running
+        # the same selection against an unreachable API URL, where all 229
+        # tests still pass. Naming the directory rather than an allowlist
+        # means a new offline test file is covered without editing CI - the
+        # allowlist had already fallen behind by two files.
+        run: uv run pytest -m "not integration" --cov=src/gramps_mcp --cov-report=xml tests/
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

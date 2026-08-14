@@ -17,9 +17,50 @@
 """Formatting for destructive-operation results and previews."""
 
 
+def _person_name(obj: dict) -> str | None:
+    """
+    Assemble a readable name from a record's primary_name, if it has one.
+
+    Args:
+        obj (dict): The record as returned by the API.
+
+    Returns:
+        str | None: "Given SURNAME" when the record carries a primary_name
+            with any content, otherwise None.
+    """
+    name = obj.get("primary_name")
+    if not isinstance(name, dict):
+        return None
+    given = (name.get("first_name") or "").strip()
+    surnames = " ".join(
+        (entry.get("surname") or "").strip()
+        for entry in name.get("surname_list") or []
+        if isinstance(entry, dict)
+    ).strip()
+    return f"{given} {surnames}".strip() or None
+
+
 def _label(obj: dict) -> str:
-    """Return the most human-readable label a record offers."""
-    for key in ("title", "desc", "text", "page", "gramps_id", "handle"):
+    """
+    Return the most human-readable label a record offers.
+
+    Args:
+        obj (dict): The record as returned by the API.
+
+    Returns:
+        str: A name, title or description, truncated to 80 characters, or
+            "(no label)" when the record offers nothing readable. The
+            gramps_id is deliberately not used - the caller already prints
+            it, and repeating it names nothing.
+    """
+    # Reason: a person record carries none of the title/desc/text/page keys,
+    # so without this branch a person merge preview would show two opaque ids
+    # and ask the caller to check a direction the preview never showed them.
+    person_name = _person_name(obj)
+    if person_name:
+        return person_name[:80]
+
+    for key in ("title", "desc", "text", "page", "name"):
         value = obj.get(key)
         if isinstance(value, dict):
             value = value.get("string") or value.get("value")

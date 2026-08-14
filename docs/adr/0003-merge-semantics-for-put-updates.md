@@ -4,12 +4,17 @@ Date: 2025-09-11
 
 ## Status
 
-Superseded by ADR 0007. The union-on-update behaviour described below is
-unchanged and remains the default for every write; only this record's claim
-that removal is impossible through this server is superseded - removal now
-happens through the one explicitly named door `detach_reference` adds.
+Superseded by ADR 0007
 
 ## Context
+
+**Scope of the supersession.** The union-on-update behaviour described below
+is unchanged and remains the default for every write. Only this record's
+claim that removal is impossible through this server is superseded - removal
+now happens through the one explicitly named door `detach_reference` adds. A
+reader who takes ADR 0007 as "union semantics were abandoned" has read it
+wrong, and acting on that reading would cause the data loss this record
+exists to prevent.
 
 The Gramps Web API's `PUT /objects/{handle}` replaces the whole object with
 the submitted body. An MCP tool call, by contrast, is almost always partial:
