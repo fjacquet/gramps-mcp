@@ -113,7 +113,7 @@ async def _fetch_level(
 
     # Reason: return_exceptions keeps one server error from discarding the
     # hundreds of fetches that succeeded alongside it.
-    payloads = await asyncio.gather(
+    payloads: list[dict | Exception] = await asyncio.gather(
         *(_bounded(handle) for handle in handles), return_exceptions=True
     )
     return dict(zip(handles, payloads, strict=True))

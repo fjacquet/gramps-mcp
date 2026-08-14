@@ -5,6 +5,8 @@ Tests get_descendants, get_ancestors, and get_recent_changes tools.
 These tests require a working Gramps Web API instance with valid credentials.
 """
 
+import re
+
 import pytest
 from dotenv import load_dotenv
 from mcp.types import TextContent
@@ -118,6 +120,15 @@ class TestGetDescendantsTool:
                             "family",
                         ]
                     )
+                    # Reason: the substring/keyword checks above pass on
+                    # coincidental wording alone - they would not catch a
+                    # broken format_traversal. These assert on the BFS
+                    # output's actual structure: the heading, its
+                    # generation/people count, and at least one indented
+                    # child line carrying a gramps_id.
+                    assert text.startswith("# Descendants of ")
+                    assert re.search(r"\d+ generations?, \d+ people", text)
+                    assert re.search(r"\n {2,}- .*\([A-Z]\d{4}\)", text)
         else:
             # If no people found in a populated tree, this is a test failure
             pytest.fail(
@@ -183,6 +194,16 @@ class TestGetAncestorsTool:
             assert "report generated successfully" not in text.lower()
             # Report should contain genealogy-related content - check for "Generation" which appears in ancestor reports
             assert "generation" in text.lower()
+            # Reason: the substring check above passes on coincidental
+            # wording alone - it would not catch a broken
+            # format_traversal. These assert on the BFS output's actual
+            # structure: the heading, its generation/people count, and at
+            # least one indented child line carrying a gramps_id. I0001 is
+            # the tree owner and has both parents recorded, so an indented
+            # child line is guaranteed here.
+            assert text.startswith("# Ancestors of ")
+            assert re.search(r"\d+ generations?, \d+ people", text)
+            assert re.search(r"\n {2,}- .*\([A-Z]\d{4}\)", text)
 
     @pytest.mark.asyncio
     async def test_get_ancestors_invalid_gramps_id(self):
