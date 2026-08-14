@@ -27,7 +27,7 @@ from typing import Any
 
 from mcp.types import TextContent
 
-from ..client import GrampsWebAPIClient
+from ..client import GrampsAPIError, GrampsWebAPIClient
 from ..config import get_settings
 from ..handlers.citation_handler import format_citation
 from ..handlers.event_handler import format_event
@@ -37,6 +37,7 @@ from ..models.parameters.citation_params import CitationData
 from ..models.parameters.event_params import EventSaveParams
 from ..models.parameters.source_params import SourceSaveParams
 from ..models.parameters.sourced_event_params import SourcedEventData
+from ..utils import resolve_source_handles_by_title
 from .data_management import _extract_entity_data, _format_error_response
 from .media_upload import upload_media_from_path
 
@@ -53,18 +54,44 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
         tree_id = settings.gramps_tree_id
 
         client = GrampsWebAPIClient()
-        # 1. Source
-        source_kwargs: dict[str, Any] = {
-            "title": params.source_title,
-            "author": params.source_author,
-            "pubinfo": params.source_pubinfo,
-        }
-        source_params = SourceSaveParams(**source_kwargs)
-        source_result = await client.make_api_call(
-            api_call=ApiCalls.POST_SOURCES, params=source_params, tree_id=tree_id
-        )
-        source_data = _extract_entity_data(source_result)
-        source_handle = source_data["handle"]
+        # 1. Source - reuse an existing one, or create after a collision check
+        if params.source_handle:
+            source_handle = params.source_handle
+        else:
+            # Reason: check_exactly_one_source guarantees source_title is set
+            # whenever source_handle is not; mypy cannot see across the
+            # validator, so narrow the type explicitly instead of loosening
+            # resolve_source_handles_by_title's signature to Optional.
+            assert params.source_title is not None
+            existing = await resolve_source_handles_by_title(
+                client, tree_id, params.source_title
+            )
+            if existing:
+                # Reason: refuse rather than reuse. Source titles repeat
+                # heavily in genealogy ("Etat civil, Paris"), so silently
+                # attaching to a same-titled source would be invisible and
+                # wrong - worse than the visible duplicate this guards
+                # against. Only the caller knows if it is the same document.
+                raise GrampsAPIError(
+                    f"A source titled {params.source_title!r} already exists "
+                    f"({', '.join(existing)}). Call again with "
+                    "source_handle set to one of those to attach this "
+                    "citation to it, or use a distinct title if this is a "
+                    "different document."
+                )
+            source_kwargs: dict[str, Any] = {
+                "title": params.source_title,
+                "author": params.source_author,
+                "pubinfo": params.source_pubinfo,
+            }
+            source_params = SourceSaveParams(**source_kwargs)
+            source_result = await client.make_api_call(
+                api_call=ApiCalls.POST_SOURCES,
+                params=source_params,
+                tree_id=tree_id,
+            )
+            source_data = _extract_entity_data(source_result)
+            source_handle = source_data["handle"]
 
         # 2. Media (optional) - shared upload helper, not create_media_tool
         media_list = None

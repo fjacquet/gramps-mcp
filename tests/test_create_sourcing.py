@@ -9,6 +9,7 @@ integration - Pydantic validation is tested elsewhere.
 """
 
 import re
+import uuid
 
 import pytest
 
@@ -293,9 +294,16 @@ class TestCreateSourcedEventTool:
         """Source, citation, and event are created in one call, with the
         citation auto-wired onto the event - the exact chain that used to
         require three separate calls and a copy-pasted handle."""
+        # Reason: a fixed title collides with itself on a second run now that
+        # create_sourced_event refuses a duplicate title instead of creating
+        # another copy - the tree already carries dozens of same-titled
+        # sources from historical runs before that refusal existed. A
+        # per-run suffix keeps this test creating a source it can find,
+        # regardless of what earlier runs left behind.
+        title = f"Sourced Event Composite Test Register {uuid.uuid4().hex[:8]}"
         result = await create_sourced_event_tool(
             {
-                "source_title": "Sourced Event Composite Test Register",
+                "source_title": title,
                 "citation_page": "Page 7, composite test entry",
                 "event_type": "Birth",
                 "event_date": {
@@ -312,9 +320,7 @@ class TestCreateSourcedEventTool:
 
         text = result[0].text
         assert "Error:" not in text, f"Expected success but got error: {text}"
-        assert "Sourced Event Composite Test Register" in text, (
-            f"Expected source title in output but got: {text}"
-        )
+        assert title in text, f"Expected source title in output but got: {text}"
         assert "Page 7, composite test entry" in text, (
             f"Expected citation page in output but got: {text}"
         )
@@ -344,9 +350,13 @@ class TestCreateSourcedEventTool:
     async def test_create_sourced_event_with_media_path(self, gramps_client, tree_id):
         """media_path on the composite tool attaches to the citation, not
         the event or source."""
+        # Reason: same rerun-collision hazard as the composite-success test
+        # above - a fixed title now collides with historical duplicates
+        # once create_sourced_event refuses a repeat title.
+        title = f"Sourced Event Media Test Register {uuid.uuid4().hex[:8]}"
         result = await create_sourced_event_tool(
             {
-                "source_title": "Sourced Event Media Test Register",
+                "source_title": title,
                 "citation_page": "Page 9, media test entry",
                 "event_type": "Death",
                 "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
@@ -378,6 +388,82 @@ class TestCreateSourcedEventTool:
             f"Expected media attached to citation {citation_handle} but "
             f"media_list was: {citation_data.get('media_list')}"
         )
+
+    @pytest.mark.asyncio
+    async def test_reuses_an_existing_source_by_handle(self, gramps_client, tree_id):
+        """A second fact from the same document shares one source."""
+        first = await create_sourced_event_tool(
+            {
+                "source_title": f"{PREFIX} Reuse Register",
+                "citation_page": "Page 1, birth",
+                "event_type": "Birth",
+            }
+        )
+        first_text = first[0].text
+        assert "Error:" not in first_text, first_text
+        source_handle = _handle_on_line(first_text, "Reuse Register")
+
+        second = await create_sourced_event_tool(
+            {
+                "source_handle": source_handle,
+                "citation_page": "Page 1, death",
+                "event_type": "Death",
+            }
+        )
+        second_text = second[0].text
+        assert "Error:" not in second_text, second_text
+        assert source_handle in second_text, (
+            f"Second call did not attach to the existing source: {second_text}"
+        )
+
+        citation_handle = _handle_on_line(second_text, "Page 1, death")
+        citation_data = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_CITATION,
+            tree_id=tree_id,
+            handle=citation_handle,
+        )
+        assert citation_data.get("source_handle") == source_handle
+
+    @pytest.mark.asyncio
+    async def test_refuses_a_duplicate_source_title(self):
+        """Creating a second source with an existing title is refused, not
+        guessed: two documents can legitimately share a title."""
+        title = f"{PREFIX} Collision Register"
+        first = await create_sourced_event_tool(
+            {
+                "source_title": title,
+                "citation_page": "Page 1",
+                "event_type": "Birth",
+            }
+        )
+        assert "Error:" not in first[0].text, first[0].text
+
+        second = await create_sourced_event_tool(
+            {
+                "source_title": title,
+                "citation_page": "Page 2",
+                "event_type": "Death",
+            }
+        )
+        second_text = second[0].text
+        assert "Error:" in second_text, (
+            f"Expected a refusal on the duplicate title but got: {second_text}"
+        )
+        assert "source_handle" in second_text, (
+            f"The refusal must name the way forward: {second_text}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_refuses_both_source_title_and_source_handle(self):
+        """The two are mutually exclusive."""
+        result = await create_sourced_event_tool(
+            {
+                "source_title": f"{PREFIX} Both Register",
+                "source_handle": "103f77fe86ec4c13f3fac1a420ec",
+                "event_type": "Birth",
+            }
+        )
+        assert "Error:" in result[0].text
 
     @pytest.mark.asyncio
     async def test_create_sourced_event_missing_required_fields(self):

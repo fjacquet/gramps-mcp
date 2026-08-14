@@ -162,6 +162,36 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | N
     return None
 
 
+async def resolve_source_handles_by_title(
+    client, tree_id: str, title: str
+) -> list[str]:
+    """
+    Find the handles of every source carrying exactly this title.
+
+    Args:
+        client: GrampsWebAPIClient instance
+        tree_id: Family tree identifier
+        title: The exact source title to match
+
+    Returns:
+        Handles of matching sources, empty when none match
+    """
+    # Reason: unlike the gramps_id resolve_person_handle interpolates - whose
+    # callers gate it against an anchored ^[A-Z]+[0-9]+$ pattern first - a
+    # source title is free text supplied by the caller. Real titles in this
+    # tree contain quotes, dashes and parentheses. An unescaped quote would
+    # close the GQL string literal and inject filter syntax.
+    escaped = title.replace("\\", "\\\\").replace('"', '\\"')
+    results = await client.make_api_call(
+        api_call=ApiCalls.GET_SOURCES,
+        params={"gql": f'title="{escaped}"', "pagesize": 10},
+        tree_id=tree_id,
+    )
+    if not results or not isinstance(results, list):
+        return []
+    return [item["handle"] for item in results if item.get("handle")]
+
+
 async def resolve_family_handle(client, tree_id: str, gramps_id: str) -> str | None:
     """
     Look up a family's handle by gramps_id via a direct GQL search.
