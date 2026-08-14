@@ -111,7 +111,13 @@ class TestFindAnythingTool:
         "some number no greater than the cap".
         """
         marker = uuid.uuid4().hex[:8]
-        query = f"{PREFIX} {marker}"
+        # Reason: PREFIX is a very high-frequency token in this tree and
+        # Gramps full-text search does not do boolean AND, so a `PREFIX
+        # marker` query can have an unrelated PREFIX record occupy the
+        # single max_results=1 slot below and fail this test spuriously.
+        # Search on the unique marker alone, as the sibling
+        # TestFindAnythingPagination class already does.
+        query = marker
         created = await self._create_marker_people(marker, 2)
 
         try:

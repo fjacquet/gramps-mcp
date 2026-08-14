@@ -56,6 +56,17 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
         client = GrampsWebAPIClient()
         # 1. Source - reuse an existing one, or create after a collision check
         if params.source_handle:
+            # Reason: a stale or mistyped source_handle must be rejected
+            # here, before any write happens. Without this check the tool
+            # uploads media (step 2 below) and creates a citation before
+            # POST_CITATIONS finally rejects the missing source - leaving
+            # an orphaned media record in the tree with nothing pointing
+            # at it. Fail fast instead.
+            await client.make_api_call(
+                api_call=ApiCalls.GET_SOURCE,
+                tree_id=tree_id,
+                handle=params.source_handle,
+            )
             source_handle = params.source_handle
         else:
             # Reason: check_exactly_one_source guarantees source_title is set

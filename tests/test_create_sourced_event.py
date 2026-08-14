@@ -15,7 +15,9 @@ import uuid
 import pytest
 
 from src.gramps_mcp.models.api_calls import ApiCalls
+from src.gramps_mcp.models.parameters.media_params import MediaSearchParams
 from src.gramps_mcp.tools.sourced_event import create_sourced_event_tool
+from tests.conftest import delete_entity
 from tests.constants import PREFIX
 from tests.workflow_helpers import handle_on_line
 
@@ -37,50 +39,71 @@ class TestCreateSourcedEventTool:
         # per-run suffix keeps this test creating a source it can find,
         # regardless of what earlier runs left behind.
         title = f"Sourced Event Composite Test Register {uuid.uuid4().hex[:8]}"
-        result = await create_sourced_event_tool(
-            {
-                "source_title": title,
-                "citation_page": "Page 7, composite test entry",
-                "event_type": "Birth",
-                "event_date": {
-                    "dateval": [3, 4, 1890, False],
-                    "quality": 0,
-                    "modifier": 0,
-                },
-            }
-        )
+        source_handle = citation_handle = event_handle = None
+        try:
+            result = await create_sourced_event_tool(
+                {
+                    "source_title": title,
+                    "citation_page": "Page 7, composite test entry",
+                    "event_type": "Birth",
+                    "event_date": {
+                        "dateval": [3, 4, 1890, False],
+                        "quality": 0,
+                        "modifier": 0,
+                    },
+                }
+            )
 
-        print("\n--- CREATE SOURCED EVENT SUCCESS RESULT ---")
-        print(result[0].text)
-        print("--- END ---\n")
+            print("\n--- CREATE SOURCED EVENT SUCCESS RESULT ---")
+            print(result[0].text)
+            print("--- END ---\n")
 
-        text = result[0].text
-        assert "Error:" not in text, f"Expected success but got error: {text}"
-        assert title in text, f"Expected source title in output but got: {text}"
-        assert "Page 7, composite test entry" in text, (
-            f"Expected citation page in output but got: {text}"
-        )
-        assert "Birth" in text, f"Expected event type in output but got: {text}"
+            text = result[0].text
+            assert "Error:" not in text, f"Expected success but got error: {text}"
+            assert title in text, f"Expected source title in output but got: {text}"
+            assert "Page 7, composite test entry" in text, (
+                f"Expected citation page in output but got: {text}"
+            )
+            assert "Birth" in text, f"Expected event type in output but got: {text}"
 
-        citation_handle = handle_on_line(text, "Page 7, composite test entry")
-        event_handle = handle_on_line(text, "Birth")
+            source_handle = handle_on_line(text, title)
+            citation_handle = handle_on_line(text, "Page 7, composite test entry")
+            event_handle = handle_on_line(text, "Birth")
 
-        # The whole point of this tool: verify the event actually got the
-        # citation attached, not just that the response text claims success.
-        # Reason: the shared gramps_client fixture is used rather than a
-        # throwaway client - GrampsWebAPIClient.close() tears down the
-        # AuthManager singleton's httpx client, which every other test shares.
-        event_data = await gramps_client.make_api_call(
-            api_call=ApiCalls.GET_EVENT,
-            tree_id=tree_id,
-            handle=event_handle,
-        )
+            # The whole point of this tool: verify the event actually got the
+            # citation attached, not just that the response text claims success.
+            # Reason: the shared gramps_client fixture is used rather than a
+            # throwaway client - GrampsWebAPIClient.close() tears down the
+            # AuthManager singleton's httpx client, which every other test shares.
+            event_data = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_EVENT,
+                tree_id=tree_id,
+                handle=event_handle,
+            )
 
-        assert citation_handle in event_data.get("citation_list", []), (
-            f"Expected citation {citation_handle} attached to event "
-            f"{event_handle} but citation_list was: "
-            f"{event_data.get('citation_list')}"
-        )
+            assert citation_handle in event_data.get("citation_list", []), (
+                f"Expected citation {citation_handle} attached to event "
+                f"{event_handle} but citation_list was: "
+                f"{event_data.get('citation_list')}"
+            )
+        finally:
+            # Reason: delete in dependency order (event, then citation, then
+            # source) so each delete targets a record nothing else still
+            # references. delete_entity swallows individual failures so a
+            # cleanup hiccup cannot flip this passing test to failing - see
+            # the 48-source leak this fixes (#21 CodeRabbit review).
+            if event_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_EVENT, event_handle
+                )
+            if citation_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_CITATION, citation_handle
+                )
+            if source_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_SOURCE, source_handle
+                )
 
     @pytest.mark.asyncio
     async def test_create_sourced_event_with_media_path(self, gramps_client, tree_id):
@@ -90,48 +113,70 @@ class TestCreateSourcedEventTool:
         # above - a fixed title now collides with historical duplicates
         # once create_sourced_event refuses a repeat title.
         title = f"Sourced Event Media Test Register {uuid.uuid4().hex[:8]}"
-        result = await create_sourced_event_tool(
-            {
-                "source_title": title,
-                "citation_page": "Page 9, media test entry",
-                "event_type": "Death",
-                "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
-            }
-        )
+        source_handle = citation_handle = event_handle = media_handle = None
+        try:
+            result = await create_sourced_event_tool(
+                {
+                    "source_title": title,
+                    "citation_page": "Page 9, media test entry",
+                    "event_type": "Death",
+                    "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
+                }
+            )
 
-        print("\n--- CREATE SOURCED EVENT WITH MEDIA_PATH RESULT ---")
-        print(result[0].text)
-        print("--- END ---\n")
+            print("\n--- CREATE SOURCED EVENT WITH MEDIA_PATH RESULT ---")
+            print(result[0].text)
+            print("--- END ---\n")
 
-        text = result[0].text
-        assert "Error:" not in text, f"Expected success but got error: {text}"
-        assert "media_path" not in text, (
-            f"media_path must not leak into the response but got: {text}"
-        )
+            text = result[0].text
+            assert "Error:" not in text, f"Expected success but got error: {text}"
+            assert "media_path" not in text, (
+                f"media_path must not leak into the response but got: {text}"
+            )
 
-        citation_handle = handle_on_line(text, "Page 9, media test entry")
+            source_handle = handle_on_line(text, title)
+            citation_handle = handle_on_line(text, "Page 9, media test entry")
+            event_handle = handle_on_line(text, "Death")
 
-        citation_data = await gramps_client.make_api_call(
-            api_call=ApiCalls.GET_CITATION,
-            tree_id=tree_id,
-            handle=citation_handle,
-        )
+            citation_data = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_CITATION,
+                tree_id=tree_id,
+                handle=citation_handle,
+            )
 
-        media_refs = citation_data.get("media_list") or []
-        assert media_refs, (
-            f"Expected media attached to citation {citation_handle} but "
-            f"media_list was: {media_refs}"
-        )
-        media_data = await gramps_client.make_api_call(
-            api_call=ApiCalls.GET_MEDIA_ITEM,
-            tree_id=tree_id,
-            handle=media_refs[-1]["ref"],
-        )
-        # Guards the raw-handle regression: this line used to print
-        # media_info["handle"] rather than its gramps_id.
-        assert f"Attached media: {media_data['gramps_id']}" in text, (
-            f"Expected the uploaded media's gramps_id in: {text}"
-        )
+            media_refs = citation_data.get("media_list") or []
+            assert media_refs, (
+                f"Expected media attached to citation {citation_handle} but "
+                f"media_list was: {media_refs}"
+            )
+            media_handle = media_refs[-1]["ref"]
+            media_data = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_MEDIA_ITEM,
+                tree_id=tree_id,
+                handle=media_handle,
+            )
+            # Guards the raw-handle regression: this line used to print
+            # media_info["handle"] rather than its gramps_id.
+            assert f"Attached media: {media_data['gramps_id']}" in text, (
+                f"Expected the uploaded media's gramps_id in: {text}"
+            )
+        finally:
+            if event_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_EVENT, event_handle
+                )
+            if citation_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_CITATION, citation_handle
+                )
+            if media_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_MEDIA_ITEM, media_handle
+                )
+            if source_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_SOURCE, source_handle
+                )
 
     @pytest.mark.asyncio
     async def test_reuses_an_existing_source_by_handle(self, gramps_client, tree_id):
@@ -144,40 +189,62 @@ class TestCreateSourcedEventTool:
         # leftovers findable for manual cleanup. Do not "simplify" this back
         # to a fixed string.
         title = f"{PREFIX} Reuse Register {uuid.uuid4().hex[:8]}"
-        first = await create_sourced_event_tool(
-            {
-                "source_title": title,
-                "citation_page": "Page 1, birth",
-                "event_type": "Birth",
-            }
-        )
-        first_text = first[0].text
-        assert "Error:" not in first_text, first_text
-        source_handle = handle_on_line(first_text, "Reuse Register")
+        source_handle = None
+        first_citation_handle = first_event_handle = None
+        second_citation_handle = second_event_handle = None
+        try:
+            first = await create_sourced_event_tool(
+                {
+                    "source_title": title,
+                    "citation_page": "Page 1, birth",
+                    "event_type": "Birth",
+                }
+            )
+            first_text = first[0].text
+            assert "Error:" not in first_text, first_text
+            source_handle = handle_on_line(first_text, "Reuse Register")
+            first_citation_handle = handle_on_line(first_text, "Page 1, birth")
+            first_event_handle = handle_on_line(first_text, "Birth")
 
-        second = await create_sourced_event_tool(
-            {
-                "source_handle": source_handle,
-                "citation_page": "Page 1, death",
-                "event_type": "Death",
-            }
-        )
-        second_text = second[0].text
-        assert "Error:" not in second_text, second_text
-        assert source_handle in second_text, (
-            f"Second call did not attach to the existing source: {second_text}"
-        )
+            second = await create_sourced_event_tool(
+                {
+                    "source_handle": source_handle,
+                    "citation_page": "Page 1, death",
+                    "event_type": "Death",
+                }
+            )
+            second_text = second[0].text
+            assert "Error:" not in second_text, second_text
+            assert source_handle in second_text, (
+                f"Second call did not attach to the existing source: {second_text}"
+            )
 
-        citation_handle = handle_on_line(second_text, "Page 1, death")
-        citation_data = await gramps_client.make_api_call(
-            api_call=ApiCalls.GET_CITATION,
-            tree_id=tree_id,
-            handle=citation_handle,
-        )
-        assert citation_data.get("source_handle") == source_handle
+            second_citation_handle = handle_on_line(second_text, "Page 1, death")
+            second_event_handle = handle_on_line(second_text, "Death")
+            citation_data = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_CITATION,
+                tree_id=tree_id,
+                handle=second_citation_handle,
+            )
+            assert citation_data.get("source_handle") == source_handle
+        finally:
+            for handle in (first_event_handle, second_event_handle):
+                if handle:
+                    await delete_entity(
+                        gramps_client, tree_id, ApiCalls.DELETE_EVENT, handle
+                    )
+            for handle in (first_citation_handle, second_citation_handle):
+                if handle:
+                    await delete_entity(
+                        gramps_client, tree_id, ApiCalls.DELETE_CITATION, handle
+                    )
+            if source_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_SOURCE, source_handle
+                )
 
     @pytest.mark.asyncio
-    async def test_refuses_a_duplicate_source_title(self):
+    async def test_refuses_a_duplicate_source_title(self, gramps_client, tree_id):
         """Creating a second source with an existing title is refused, not
         guessed: two documents can legitimately share a title."""
         # Reason: the uuid suffix makes this run's title distinct from any
@@ -187,29 +254,51 @@ class TestCreateSourcedEventTool:
         # revert to a fixed string; that would make this test collide with
         # itself on rerun instead of testing the collision it names.
         title = f"{PREFIX} Collision Register {uuid.uuid4().hex[:8]}"
-        first = await create_sourced_event_tool(
-            {
-                "source_title": title,
-                "citation_page": "Page 1",
-                "event_type": "Birth",
-            }
-        )
-        assert "Error:" not in first[0].text, first[0].text
+        source_handle = citation_handle = event_handle = None
+        try:
+            first = await create_sourced_event_tool(
+                {
+                    "source_title": title,
+                    "citation_page": "Page 1",
+                    "event_type": "Birth",
+                }
+            )
+            first_text = first[0].text
+            assert "Error:" not in first_text, first_text
+            source_handle = handle_on_line(first_text, "Collision Register")
+            citation_handle = handle_on_line(first_text, "Page 1")
+            event_handle = handle_on_line(first_text, "Birth")
 
-        second = await create_sourced_event_tool(
-            {
-                "source_title": title,
-                "citation_page": "Page 2",
-                "event_type": "Death",
-            }
-        )
-        second_text = second[0].text
-        assert "Error:" in second_text, (
-            f"Expected a refusal on the duplicate title but got: {second_text}"
-        )
-        assert "source_handle" in second_text, (
-            f"The refusal must name the way forward: {second_text}"
-        )
+            second = await create_sourced_event_tool(
+                {
+                    "source_title": title,
+                    "citation_page": "Page 2",
+                    "event_type": "Death",
+                }
+            )
+            second_text = second[0].text
+            assert "Error:" in second_text, (
+                f"Expected a refusal on the duplicate title but got: {second_text}"
+            )
+            assert "source_handle" in second_text, (
+                f"The refusal must name the way forward: {second_text}"
+            )
+        finally:
+            # Reason: only the first call created anything - the second is
+            # refused before any write, so there is nothing of its own to
+            # clean up.
+            if event_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_EVENT, event_handle
+                )
+            if citation_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_CITATION, citation_handle
+                )
+            if source_handle:
+                await delete_entity(
+                    gramps_client, tree_id, ApiCalls.DELETE_SOURCE, source_handle
+                )
 
     @pytest.mark.asyncio
     async def test_refuses_both_source_title_and_source_handle(self):
@@ -229,6 +318,51 @@ class TestCreateSourcedEventTool:
         assert "Error:" in text
         assert "supply exactly one of source_title or source_handle" in text, (
             f"Expected the mutual-exclusivity validator's own wording, got: {text}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_refuses_a_nonexistent_source_handle_before_uploading_media(
+        self, gramps_client, tree_id
+    ):
+        """A stale/wrong source_handle must be rejected before media_path is
+        uploaded - otherwise the upload happens first and POST_CITATIONS'
+        later rejection of the missing source leaves an orphaned media
+        record in the tree with nothing pointing at it."""
+        media_params = MediaSearchParams(pagesize=1)
+        _before_body, before_headers = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_MEDIA,
+            params=media_params,
+            tree_id=tree_id,
+            with_headers=True,
+        )
+        media_count_before = int(before_headers.get("x-total-count", 0))
+
+        result = await create_sourced_event_tool(
+            {
+                "source_handle": "0000000000000000000000000",
+                "citation_page": "Page 1, orphan media guard",
+                "event_type": "Birth",
+                "media_path": "tests/sample/33SQ-GP8N-NLK.jpg",
+            }
+        )
+
+        text = result[0].text
+        assert "Error:" in text, (
+            f"Expected the nonexistent source_handle to be rejected, got: {text}"
+        )
+
+        _after_body, after_headers = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_MEDIA,
+            params=media_params,
+            tree_id=tree_id,
+            with_headers=True,
+        )
+        media_count_after = int(after_headers.get("x-total-count", 0))
+
+        assert media_count_after == media_count_before, (
+            "Expected no media record to be created when source_handle "
+            f"validation fails, but count went from {media_count_before} "
+            f"to {media_count_after}"
         )
 
     @pytest.mark.asyncio

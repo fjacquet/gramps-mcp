@@ -17,6 +17,9 @@ from typing import Any
 
 import pytest
 
+from src.gramps_mcp.client import GrampsWebAPIClient
+from src.gramps_mcp.config import get_settings
+from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.data_management import (
     create_citation_tool,
     create_event_tool,
@@ -25,7 +28,6 @@ from src.gramps_mcp.tools.data_management import (
     create_source_tool,
 )
 from src.gramps_mcp.tools.search_basic import (
-    find_family_tool,
     find_type_tool,
 )
 from tests.workflow_helpers import (
@@ -132,24 +134,15 @@ class TestCompleteWorkflow:
     async def _step_1_repository_creation(self, workflow_data: dict[str, Any]):
         """Step 1: Repository Creation following usage guide."""
 
-        # First: Use an exact GQL lookup to search for an existing
-        # repository. `find_repository_tool`'s `RepositoriesParams` has no
-        # `query` field, so the free-text `query` this step used to pass
-        # was silently dropped by Pydantic's default extra="ignore", and
-        # the search returned an unfiltered page of repositories - same
-        # root cause as the source, citation, event, person and place
-        # lookups elsewhere in this branch. It went unnoticed here longer
-        # than at those sites only because "St. Mary's Catholic Church,
-        # Boston" (created as R0000) sorts first among the tree's
-        # repositories today; delete R0000 or add one that sorts ahead of
-        # it and this would silently bind the source's `reporef_list` to
-        # the wrong repository.
+        # First: exact GQL lookup. `RepositoriesParams` has no `query`
+        # field, so a free-text `query` here is silently dropped and the
+        # search returns an unfiltered page - same root cause as the other
+        # lookups in this branch.
         #
-        # Reason: "St. Mary's Catholic Church, Boston" carries an
-        # apostrophe and is safe to interpolate only because it is a fixed
-        # test literal in a double-quoted GQL string, not caller-supplied
-        # free text - free text would need the escaping helper in
-        # `src/gramps_mcp/utils.py`.
+        # Reason: the apostrophe in "St. Mary's Catholic Church, Boston"
+        # is safe to interpolate only because it is a fixed test literal in
+        # a double-quoted GQL string, not caller-supplied free text - that
+        # would need the escaping helper in `src/gramps_mcp/utils.py`.
         find_result = await find_type_tool(
             {
                 "type": "repository",
@@ -203,17 +196,11 @@ class TestCompleteWorkflow:
     async def _step_2_source_creation(self, workflow_data: dict[str, Any]):
         """Step 2: Source Document Creation following usage guide."""
 
-        # First: Use an exact GQL lookup to search for an existing source
-        # document. `find_source_tool`'s `SourceSearchParams` has no `query`
-        # field, so the free-text `query` this step used to pass was
-        # silently dropped by Pydantic's default extra="ignore" - the search
-        # returned an unfiltered page of sources, "Marriage Register" almost
-        # never landed in the first 5, and a duplicate source got created on
-        # every run (confirmed live: 38 duplicate "Marriage Register
-        # 1875-1880" sources in the tree before this fix). Same root cause
-        # as the event step below and the person lookup in
-        # create_or_find_person_with_attributes - an exact GQL match on the
-        # title sidesteps it entirely.
+        # First: exact GQL lookup. `SourceSearchParams` has no `query`
+        # field, so a free-text `query` here is silently dropped and the
+        # unfiltered page rarely surfaces "Marriage Register" in the first
+        # 5 - confirmed live: 38 duplicate sources before this fix. Same
+        # root cause as the event step below.
         find_result = await find_type_tool(
             {
                 "type": "source",
@@ -287,6 +274,19 @@ class TestCompleteWorkflow:
             if handle_match:
                 existing_handle = handle_match.group(1)
 
+        # Many duplicate citations share this page text across historical
+        # runs; the GQL match can return one from a different run. Verify
+        # source_handle matches step 2's source before reusing it - a
+        # coherent chain, not two records that merely share page text.
+        if existing_handle:
+            client = GrampsWebAPIClient()
+            tree_id = get_settings().gramps_tree_id
+            citation_data = await client.make_api_call(
+                api_call=ApiCalls.GET_CITATION, tree_id=tree_id, handle=existing_handle
+            )
+            if citation_data.get("source_handle") != workflow_data["source_handle"]:
+                existing_handle = None
+
         if existing_handle:
             # Use existing citation
             workflow_data["citation_handle"] = existing_handle
@@ -344,29 +344,17 @@ class TestCompleteWorkflow:
         # Create place hierarchy first (if event has place)
         await create_place_hierarchy(workflow_data)
 
-        # First: Use an exact GQL lookup to search for the existing marriage
-        # event. `find_event_tool`'s `EventSearchParams` has no `query`
-        # field, so the free-text `query` this step used to pass was
-        # silently dropped and the search returned an unfiltered page that
-        # almost never contained this event - confirmed live: 37 duplicate
-        # marriage events with this exact description already in the tree,
-        # E1331..E1413. A fresh event on every run is what pushed
-        # `event_ref_list` on the found person unbounded (eleven groom
-        # references on one person, see #16 and the plan's task 9 brief):
-        # each new event handle got appended to the list on the update path,
-        # and `merge.py` merges list fields on PUT rather than replacing
-        # them (deliberate, for real edits) rather than deduplicating them.
-        # Finding the existing event, instead of changing merge semantics,
-        # is the fix - the reference appended on each rerun is then the one
-        # already there.
+        # First: exact GQL lookup. `EventSearchParams` has no `query`
+        # field, so a free-text `query` here is silently dropped and the
+        # unfiltered page almost never contained this event - confirmed
+        # live: 37 duplicate marriage events (E1331..E1413), which is what
+        # pushed the found person's `event_ref_list` unbounded on rerun
+        # (see #16). Finding the existing event fixes it.
         #
-        # Reason: the interpolated value below carries an apostrophe
-        # ("O'Sullivan") and is safe here only because it is a fixed test
-        # literal inside a double-quoted GQL string, not caller-controlled
-        # free text. A value that could contain a double quote would need
-        # the escaping helper in `src/gramps_mcp/utils.py` - that is the
-        # part of this pattern that breaks if copied to interpolate
-        # untrusted input.
+        # Reason: the "O'Sullivan" apostrophe below is safe to interpolate
+        # only because it is a fixed test literal in a double-quoted GQL
+        # string, not caller-controlled free text - that would need the
+        # escaping helper in `src/gramps_mcp/utils.py`.
         find_result = await find_type_tool(
             {
                 "type": "event",
@@ -387,6 +375,19 @@ class TestCompleteWorkflow:
             handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
             if handle_match:
                 existing_handle = handle_match.group(1)
+
+        # Same cross-run mixing hazard as the citation step: verify the
+        # candidate carries this run's citation before reusing it.
+        if existing_handle:
+            client = GrampsWebAPIClient()
+            tree_id = get_settings().gramps_tree_id
+            event_data = await client.make_api_call(
+                api_call=ApiCalls.GET_EVENT, tree_id=tree_id, handle=existing_handle
+            )
+            if workflow_data["citation_handle"] not in (
+                event_data.get("citation_list") or []
+            ):
+                existing_handle = None
 
         if existing_handle:
             # Use existing event
@@ -435,9 +436,27 @@ class TestCompleteWorkflow:
     async def _step_6_family_creation(self, workflow_data: dict[str, Any]):
         """Step 6: Family Unit Creation following usage guide."""
 
-        # First: Use find_family to search for existing family
-        find_result = await find_family_tool(
-            {"query": "John Smith Mary Jones", "pagesize": 5}
+        # `find_family_tool`'s params have no `query` field either, so the
+        # free-text `query` this step used to pass was silently dropped and
+        # the search always "found" an unrelated family (confirmed live:
+        # F0308), taking the found path without ever creating or
+        # validating this test's own family. Match on the two handles this
+        # step already holds instead - same fix as the other lookups in
+        # this branch.
+        #
+        # Reason: father_handle/mother_handle are hex handles, not
+        # caller-controlled free text, so no escaping question arises, and
+        # a match is exact by construction - nothing to disambiguate.
+        find_result = await find_type_tool(
+            {
+                "type": "family",
+                "gql": (
+                    "class = family and father_handle = "
+                    f'"{workflow_data["john_handle"]}" and mother_handle = '
+                    f'"{workflow_data["mary_handle"]}"'
+                ),
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
