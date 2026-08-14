@@ -20,7 +20,7 @@ Markdown rendering for breadth-first traversal results.
 No I/O: everything here operates on an in-memory TraversalResult.
 """
 
-from ..traversal import VISIT_CAP, TraversalResult
+from ..traversal import TraversalResult
 
 INDENT = "  "
 
@@ -122,7 +122,7 @@ def format_traversal(result: TraversalResult, direction: str) -> str:
     text = header + "\n\n" + "\n".join(lines) + "\n"
     if result.truncated_by_cap:
         text += (
-            f"\n**Truncated**: visit cap of {VISIT_CAP} reached, "
+            f"\n**Truncated**: visit cap of {result.visit_cap} reached, "
             f"{result.unexplored} branches unexplored. Lower max_generations "
             "or start from a nearer ancestor.\n"
         )
