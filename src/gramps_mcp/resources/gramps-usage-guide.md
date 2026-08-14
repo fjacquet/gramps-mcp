@@ -429,9 +429,20 @@ matters, look for a death event and source it.
 
 - `gramps_id` is **required** and is the only accepted identifier - these two
   tools do not take a handle.
-- `max_generations` defaults to 5 and is passed straight through. **No cap is
-  enforced.** A large value on a well-populated tree will overflow the context
-  window. Do not raise it above 5 without the user asking for more generations.
+- `max_generations` defaults to 5 and the parameter model declares a 1-20
+  bound; that bound is enforced when a client validates arguments against the
+  schema (for example over HTTP), but the stdio transport passes arguments
+  straight through without Pydantic validation, so it is advisory there. In
+  every case the walk also stops after 500 people - the output says so when
+  it happens, with an unexplored-branch count.
+- Output is an indented markdown tree, one line per person, depth-first: each
+  line carries the person's name, `gramps_id`, and birth/death dates when
+  known, for example `- JACQUET, Yvan (I0042), b. 1948 Lyon, d. 2011`. A
+  person reached a second time by a different path is listed again with
+  `[already listed above]` instead of being repeated in full. A person the
+  walk could not fetch shows as `[unavailable: <reason>]`.
+- Still start small: a large `max_generations` on a well-populated tree can
+  overflow the context window well before it hits either cap.
 
 ### `recent_changes` - what was modified lately
 

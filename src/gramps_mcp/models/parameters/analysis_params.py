@@ -30,9 +30,11 @@ class DescendantsParams(BaseModel):
     gramps_id: str = Field(..., description="Person ID")
     max_generations: int | None = Field(
         5,
+        ge=1,
+        le=20,
         description=(
-            "Max generations to retrieve (default: 5, use higher values "
-            "carefully as they can overflow context)"
+            "Max generations to retrieve (default: 5, max: 20). The walk "
+            "also stops after 500 people and says so in its output."
         ),
     )
 
@@ -41,9 +43,11 @@ class AncestorsParams(BaseModel):
     gramps_id: str = Field(..., description="Person ID")
     max_generations: int | None = Field(
         5,
+        ge=1,
+        le=20,
         description=(
-            "Max generations to retrieve (default: 5, use higher values "
-            "carefully as they can overflow context)"
+            "Max generations to retrieve (default: 5, max: 20). The walk "
+            "also stops after 500 people and says so in its output."
         ),
     )
 
