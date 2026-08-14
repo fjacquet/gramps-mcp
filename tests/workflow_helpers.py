@@ -20,7 +20,12 @@ from src.gramps_mcp.tools.data_management import (
     create_person_tool,
     create_place_tool,
 )
-from src.gramps_mcp.tools.search_basic import find_person_tool, find_place_tool
+from src.gramps_mcp.tools.search_basic import (
+    find_anything_tool,
+    find_person_tool,
+    find_place_tool,
+)
+from tests.constants import PREFIX
 
 
 def extract_handle(create_result: Any) -> str:
@@ -218,4 +223,155 @@ async def create_or_find_person(
             }
         )
 
+        return extract_handle(create_result)
+
+
+async def create_or_find_person_with_attributes(
+    given_name: str,
+    surname: str,
+    gender: int,
+    birth_year: str,
+    context: str,
+    event_handle: str,
+    event_role: str,
+) -> str:
+    """
+    Create or find a person with complete attributes following the workflow guidelines.
+
+    The person's first name carries `PREFIX` (`tests/constants.py`), the same
+    marker `tests/conftest.py` uses. Two things depend on that: it keeps this
+    test's people out of `find_anything_tool`'s way of unrelated same-named
+    records left by other tests (there are unprefixed "John Smith" people in
+    the live tree from a different workflow test), and it is what makes a
+    leftover from a killed run findable by a prefix scan - see #16.
+
+    `find_person_tool` is not used here even though it looks like the
+    natural search step: it is not MCP-exposed (only `find_type` and
+    `find_anything` are, per `TOOL_REGISTRY` in `server.py`), and in the one
+    real caller that does reach it (`find_type_tool`) it is always given
+    `gql`, never `query`. Its `query` parameter is a latent trap - accepted
+    and silently ignored, because `BaseGetMultipleParams` never declares a
+    `query` field - not a live defect, since nothing in production ever
+    calls it that way. `find_anything_tool` is the tool that actually
+    supports free-text `query` (see #18 for the full writeup).
+
+    Args:
+        given_name: Person's first name
+        surname: Person's last name
+        gender: 0=Female, 1=Male, 2=Unknown
+        birth_year: Estimated birth year for search
+        context: Geographic context for search
+        event_handle: Handle of event to link to person
+        event_role: Role of person in the event (groom, bride, witness, etc.)
+
+    Returns:
+        Person handle
+    """
+    prefixed_first_name = f"{PREFIX} {given_name}"
+    full_name = f"{prefixed_first_name} {surname}"
+
+    # Create note and media for person
+    person_note_handle = await create_test_note(
+        f"Genealogy research note for {full_name}. Found in marriage records from St. Mary's Church, Boston.",
+        "Research",
+    )
+
+    person_media_handle = await create_test_media(
+        "tests/sample/33SQ-GP8N-NLK.jpg",
+        f"Portrait of {full_name}",
+        {"year": int(birth_year) + 25, "type": "about", "quality": "estimated"},
+    )
+
+    # First: Use find_anything to search for an existing, prefixed person.
+    # find_anything mixes person, family, note, media and citation records
+    # in one result set, so pick a handle only off a line that actually
+    # looks like a person entry - "Name (M) - I0123 - [handle]" at the start
+    # of a line, produced by format_person. A family line ("Father: Name
+    # (M) - I0123 | Mother: ... - F0456 - [handle]") or a note/media title
+    # that happens to mention the name would otherwise hand back the wrong
+    # kind of handle.
+    find_result = await find_anything_tool({"query": full_name})
+
+    assert isinstance(find_result, list) and len(find_result) == 1
+    result_text = find_result[0].text
+
+    person_line_pattern = re.compile(
+        rf"^{re.escape(full_name)} \([MFU]\) - I\d+ - \[([a-f0-9]+)\]",
+        re.MULTILINE,
+    )
+    existing_handle = None
+    if "No records found" not in result_text:
+        person_match = person_line_pattern.search(result_text)
+        if person_match:
+            # In real usage, we would ask user to confirm identity
+            # For this test, we assume it's a match
+            existing_handle = person_match.group(1)
+
+    if existing_handle:
+        # Update existing person with event link
+        update_result = await create_person_tool(
+            {
+                "handle": existing_handle,
+                # primary_name and gender are required on PersonData, so a
+                # partial update must resupply them. The old call passed
+                # only handle plus two undeclared keys, which left the
+                # model missing both required fields - it raised, the tool
+                # swallowed it into an "Error:" string, and nothing
+                # asserted on the result.
+                "primary_name": {
+                    "first_name": prefixed_first_name,
+                    "surname_list": [{"surname": surname}],
+                },
+                "gender": gender,
+                "event_ref_list": [{"ref": event_handle, "role": event_role}],
+            }
+        )
+        update_text = update_result[0].text
+        assert "Error:" not in update_text, (
+            f"create_person_tool update failed: {update_text}"
+        )
+        assert "Events:" in update_text, (
+            f"Marriage event was not linked on update: {update_text}"
+        )
+        return existing_handle
+    else:
+        # Create new person with complete attributes
+        create_result = await create_person_tool(
+            {
+                "primary_name": {
+                    "first_name": prefixed_first_name,
+                    "surname_list": [{"surname": surname}],
+                },
+                "gender": gender,
+                "note_list": [person_note_handle],
+                "media_list": [{"ref": person_media_handle}],
+                "urls": [
+                    {
+                        "type": "Website",
+                        "path": (
+                            "https://findagrave.com/memorial/"
+                            f"{given_name.lower()}-{surname.lower()}"
+                        ),
+                        "description": f"Find A Grave memorial for {full_name}",
+                    }
+                ],
+                "event_ref_list": [{"ref": event_handle, "role": event_role}],
+            }
+        )
+
+        create_text = create_result[0].text
+        assert "Error:" not in create_text, f"create_person_tool failed: {create_text}"
+        # The five keys this test used to pass were silently dropped by
+        # Pydantic, so it went green while linking nothing. Assert the
+        # links, not just the handle.
+        assert full_name in create_text, (
+            f"Person was created without a name: {create_text}"
+        )
+        assert "Attached notes:" in create_text, (
+            f"Research note was not linked: {create_text}"
+        )
+        assert "Attached media:" in create_text, (
+            f"Portrait was not linked: {create_text}"
+        )
+        assert "Events:" in create_text, f"Marriage event was not linked: {create_text}"
         return extract_handle(create_result)

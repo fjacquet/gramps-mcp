@@ -21,7 +21,6 @@ from src.gramps_mcp.tools.data_management import (
     create_citation_tool,
     create_event_tool,
     create_family_tool,
-    create_person_tool,
     create_repository_tool,
     create_source_tool,
 )
@@ -29,11 +28,11 @@ from src.gramps_mcp.tools.search_basic import (
     find_citation_tool,
     find_event_tool,
     find_family_tool,
-    find_person_tool,
     find_repository_tool,
     find_source_tool,
 )
 from tests.workflow_helpers import (
+    create_or_find_person_with_attributes,
     create_place_hierarchy,
     create_test_media,
     create_test_note,
@@ -333,13 +332,13 @@ class TestCompleteWorkflow:
         """Step 5: Person Creation and Event Linking following usage guide."""
 
         # Create/Find John Smith (groom) with complete attributes
-        john_handle = await self._create_or_find_person_with_attributes(
+        john_handle = await create_or_find_person_with_attributes(
             "John", "Smith", 1, "1850", "Boston", workflow_data["event_handle"], "groom"
         )
         workflow_data["john_handle"] = john_handle
 
         # Create/Find Mary Jones (bride) with complete attributes
-        mary_handle = await self._create_or_find_person_with_attributes(
+        mary_handle = await create_or_find_person_with_attributes(
             "Mary", "Jones", 0, "1855", "Boston", workflow_data["event_handle"], "bride"
         )
         workflow_data["mary_handle"] = mary_handle
@@ -379,94 +378,3 @@ class TestCompleteWorkflow:
             handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
             assert handle_match, f"No handle found in: {create_text}"
             workflow_data["family_handle"] = handle_match.group(1)
-
-    async def _create_or_find_person_with_attributes(
-        self,
-        given_name: str,
-        surname: str,
-        gender: int,
-        birth_year: str,
-        context: str,
-        event_handle: str,
-        event_role: str,
-    ) -> str:
-        """
-        Create or find a person with complete attributes following the workflow guidelines.
-
-        Args:
-            given_name: Person's first name
-            surname: Person's last name
-            gender: 0=Female, 1=Male, 2=Unknown
-            birth_year: Estimated birth year for search
-            context: Geographic context for search
-            event_handle: Handle of event to link to person
-            event_role: Role of person in the event (groom, bride, witness, etc.)
-
-        Returns:
-            Person handle
-        """
-        # Create note and media for person
-        person_note_handle = await create_test_note(
-            f"Genealogy research note for {given_name} {surname}. Found in marriage records from St. Mary's Church, Boston.",
-            "Research",
-        )
-
-        person_media_handle = await create_test_media(
-            "tests/sample/33SQ-GP8N-NLK.jpg",
-            f"Portrait of {given_name} {surname}",
-            {"year": int(birth_year) + 25, "type": "about", "quality": "estimated"},
-        )
-
-        # First: Use find_person to search for existing person
-        search_query = f"{given_name} {surname} {birth_year} {context}"
-        find_result = await find_person_tool({"query": search_query, "pagesize": 5})
-
-        assert isinstance(find_result, list) and len(find_result) == 1
-        result_text = find_result[0].text
-
-        # Check for potential matches
-        existing_handle = None
-        if "No people found" not in result_text:
-            if (
-                given_name.lower() in result_text.lower()
-                and surname.lower() in result_text.lower()
-            ):
-                handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-                if handle_match:
-                    # In real usage, we would ask user to confirm identity
-                    # For this test, we assume it's a match
-                    existing_handle = handle_match.group(1)
-
-        if existing_handle:
-            # Update existing person with event link
-            await create_person_tool(
-                {
-                    "handle": existing_handle,
-                    "event_handle": event_handle,
-                    "event_role": event_role,
-                }
-            )
-            return existing_handle
-        else:
-            # Create new person with complete attributes
-            create_result = await create_person_tool(
-                {
-                    "primary_name": {"given_name": given_name, "surname": surname},
-                    "gender": gender,
-                    "note_handle": person_note_handle,
-                    "media_handle": person_media_handle,
-                    "url": {
-                        "type": "Website",
-                        "path": f"https://findagrave.com/memorial/{given_name.lower()}-{surname.lower()}",
-                        "description": f"Find A Grave memorial for {given_name} {surname}",
-                    },
-                    "event_handle": event_handle,
-                    "event_role": event_role,
-                }
-            )
-
-            assert isinstance(create_result, list) and len(create_result) == 1
-            create_text = create_result[0].text
-            handle_match = re.search(r"\[([a-f0-9]+)\]", create_text)
-            assert handle_match, f"No handle found in: {create_text}"
-            return handle_match.group(1)
