@@ -98,6 +98,7 @@ class TestParameterAlignment:
             "reporef_list",
             "author",
             "pubinfo",
+            "abbrev",
             "media_path",
         }
         system_fields = {

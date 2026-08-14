@@ -12,6 +12,7 @@ import re
 
 import pytest
 
+from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.data_management import (
     create_citation_tool,
     create_repository_tool,
@@ -160,6 +161,38 @@ class TestCreateSourceTool:
             f"Expected inline-uploaded media to be attached but got: {text}"
         )
 
+    @pytest.mark.asyncio
+    async def test_create_source_with_abbrev(
+        self, gramps_client, tree_id, repository_handle
+    ):
+        """abbrev survives a round trip through POST /sources.
+
+        The shipped usage guide (gramps-usage-guide.md:186) offers abbrev on
+        source creation. This test decides whether the guide is true: if the
+        value comes back, the field belongs on SourceSaveParams; if it does
+        not, the guide is wrong and the mention has to go.
+        """
+        result = await create_source_tool(
+            {
+                "title": f"{PREFIX} Abbrev Round Trip",
+                "reporef_list": [{"ref": repository_handle}],
+                "abbrev": "ARR",
+            }
+        )
+
+        text = result[0].text
+        assert "Error:" not in text, f"Expected success but got error: {text}"
+
+        source_handle = _handle_on_line(text, "Abbrev Round Trip")
+        source_data = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_SOURCE,
+            tree_id=tree_id,
+            handle=source_handle,
+        )
+        assert source_data.get("abbrev") == "ARR", (
+            f"POST /sources did not store abbrev; got {source_data.get('abbrev')!r}"
+        )
+
 
 class TestCreateCitationTool:
     """Test create_citation_tool functionality - Fifth in workflow."""
@@ -260,8 +293,6 @@ class TestCreateSourcedEventTool:
         """Source, citation, and event are created in one call, with the
         citation auto-wired onto the event - the exact chain that used to
         require three separate calls and a copy-pasted handle."""
-        from src.gramps_mcp.models.api_calls import ApiCalls
-
         result = await create_sourced_event_tool(
             {
                 "source_title": "Sourced Event Composite Test Register",
@@ -313,8 +344,6 @@ class TestCreateSourcedEventTool:
     async def test_create_sourced_event_with_media_path(self, gramps_client, tree_id):
         """media_path on the composite tool attaches to the citation, not
         the event or source."""
-        from src.gramps_mcp.models.api_calls import ApiCalls
-
         result = await create_sourced_event_tool(
             {
                 "source_title": "Sourced Event Media Test Register",
