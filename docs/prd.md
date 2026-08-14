@@ -92,7 +92,9 @@ other list on the record keeps the union behaviour. `detach_reference` cannot
 reach every list the read side exposes - the write models were built for
 creation, not full GET parity, so combinations like `media_list` on an event
 or `person_ref_list` on a person are refused rather than silently doing
-nothing.
+nothing. The per-type reachable set is listed in the usage guide's
+Destructive Operations section and pinned against the models by
+`tests/test_alignment_destructive.py`.
 
 **It can delete and merge records, one at a time.** `delete_type` deletes a
 single record by handle or `gramps_id` and refuses while other records still
@@ -164,8 +166,6 @@ These are specific, current and unfixed.
   the shared 401 refresh-and-retry nor the connection and timeout wrapping every
   other call gets. A media upload that hits an expired token fails instead of
   retrying, and a network failure surfaces as a raw httpx exception.
-- `SourceSaveParams` declares no field for a source abbreviation, though the
-  usage guide lists one among a source's attributes. No tool call can set it.
 - `tests/test_workflow_marriage.py`, in the person-creation helper around lines
   444 and 454, passes `event_handle`, `event_role`, `note_handle`,
   `media_handle` and `url` to `create_person_tool`. `PersonData` declares

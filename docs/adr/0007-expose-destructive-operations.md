@@ -95,15 +95,25 @@ loss ADR 0003 was written to prevent.
 
 **`detach_reference` cannot reach every list the read side exposes**,
 because the write models were built for creation, not for full parity with
-GET. `EventSaveParams` declares no `media_list`, `attribute_list` or
-`tag_list`; `PersonData` declares no `person_ref_list` or `lds_ord_list`;
-`MediaSaveParams` declares no `attribute_list` or `tag_list`; `NoteSaveParams`
-and `TagSaveParams` declare no list fields at all; `CitationData` and
-`RepositoryData` declare none either. Calling `detach_reference` against one
-of these combinations is refused loudly, with the reason named, rather than
-appearing to succeed while touching nothing. Closing this gap means adding
-fields to write models that were deliberately kept minimal; it is not done
-here.
+GET. The gap is narrower than it looks: `PersonData`, `CitationData`,
+`RepositoryData` and `SourceSaveParams` all inherit `BaseDataModel`, which
+declares `note_list`, `media_list`, `attribute_list` and `tag_list`, so the
+common cleanup cases (detaching a note, a media reference or a tag) work on
+those four types. What is genuinely unreachable: `EventSaveParams` declares
+no `media_list`, `attribute_list` or `tag_list`; `MediaSaveParams` declares
+no `attribute_list` or `tag_list`; `FamilySaveParams` declares no
+`tag_list`, `attribute_list` or `citation_list`; `PersonData` declares no
+`person_ref_list`, `citation_list`, `address_list` or `lds_ord_list`; and
+`NoteSaveParams` and `TagSaveParams` declare no list fields at all.
+
+The authoritative, per-type list lives in the usage guide's Destructive
+Operations section, and `tests/test_alignment_destructive.py` derives the
+same table from `model_fields` and fails when guide and models disagree - so
+this paragraph cannot drift into being wrong again without a red test.
+Calling `detach_reference` against an unreachable combination is refused
+loudly, with the reason named, rather than appearing to succeed while
+touching nothing. Closing the remaining gaps means adding fields to write
+models that were deliberately kept minimal; it is not done here.
 
 **`undo_change` needs `force=true` to undo a deletion**, because of a
 confirmed upstream defect in `gramps_webapi`. `old_unchanged()`

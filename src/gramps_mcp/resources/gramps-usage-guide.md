@@ -534,24 +534,32 @@ ref_handle=...)`.
   in `list_name`.
 - **Not every (type, list_name) pair is reachable.** The write model for each
   type has to declare the list before this tool can edit it, and the write
-  models were built for creation, not full read/write parity. What works
-  today:
-  - `person`: `event_ref_list`, `family_list`, `parent_family_list`. Not
-    `person_ref_list`, `lds_ord_list`, `media_list`, `note_list`,
-    `citation_list`, `tag_list`, `address_list`, `attribute_list`.
-  - `family`: `child_ref_list`, `event_ref_list`, `note_list`, `media_list`.
-  - `event`: `citation_list`, `note_list`. Not `media_list`,
-    `attribute_list`, `tag_list`.
-  - `place`: `placeref_list`, `media_list`, `citation_list`, `note_list`,
-    `tag_list`.
-  - `source`: `reporef_list` only.
-  - `media`: `citation_list`, `note_list`. Not `attribute_list`, `tag_list`.
-  - `citation`, `repository`, `note`, `tag`: no list field is reachable
-    through this tool today - a call against any of these types is always
-    refused.
-  - A refusal names the reason (the write model does not declare that list),
-    so a call against an unsupported combination fails loudly rather than
-    reporting success while changing nothing.
+  models were built for creation, not full read/write parity. This is the
+  complete reachable set, one line per type, derived from the write models
+  and pinned by `tests/test_alignment_destructive.py` - that test fails if
+  this list and the models ever disagree:
+
+  - `person`: `attribute_list`, `event_ref_list`, `family_list`, `media_list`, `note_list`, `parent_family_list`, `tag_list`
+  - `family`: `child_ref_list`, `event_ref_list`, `media_list`, `note_list`
+  - `event`: `citation_list`, `note_list`
+  - `place`: `citation_list`, `media_list`, `note_list`, `placeref_list`, `tag_list`
+  - `source`: `attribute_list`, `media_list`, `note_list`, `reporef_list`, `tag_list`
+  - `citation`: `attribute_list`, `media_list`, `note_list`, `tag_list`
+  - `repository`: `attribute_list`, `media_list`, `note_list`, `tag_list`
+  - `media`: `citation_list`, `note_list`
+  - `note`: none
+  - `tag`: none
+
+  The gaps that remain, all of them lists the read side exposes but the
+  write model does not declare: a person's person_ref_list, citation_list,
+  address_list and lds_ord_list; an event's media_list, attribute_list and
+  tag_list; a family's tag_list, attribute_list and citation_list; a media
+  object's attribute_list and tag_list; and notes and tags, which declare no
+  list fields at all, so a detach against either is always refused.
+
+  A refusal names the reason (the write model does not declare that list),
+  so a call against an unsupported combination fails loudly rather than
+  reporting success while changing nothing.
 
 ### `undo_change` - reverse a recorded transaction
 
