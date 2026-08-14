@@ -133,10 +133,12 @@ class ApiCalls(Enum):
     # MANAGEMENT operations - Transactions
     GET_TRANSACTIONS_HISTORY = ("GET", "transactions/history/")
     GET_TRANSACTION_HISTORY = ("GET", "transactions/history/{transaction_id}/")
-    # Reason: the server reads this endpoint's only optional argument
-    # (message) from the query string, while make_api_call sends a JSON body
-    # for POST. No parameter model is mapped, so params stays None and the
-    # server applies its default message of "Undo".
+    # Reason: the server reads this endpoint's arguments (force, message)
+    # from the query string rather than a JSON body, so make_api_call carves
+    # this call out to send its params as query parameters - see the
+    # exclusion tuple in GrampsWebAPIClient.make_api_call. Only "force" is
+    # exposed (UndoTransactionQueryParams); "message" is never set, so the
+    # server applies its own default of "Undo".
     POST_TRANSACTION_UNDO = ("POST", "transactions/history/{transaction_id}/undo")
 
     # MANAGEMENT operations - Types
@@ -153,7 +155,10 @@ class ApiCalls(Enum):
     GET_REPORT_PROCESSED = ("GET", "reports/{report_id}/file/processed/{filename}")
 
     # TASK operations
-    GET_TASK_STATUS = ("GET", "tasks/{task_id}/")
+    # Reason: no trailing slash - unlike most GET endpoints, this route 404s
+    # on the server with one (verified against the live server: "tasks/{id}/"
+    # returns 404, "tasks/{id}" returns 200).
+    GET_TASK_STATUS = ("GET", "tasks/{task_id}")
 
     # HOLIDAYS operations
     GET_HOLIDAYS = ("GET", "holidays/")

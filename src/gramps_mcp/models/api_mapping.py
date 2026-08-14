@@ -26,7 +26,11 @@ from pydantic import BaseModel
 from .api_calls import ApiCalls
 from .parameters.base_params import BaseGetMultipleParams, BaseGetSingleParams
 from .parameters.citation_params import CitationData, GetCitationsParams
-from .parameters.destructive_params import FamilyMergeBody, PersonMergeBody
+from .parameters.destructive_params import (
+    FamilyMergeBody,
+    PersonMergeBody,
+    UndoTransactionQueryParams,
+)
 from .parameters.event_params import EventSaveParams, EventSearchParams, EventSpanParams
 from .parameters.facts_params import FactsParams
 from .parameters.family_params import FamilySaveParams, FamilyTimelineParams
@@ -157,7 +161,9 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     # TRANSACTIONS operations
     ApiCalls.GET_TRANSACTIONS_HISTORY: TransactionHistoryParams,
     ApiCalls.GET_TRANSACTION_HISTORY: TransactionHistoryByIdParams,
-    ApiCalls.POST_TRANSACTION_UNDO: None,  # transaction_id travels in the URL
+    # transaction_id travels in the URL; force travels in the query string -
+    # see the ApiCalls.POST_TRANSACTION_UNDO carve-out in client.py.
+    ApiCalls.POST_TRANSACTION_UNDO: UndoTransactionQueryParams,
     # TYPES operations
     ApiCalls.GET_TYPES: None,
     ApiCalls.GET_TYPES_DEFAULT: None,

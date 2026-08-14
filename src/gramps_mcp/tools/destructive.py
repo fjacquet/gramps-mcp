@@ -21,6 +21,7 @@ Every tool here can remove data. The guard rails live in destructive.py as
 pure functions; this module does the I/O and the formatting.
 """
 
+import asyncio
 import logging
 
 from mcp.types import TextContent
@@ -301,6 +302,34 @@ async def merge_type_tool(client, arguments: dict) -> list[TextContent]:
         return _format_error_response(e, "merge")
 
 
+async def _await_undo_result(client, task_id: str, timeout: float = 5.0) -> dict:
+    """
+    Poll a queued undo task until it reaches a terminal state, or timeout.
+
+    Args:
+        client (GrampsWebAPIClient): Client to issue the polling GET with.
+        task_id (str): Celery task id returned by POST_TRANSACTION_UNDO.
+        timeout (float): Maximum time to poll, in seconds.
+
+    Returns:
+        dict: The last task-status response observed. Its "state" key is
+            "SUCCESS" or "FAILURE" on a terminal outcome, or whatever
+            non-terminal state (e.g. "PENDING") was last seen when the
+            timeout was reached.
+    """
+    loop = asyncio.get_event_loop()
+    deadline = loop.time() + timeout
+    status: dict = {"state": "PENDING"}
+    while loop.time() < deadline:
+        status = await client.make_api_call(
+            api_call=ApiCalls.GET_TASK_STATUS, task_id=task_id
+        )
+        if status.get("state") in ("SUCCESS", "FAILURE"):
+            return status
+        await asyncio.sleep(0.3)
+    return status
+
+
 @with_client
 async def undo_change_tool(client, arguments: dict) -> list[TextContent]:
     """Undo one recorded transaction."""
@@ -308,15 +337,51 @@ async def undo_change_tool(client, arguments: dict) -> list[TextContent]:
         params = UndoChangeParams(**arguments)
         tree_id = get_settings().gramps_tree_id
 
-        # Reason: params stays None. The endpoint reads its only optional
-        # argument from the query string, while make_api_call sends a JSON
-        # body for POST, so the server would ignore it anyway and apply its
-        # own default message.
-        await client.make_api_call(
+        # Reason: force travels in the query string, not a JSON body - see
+        # the ApiCalls.POST_TRANSACTION_UNDO carve-out in
+        # GrampsWebAPIClient.make_api_call and UndoTransactionQueryParams,
+        # which is the model registered for this endpoint.
+        response = await client.make_api_call(
             api_call=ApiCalls.POST_TRANSACTION_UNDO,
+            params={"force": params.force},
             tree_id=tree_id,
             transaction_id=params.transaction_id,
         )
+
+        # Reason: "Undo a transaction using background processing" is the
+        # endpoint's own docstring - the POST above only confirms the task
+        # was queued, not that the undo succeeded. Without force, a known
+        # Gramps Web bug (see UndoChangeParams.force's description) makes
+        # every delete-undo fail silently in the background, so this tool
+        # must poll the task to a terminal state before claiming success.
+        task = response.get("task") if isinstance(response, dict) else None
+        task_id = task.get("id") if task else None
+        if task_id:
+            status = await _await_undo_result(client, task_id)
+            state = status.get("state")
+            if state == "FAILURE":
+                hint = (
+                    ""
+                    if params.force
+                    else " Retry with force=true if the object genuinely has "
+                    "not changed since the transaction."
+                )
+                raise GrampsAPIError(
+                    f"transaction {params.transaction_id} was not undone: "
+                    f"{status.get('info') or 'undo task failed'}.{hint}"
+                )
+            if state != "SUCCESS":
+                return [
+                    TextContent(
+                        type="text",
+                        text=(
+                            f"Transaction {params.transaction_id} undo is "
+                            "still processing in the background after 5 "
+                            "seconds. Run recent_changes to confirm the "
+                            "outcome."
+                        ),
+                    )
+                ]
 
         return [
             TextContent(

@@ -385,10 +385,13 @@ class GrampsWebAPIClient:
 
         if validated_params is not None:
             params_dict = validated_params.model_dump(exclude_none=True, mode="json")
-            # POST and PUT operations use JSON body, GET operations use query parameters
-            if (
-                api_call.method in ["POST", "PUT"]
-                and api_call != ApiCalls.POST_REPORT_FILE
+            # POST and PUT operations use JSON body, GET operations use query
+            # parameters. POST_REPORT_FILE and POST_TRANSACTION_UNDO are
+            # exceptions: their servers read their optional arguments from the
+            # query string instead of a JSON body.
+            if api_call.method in ["POST", "PUT"] and api_call not in (
+                ApiCalls.POST_REPORT_FILE,
+                ApiCalls.POST_TRANSACTION_UNDO,
             ):
                 json_data = params_dict
             else:
