@@ -139,9 +139,5 @@ async def delete_type_tool(client, arguments: dict) -> list[TextContent]:
             )
         ]
 
-    except KeyError as e:
-        return _format_error_response(
-            ValueError(f"Unsupported record type: {e}"), "deletion"
-        )
     except Exception as e:
         return _format_error_response(e, "deletion")
