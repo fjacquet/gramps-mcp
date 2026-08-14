@@ -28,10 +28,12 @@ from mcp.types import TextContent
 from ..client import GrampsAPIError
 from ..config import get_settings
 from ..destructive import TYPE_ENDPOINTS, remove_from_list, should_refuse_delete
+from ..handlers.destructive_handler import format_merge_preview
 from ..models.api_mapping import get_param_model
 from ..models.parameters.destructive_params import (
     DeleteTypeParams,
     DetachReferenceParams,
+    MergeTypeParams,
 )
 from .search_basic import with_client
 
@@ -215,3 +217,61 @@ async def detach_reference_tool(client, arguments: dict) -> list[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "detach")
+
+
+@with_client
+async def merge_type_tool(client, arguments: dict) -> list[TextContent]:
+    """Merge two records of the same type, previewing unless confirm is set."""
+    try:
+        params = MergeTypeParams(**arguments)
+        tree_id = get_settings().gramps_tree_id
+
+        if params.phoenix_handle == params.titanic_handle:
+            raise ValueError("phoenix_handle and titanic_handle must differ")
+
+        endpoints = TYPE_ENDPOINTS[params.type]
+        if endpoints.merge is None:
+            raise ValueError(f"{params.type} records cannot be merged")
+
+        phoenix = await client.make_api_call(
+            api_call=endpoints.get, tree_id=tree_id, handle=params.phoenix_handle
+        )
+        titanic = await client.make_api_call(
+            api_call=endpoints.get, tree_id=tree_id, handle=params.titanic_handle
+        )
+
+        if not params.confirm:
+            return [
+                TextContent(
+                    type="text",
+                    text=format_merge_preview(phoenix, titanic, params.type),
+                )
+            ]
+
+        extra = {}
+        if params.phoenix_father_handle:
+            extra["phoenix_father_handle"] = params.phoenix_father_handle
+        if params.phoenix_mother_handle:
+            extra["phoenix_mother_handle"] = params.phoenix_mother_handle
+
+        await client.make_api_call(
+            api_call=endpoints.merge,
+            params=extra or None,
+            tree_id=tree_id,
+            phoenix_handle=params.phoenix_handle,
+            titanic_handle=params.titanic_handle,
+        )
+
+        return [
+            TextContent(
+                type="text",
+                text=(
+                    f"Merged {params.type} {titanic.get('gramps_id', '?')} into "
+                    f"{phoenix.get('gramps_id', '?')}. The absorbed record is gone; "
+                    "use undo_change to reverse this."
+                ),
+            )
+        ]
+
+    except Exception as e:
+        return _format_error_response(e, "merge")

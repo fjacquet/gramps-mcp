@@ -82,3 +82,28 @@ class DetachReferenceParams(StrictModel):
         )
     )
     ref_handle: str = Field(description="Handle of the element to remove")
+
+
+class MergeTypeParams(StrictModel):
+    """Parameters for merging two records of the same type."""
+
+    type: MergeableType = Field(
+        description="Record type to merge (tags cannot be merged)"
+    )
+    phoenix_handle: str = Field(description="Handle of the record that survives")
+    titanic_handle: str = Field(
+        description="Handle of the record that is absorbed and disappears"
+    )
+    confirm: bool = Field(
+        False,
+        description=(
+            "Perform the merge. Without it the call returns a preview of both "
+            "records and changes nothing."
+        ),
+    )
+    phoenix_father_handle: str | None = Field(
+        None, description="Family merges only: which father the result keeps"
+    )
+    phoenix_mother_handle: str | None = Field(
+        None, description="Family merges only: which mother the result keeps"
+    )

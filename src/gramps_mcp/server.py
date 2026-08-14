@@ -54,6 +54,7 @@ from .models.parameters.citation_params import CitationData
 from .models.parameters.destructive_params import (
     DeleteTypeParams,
     DetachReferenceParams,
+    MergeTypeParams,
 )
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
@@ -91,7 +92,7 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
-from .tools.destructive import delete_type_tool, detach_reference_tool
+from .tools.destructive import delete_type_tool, detach_reference_tool, merge_type_tool
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
@@ -292,6 +293,16 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
         "schema": DetachReferenceParams,
         "handler": detach_reference_tool,
+    },
+    "merge_type": {
+        "description": (
+            "Merge two records of the same type. The phoenix survives, the "
+            "titanic is absorbed and every reference to it is repointed. "
+            "Returns a preview and changes nothing unless confirm=true. "
+            "Tags cannot be merged"
+        ),
+        "schema": MergeTypeParams,
+        "handler": merge_type_tool,
     },
 }
 
