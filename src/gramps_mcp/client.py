@@ -87,6 +87,7 @@ class GrampsWebAPIClient:
         return_headers: bool = False,
         content: bytes | None = None,
         extra_headers: dict | None = None,
+        as_text: bool = False,
     ):
         """
         Make HTTP request with error handling and auth retry.
@@ -101,10 +102,14 @@ class GrampsWebAPIClient:
             content (bytes | None): Raw body, sent instead of json_data.
             extra_headers (dict | None): Headers merged over the authentication
                 headers, so a caller can override Content-Type.
+            as_text (bool): Return the raw response body text instead of
+                treating it as JSON. HTTP error handling is unaffected - a
+                non-2xx response still raises GrampsAPIError.
 
         Returns:
             Any: The parsed response body, or a (body, headers) tuple when
-                return_headers is set.
+                return_headers is set. When as_text is set, the body is the
+                raw response text rather than parsed JSON.
 
         Raises:
             GrampsAPIError: For any HTTP, connection, timeout or parse failure.
@@ -140,9 +145,20 @@ class GrampsWebAPIClient:
                     return_headers=return_headers,
                     content=content,
                     extra_headers=extra_headers,
+                    as_text=as_text,
                 )
 
             response.raise_for_status()
+
+            # Reason: a report download is a file fetch, not a JSON call - the
+            # body is HTML/PDF/etc by design, so it must not travel through
+            # _parse_response_body's JSON-failure path, which truncates the
+            # text to MAX_ERROR_DETAIL for privacy reasons that do not apply
+            # to a legitimate, successful, non-JSON response.
+            if as_text:
+                if return_headers:
+                    return response.text, dict(response.headers)
+                return response.text
 
             # Handle empty responses
             if not response.text.strip():
@@ -302,6 +318,7 @@ class GrampsWebAPIClient:
         tree_id: str = "default",
         with_headers: bool = False,
         replace_lists: list[str] | None = None,
+        as_text: bool = False,
         **url_params,
     ):
         """
@@ -311,8 +328,14 @@ class GrampsWebAPIClient:
             api_call: The API call to make from the ApiCalls enum
             params: Parameters for the API call (dict or Pydantic model)
             tree_id: Family tree identifier (default: "default")
+            with_headers: Return (body, headers) instead of just the body.
             replace_lists: Keys whose lists should be replaced outright rather
                 than merged into the existing record. PUT operations only.
+            as_text: Return the raw response body text instead of parsing it
+                as JSON. Use for endpoints whose successful response is not
+                JSON by design (e.g. an HTML report download) - JSON parsing
+                would fail and route the response through the error-truncation
+                path meant for genuinely malformed bodies.
             **url_params: URL parameters for endpoint substitution
                 (e.g., handle, handle1, handle2)
 
@@ -374,6 +397,7 @@ class GrampsWebAPIClient:
             params=request_params,
             json_data=json_data,
             return_headers=with_headers,
+            as_text=as_text,
         )
 
     async def upload_media_file(
