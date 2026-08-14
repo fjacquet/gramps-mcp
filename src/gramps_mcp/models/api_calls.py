@@ -30,6 +30,7 @@ class ApiCalls(Enum):
     GET_PERSON = ("GET", "people/{handle}")
     PUT_PERSON = ("PUT", "people/{handle}")
     DELETE_PERSON = ("DELETE", "people/{handle}")
+    MERGE_PERSON = ("POST", "people/{phoenix_handle}/merge/{titanic_handle}")
     GET_PERSON_TIMELINE = ("GET", "people/{handle}/timeline")
     GET_PERSON_DNA_MATCHES = ("GET", "people/{handle}/dna/matches")
 
@@ -39,6 +40,7 @@ class ApiCalls(Enum):
     GET_FAMILY = ("GET", "families/{handle}")
     PUT_FAMILY = ("PUT", "families/{handle}")
     DELETE_FAMILY = ("DELETE", "families/{handle}")
+    MERGE_FAMILY = ("POST", "families/{phoenix_handle}/merge/{titanic_handle}")
     GET_FAMILY_TIMELINE = ("GET", "families/{handle}/timeline")
 
     # EVENTS operations
@@ -47,6 +49,7 @@ class ApiCalls(Enum):
     GET_EVENT = ("GET", "events/{handle}")
     PUT_EVENT = ("PUT", "events/{handle}")
     DELETE_EVENT = ("DELETE", "events/{handle}")
+    MERGE_EVENT = ("POST", "events/{phoenix_handle}/merge/{titanic_handle}")
     GET_EVENT_SPAN = ("GET", "events/{handle1}/span/{handle2}")
 
     # PLACES operations
@@ -55,6 +58,7 @@ class ApiCalls(Enum):
     GET_PLACE = ("GET", "places/{handle}")
     PUT_PLACE = ("PUT", "places/{handle}")
     DELETE_PLACE = ("DELETE", "places/{handle}")
+    MERGE_PLACE = ("POST", "places/{phoenix_handle}/merge/{titanic_handle}")
 
     # CITATIONS operations
     GET_CITATIONS = ("GET", "citations/")
@@ -62,6 +66,7 @@ class ApiCalls(Enum):
     GET_CITATION = ("GET", "citations/{handle}")
     PUT_CITATION = ("PUT", "citations/{handle}")
     DELETE_CITATION = ("DELETE", "citations/{handle}")
+    MERGE_CITATION = ("POST", "citations/{phoenix_handle}/merge/{titanic_handle}")
 
     # SOURCES operations
     GET_SOURCES = ("GET", "sources/")
@@ -69,6 +74,7 @@ class ApiCalls(Enum):
     GET_SOURCE = ("GET", "sources/{handle}")
     PUT_SOURCE = ("PUT", "sources/{handle}")
     DELETE_SOURCE = ("DELETE", "sources/{handle}")
+    MERGE_SOURCE = ("POST", "sources/{phoenix_handle}/merge/{titanic_handle}")
 
     # REPOSITORIES operations
     GET_REPOSITORIES = ("GET", "repositories/")
@@ -76,6 +82,10 @@ class ApiCalls(Enum):
     GET_REPOSITORY = ("GET", "repositories/{handle}")
     PUT_REPOSITORY = ("PUT", "repositories/{handle}")
     DELETE_REPOSITORY = ("DELETE", "repositories/{handle}")
+    MERGE_REPOSITORY = (
+        "POST",
+        "repositories/{phoenix_handle}/merge/{titanic_handle}",
+    )
 
     # MEDIA operations
     GET_MEDIA = ("GET", "media/")
@@ -83,6 +93,7 @@ class ApiCalls(Enum):
     GET_MEDIA_ITEM = ("GET", "media/{handle}")
     PUT_MEDIA_ITEM = ("PUT", "media/{handle}")
     DELETE_MEDIA_ITEM = ("DELETE", "media/{handle}")
+    MERGE_MEDIA = ("POST", "media/{phoenix_handle}/merge/{titanic_handle}")
     GET_MEDIA_FILE = ("GET", "media/{handle}/file")
     PUT_MEDIA_FILE = ("PUT", "media/{handle}/file")
 
@@ -92,6 +103,7 @@ class ApiCalls(Enum):
     GET_NOTE = ("GET", "notes/{handle}")
     PUT_NOTE = ("PUT", "notes/{handle}")
     DELETE_NOTE = ("DELETE", "notes/{handle}")
+    MERGE_NOTE = ("POST", "notes/{phoenix_handle}/merge/{titanic_handle}")
 
     # TAGS operations
     GET_TAGS = ("GET", "tags/")
@@ -121,6 +133,11 @@ class ApiCalls(Enum):
     # MANAGEMENT operations - Transactions
     GET_TRANSACTIONS_HISTORY = ("GET", "transactions/history/")
     GET_TRANSACTION_HISTORY = ("GET", "transactions/history/{transaction_id}/")
+    # Reason: the server reads this endpoint's only optional argument
+    # (message) from the query string, while make_api_call sends a JSON body
+    # for POST. No parameter model is mapped, so params stays None and the
+    # server applies its default message of "Undo".
+    POST_TRANSACTION_UNDO = ("POST", "transactions/history/{transaction_id}/undo")
 
     # MANAGEMENT operations - Types
     GET_TYPES = ("GET", "types/")
