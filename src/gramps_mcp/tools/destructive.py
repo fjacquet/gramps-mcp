@@ -38,6 +38,7 @@ from ..models.parameters.destructive_params import (
     MergeTypeParams,
     UndoChangeParams,
 )
+from ..utils import escape_gql_literal
 from .search_basic import with_client
 
 logger = logging.getLogger(__name__)
@@ -70,30 +71,36 @@ async def resolve_target_handle(
         str: The resolved handle.
 
     Raises:
-        ValueError: If neither identifier is given, or the gramps_id matches
-            no record.
+        ValueError: If neither identifier is given, the type has no
+            gramps_id at all, or the gramps_id matches no record.
     """
     if handle:
         return handle
     if not gramps_id:
         raise ValueError("Either handle or gramps_id is required")
 
-    plural = {
-        "person": ApiCalls.GET_PEOPLE,
-        "family": ApiCalls.GET_FAMILIES,
-        "event": ApiCalls.GET_EVENTS,
-        "place": ApiCalls.GET_PLACES,
-        "source": ApiCalls.GET_SOURCES,
-        "citation": ApiCalls.GET_CITATIONS,
-        "repository": ApiCalls.GET_REPOSITORIES,
-        "media": ApiCalls.GET_MEDIA,
-        "note": ApiCalls.GET_NOTES,
-        "tag": ApiCalls.GET_TAGS,
-    }[obj_type]
+    # Reason: Gramps tags carry no gramps_id, and TagSearchParams declares no
+    # gql field, so a gramps_id filter here reached the server as a bare
+    # `GET tags/?pagesize=1` and resolved to whichever tag the server listed
+    # first - which delete_type then deleted, reporting the id the caller
+    # asked for. Refused outright rather than resolved to an arbitrary tag.
+    if obj_type == "tag":
+        raise ValueError(
+            "Tags have no gramps_id. Identify a tag by handle instead - "
+            "manage_tags(action='list') lists every tag with its handle."
+        )
 
+    plural = TYPE_ENDPOINTS[obj_type].plural
+
+    # Reason: escape_gql_literal, not raw interpolation - a gramps_id such as
+    # `X" or gramps_id!="X` would otherwise close the GQL string literal
+    # early, match every record, and (with pagesize 1) resolve to an
+    # arbitrary record that delete_type would then delete. Same escaping as
+    # search_details._resolve_gramps_id, deliberately shared.
+    escaped = escape_gql_literal(gramps_id)
     results = await client.make_api_call(
         api_call=plural,
-        params={"gql": f'gramps_id="{gramps_id}"', "pagesize": 1},
+        params={"gql": f'gramps_id="{escaped}"', "pagesize": 1},
         tree_id=tree_id,
     )
     if not results:
@@ -317,7 +324,7 @@ async def _await_undo_result(client, task_id: str, timeout: float = 5.0) -> dict
             non-terminal state (e.g. "PENDING") was last seen when the
             timeout was reached.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     status: dict = {"state": "PENDING"}
     while loop.time() < deadline:

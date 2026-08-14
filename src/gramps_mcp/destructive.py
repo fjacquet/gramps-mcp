@@ -36,6 +36,11 @@ class TypeEndpoints(NamedTuple):
     put: ApiCalls
     delete: ApiCalls
     merge: ApiCalls | None
+    # Reason: the collection endpoint for the type, used to resolve a
+    # gramps_id to a handle. Kept here rather than in a second dict beside
+    # this one, so a type cannot be mapped to one endpoint for delete and a
+    # different one for lookup.
+    plural: ApiCalls
 
 
 TYPE_ENDPOINTS: dict[str, TypeEndpoints] = {
@@ -44,57 +49,72 @@ TYPE_ENDPOINTS: dict[str, TypeEndpoints] = {
         ApiCalls.PUT_PERSON,
         ApiCalls.DELETE_PERSON,
         ApiCalls.MERGE_PERSON,
+        ApiCalls.GET_PEOPLE,
     ),
     "family": TypeEndpoints(
         ApiCalls.GET_FAMILY,
         ApiCalls.PUT_FAMILY,
         ApiCalls.DELETE_FAMILY,
         ApiCalls.MERGE_FAMILY,
+        ApiCalls.GET_FAMILIES,
     ),
     "event": TypeEndpoints(
         ApiCalls.GET_EVENT,
         ApiCalls.PUT_EVENT,
         ApiCalls.DELETE_EVENT,
         ApiCalls.MERGE_EVENT,
+        ApiCalls.GET_EVENTS,
     ),
     "place": TypeEndpoints(
         ApiCalls.GET_PLACE,
         ApiCalls.PUT_PLACE,
         ApiCalls.DELETE_PLACE,
         ApiCalls.MERGE_PLACE,
+        ApiCalls.GET_PLACES,
     ),
     "source": TypeEndpoints(
         ApiCalls.GET_SOURCE,
         ApiCalls.PUT_SOURCE,
         ApiCalls.DELETE_SOURCE,
         ApiCalls.MERGE_SOURCE,
+        ApiCalls.GET_SOURCES,
     ),
     "citation": TypeEndpoints(
         ApiCalls.GET_CITATION,
         ApiCalls.PUT_CITATION,
         ApiCalls.DELETE_CITATION,
         ApiCalls.MERGE_CITATION,
+        ApiCalls.GET_CITATIONS,
     ),
     "repository": TypeEndpoints(
         ApiCalls.GET_REPOSITORY,
         ApiCalls.PUT_REPOSITORY,
         ApiCalls.DELETE_REPOSITORY,
         ApiCalls.MERGE_REPOSITORY,
+        ApiCalls.GET_REPOSITORIES,
     ),
     "media": TypeEndpoints(
         ApiCalls.GET_MEDIA_ITEM,
         ApiCalls.PUT_MEDIA_ITEM,
         ApiCalls.DELETE_MEDIA_ITEM,
         ApiCalls.MERGE_MEDIA,
+        ApiCalls.GET_MEDIA,
     ),
     "note": TypeEndpoints(
         ApiCalls.GET_NOTE,
         ApiCalls.PUT_NOTE,
         ApiCalls.DELETE_NOTE,
         ApiCalls.MERGE_NOTE,
+        ApiCalls.GET_NOTES,
     ),
     # Reason: tags are deletable but Gramps Web offers no tag merge endpoint.
-    "tag": TypeEndpoints(ApiCalls.GET_TAG, ApiCalls.PUT_TAG, ApiCalls.DELETE_TAG, None),
+    "tag": TypeEndpoints(
+        ApiCalls.GET_TAG,
+        ApiCalls.PUT_TAG,
+        ApiCalls.DELETE_TAG,
+        None,
+        ApiCalls.GET_TAGS,
+    ),
 }
 
 MAX_LISTED_BACKLINKS = 20
