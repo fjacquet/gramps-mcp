@@ -54,7 +54,7 @@ def _format_person(profile: dict) -> str:
     Returns:
         str: For example "JACQUET, Yvan (I0042), b. 1948 Lyon, d. 2011".
     """
-    line = f"{profile.get('name_display', '?')} ({profile.get('gramps_id', '?')})"
+    line = f"{profile.get('name_display') or '?'} ({profile.get('gramps_id', '?')})"
     for part in (
         _format_event(profile.get("birth"), "b."),
         _format_event(profile.get("death"), "d."),

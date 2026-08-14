@@ -9,6 +9,7 @@ TraversalResult, never the patch's call arguments.
 from unittest.mock import patch
 
 from src.gramps_mcp.client import GrampsWebAPIClient
+from src.gramps_mcp.handlers.traversal_handler import format_traversal
 from src.gramps_mcp.traversal import (
     TraversalResult,
     resolve_person_handle,
@@ -104,6 +105,30 @@ class TestResolvePersonHandle:
             )
         assert handle is None
 
+    async def test_gql_injection_attempt_is_escaped_not_interpolated_raw(self):
+        # Reason: a raw f-string interpolation of gramps_id would let a
+        # crafted id such as this one close the string literal early and
+        # match an arbitrary record. escape_gql_literal must neutralize it
+        # so the crafted value is searched for literally instead.
+        captured = {}
+
+        async def _request(self, method=None, url=None, params=None, **kwargs):
+            captured["gql"] = params["gql"]
+            return []
+
+        crafted_id = 'x" or gramps_id!="'
+        with patch.object(GrampsWebAPIClient, "_make_request", new=_request):
+            handle = await resolve_person_handle(
+                GrampsWebAPIClient(), "default", crafted_id
+            )
+
+        assert handle is None
+        # Reason: the quote must be escaped, not passed through raw -
+        # otherwise the literal closes early and the filter becomes
+        # `gramps_id = "x" or gramps_id!=""`, matching every record. Only
+        # the two literal-delimiter quotes should be unescaped.
+        assert captured["gql"] == 'gramps_id = "x\\" or gramps_id!=\\""'
+
 
 class TestWalkAncestors:
     async def test_reaches_every_ancestor_within_the_generation_limit(self):
@@ -138,8 +163,15 @@ class TestWalkAncestors:
             GrampsWebAPIClient, "_make_request", new=_ancestor_transport(people)
         ):
             result = await walk_ancestors(GrampsWebAPIClient(), "default", "h1", 5)
+        # Reason: h4 and h5 are reached through both h2 and h3. The walk
+        # must record each shared ancestor exactly once in nodes, and both
+        # parents' edge lists must point at the same shared handles - that
+        # is the property that matters, not a write-only bookkeeping field.
         assert set(result.nodes) == {"h1", "h2", "h3", "h4", "h5"}
-        assert result.revisited == {"h4", "h5"}
+        assert list(result.nodes).count("h4") == 1
+        assert list(result.nodes).count("h5") == 1
+        assert set(result.edges["h2"]) == {"h4", "h5"}
+        assert set(result.edges["h3"]) == {"h4", "h5"}
 
     async def test_a_cycle_does_not_hang_the_walk(self):
         # A person who is their own grandparent cannot happen in real data,
@@ -164,6 +196,46 @@ class TestWalkAncestors:
         assert len(result.nodes) <= 3
         assert result.truncated_by_cap is True
         assert result.unexplored > 0
+
+    async def test_visit_cap_does_not_leave_a_phantom_generation(self):
+        # Reason: a binary ancestor tree deep enough that the cap breaks
+        # mid-walk, refusing an entire generation of handles it never
+        # fetched. Before the fix, that refused generation's handles stayed
+        # in the previous level's edges and the renderer printed them as
+        # "[unavailable: not fetched]" - a phantom generation of noise, and
+        # an inflated header generation count.
+        #
+        # Tree: h1 (L0) -> h1f, h1m (L1, 2 people) -> 4 grandparents (L2).
+        # With visit_cap=5: L0 fetch brings nodes to 1 (1<=5), L1 fetch
+        # brings nodes to 3 (3<=5), then L2's 4 handles fail the check
+        # (3+4=7>5) and are refused without ever being fetched. Only 2
+        # generations (3 people) are actually fetched.
+        people: dict[str, dict] = {
+            "h1": {"gramps_id": "I0001", "name": "P1", "parents": ("h1f", "h1m")},
+            "h1f": {"gramps_id": "I0002", "name": "P2", "parents": ("h1ff", "h1fm")},
+            "h1m": {"gramps_id": "I0003", "name": "P3", "parents": ("h1mf", "h1mm")},
+            "h1ff": {"gramps_id": "I0004", "name": "P4", "parents": None},
+            "h1fm": {"gramps_id": "I0005", "name": "P5", "parents": None},
+            "h1mf": {"gramps_id": "I0006", "name": "P6", "parents": None},
+            "h1mm": {"gramps_id": "I0007", "name": "P7", "parents": None},
+        }
+
+        with patch.object(
+            GrampsWebAPIClient, "_make_request", new=_ancestor_transport(people)
+        ):
+            result = await walk_ancestors(
+                GrampsWebAPIClient(), "default", "h1", 10, visit_cap=5
+            )
+        assert result.truncated_by_cap is True
+        assert set(result.nodes) == {"h1", "h1f", "h1m"}
+        assert result.edges.get("h1f", []) == []
+        assert result.edges.get("h1m", []) == []
+
+        text = format_traversal(result, "ancestors")
+        assert "not fetched" not in text
+        assert text.splitlines()[0] == (
+            "# Ancestors of P1 (I0001) - 2 generations, 3 people"
+        )
 
     async def test_one_failing_person_does_not_lose_the_rest_of_the_level(self):
         transport = _ancestor_transport(failures={"h3": RuntimeError("HTTP 500")})

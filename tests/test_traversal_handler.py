@@ -53,7 +53,6 @@ def _result(**overrides) -> TraversalResult:
         "edges": {"h1": ["h2", "h3"]},
         "truncated_by_cap": False,
         "unexplored": 0,
-        "revisited": set(),
         "failed": {},
     }
     base.update(overrides)
@@ -84,10 +83,7 @@ class TestFormatTraversal:
         assert "  - MARIAUD, Odile (I0129)" in text
 
     def test_revisited_node_is_marked_and_not_expanded_twice(self):
-        result = _result(
-            edges={"h1": ["h2", "h3"], "h2": ["h3"]},
-            revisited={"h3"},
-        )
+        result = _result(edges={"h1": ["h2", "h3"], "h2": ["h3"]})
         text = format_traversal(result, "ancestors")
         assert text.count("MARIAUD, Odile (I0129)") == 2
         assert "[already listed above]" in text

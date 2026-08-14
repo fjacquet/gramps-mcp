@@ -26,6 +26,7 @@ import logging
 from dataclasses import dataclass, field
 
 from .models.api_calls import ApiCalls
+from .utils import escape_gql_literal
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,6 @@ class TraversalResult:
     edges: dict[str, list[str]] = field(default_factory=dict)
     truncated_by_cap: bool = False
     unexplored: int = 0
-    revisited: set[str] = field(default_factory=set)
     failed: dict[str, str] = field(default_factory=dict)
     visit_cap: int = VISIT_CAP
 
@@ -59,9 +59,13 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | N
     Returns:
         str | None: The handle, or None when no person matches.
     """
+    # Reason: escape for the GQL string literal - see escape_gql_literal,
+    # without it a crafted gramps_id closes the literal early and resolves
+    # to an arbitrary person instead of the one requested.
+    escaped = escape_gql_literal(gramps_id)
     people = await client.make_api_call(
         api_call=ApiCalls.GET_PEOPLE,
-        params={"gql": f'gramps_id = "{gramps_id}"', "pagesize": 1, "page": 1},
+        params={"gql": f'gramps_id = "{escaped}"', "pagesize": 1, "page": 1},
         tree_id=tree_id,
     )
     if not people:
@@ -130,7 +134,7 @@ def _parents_of(payload: dict) -> list[str]:
         list[str]: Father then mother, per family, skipping empty slots.
     """
     handles: list[str] = []
-    for family in payload.get("extended", {}).get("parent_families", []) or []:
+    for family in (payload.get("extended") or {}).get("parent_families", []) or []:
         for key in ("father_handle", "mother_handle"):
             handle = family.get(key)
             if handle:
@@ -149,7 +153,7 @@ def _children_of(payload: dict) -> list[str]:
         list[str]: Child handles across all families, in family order.
     """
     handles: list[str] = []
-    for family in payload.get("extended", {}).get("families", []) or []:
+    for family in (payload.get("extended") or {}).get("families", []) or []:
         for child_ref in family.get("child_ref_list", []) or []:
             handle = child_ref.get("ref")
             if handle:
@@ -190,9 +194,16 @@ async def _walk(
         if not level:
             break
         if len(result.nodes) + len(level) > visit_cap:
-            # Reason: the tail is counted once, below. Clearing level here
-            # keeps the cap break from double-counting the generation it
-            # just refused to fetch.
+            # Reason: the previous iteration already recorded edges pointing
+            # at these handles, but they were never fetched - drop those
+            # dangling references so the renderer does not print a phantom
+            # generation of "[unavailable: not fetched]" lines for handles
+            # the cap refused to reach. The tail is counted once, below;
+            # clearing level here keeps the cap break from double-counting
+            # the generation it just refused to fetch.
+            refused = set(level)
+            for handle, children in result.edges.items():
+                result.edges[handle] = [c for c in children if c not in refused]
             result.truncated_by_cap = True
             result.unexplored += len(level)
             level = []
@@ -216,7 +227,6 @@ async def _walk(
                 result.edges[handle] = children
             for child in children:
                 if child in seen:
-                    result.revisited.add(child)
                     continue
                 seen.add(child)
                 next_level.append(child)
