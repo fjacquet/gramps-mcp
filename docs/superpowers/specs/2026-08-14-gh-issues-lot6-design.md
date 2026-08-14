@@ -76,20 +76,37 @@ Applied as follows.
 `BaseDataModel(StrictModel)`, which covers `PersonData`, `SourceSaveParams`,
 `CitationData` and `RepositoryData` with no further change.
 
-**Newly inherit `BaseDataModel`** - these three are genuine Gramps primary
-objects that already redeclare base fields by hand:
+**Inherit `StrictModel` directly** - swap the base class, add no fields:
 
 - `PlaceSaveParams`
 - `FamilySaveParams`
 - `EventSaveParams`
+- `NoteSaveParams`
+- `MediaSaveParams`
+- `TagSaveParams`, `ManageTagsParams`
+- `SourcedEventData`
 
-Their manual redeclarations of `handle`, `gramps_id`, `note_list`,
-`media_list`, `tag_list` and `private` are removed in favour of the inherited
-ones. Fields the base does not carry (`father_handle`, `citation_list`,
-`lat`/`long`, `replace_lists`, and so on) stay where they are.
+Making the first three inherit `BaseDataModel` instead was considered and
+rejected on measured evidence. It would add 13 fields across the three
+(`EventSaveParams` alone gains `gramps_id`, `media_list`, `attribute_list`,
+`tag_list`, `private`, `change`), which breaks three alignment tests:
 
-**Inherit `StrictModel` directly** - no fields added, because inheriting
-`BaseDataModel` would be wrong for each of them:
+- `tests/test_alignment_records.py:55` - `EventSaveParams` has no
+  `system_fields` set at all in its inventory, only
+  `{type, citation_list, handle, date, description, place, note_list}`.
+- `tests/test_alignment_records.py:175` - `FamilySaveParams`.
+- `tests/test_alignment_records.py:242` - `PlaceSaveParams`.
+
+Per the project rule, those inventories track `gramps-usage-guide.md`: the
+fix is to document the fields in the shipped guide first, then update the
+inventory. That is a genuine scope expansion - 13 new fields in the guide
+served to MCP clients, and wider published schemas for `create_event`,
+`create_place` and `create_family` - which none of the four issues require.
+`StrictModel` alone removes the silent key drop with zero field growth.
+
+Unifying common fields across these models is deferred to a separate issue.
+
+The remaining four were never candidates for `BaseDataModel`:
 
 | Model | Why not `BaseDataModel` |
 |-------|-------------------------|
@@ -156,6 +173,27 @@ the find-or-create branch stops taking the create path every time.
 `source_title`. A model validator requires exactly one of the two, which also
 makes `source_title` optional - a visible schema change for MCP clients.
 
+**A new lookup helper is required.** Nothing in `src` can find a source by
+title. `find_source_tool` returns formatted `TextContent`, not structured
+data, and scraping it with a regex is a pattern the codebase explicitly warns
+against (`search_details.py:170-172`). The helper is modelled on
+`_resolve_gramps_id` (`search_details.py:105-159`) and returns raw handles.
+
+It **must** escape the interpolated title before building the GQL filter:
+
+```python
+escaped = title.replace("\\", "\\\\").replace('"', '\\"')
+```
+
+This is not optional here. `resolve_person_handle` (`utils.py:136-162`) gets
+away without escaping only because its callers gate `gramps_id` against an
+anchored `^[A-Z]+[0-9]+$` pattern first - a constraint its own comment calls
+out. A source title is free text supplied by the assistant, and real titles
+in this tree already contain quotes, em-dashes and parentheses
+(`AD18 Cher - Berry-Bouy, publications de mariage 1820, acte n. 1 (Maupoux
+Silvain x Jacquet Marie)`). An unescaped quote closes the GQL string literal
+and injects filter syntax.
+
 `create_sourced_event_tool` behaviour:
 
 - **`source_handle` given** - step 1 (source creation) is skipped and the
@@ -183,13 +221,19 @@ Two independent parts.
 emits a gramps_id: `source_handler.py:117`, `citation_handler.py:117`,
 `person_handler.py:171`, `family_handler.py:206`. Corrected to match.
 
-**The three assertions** - in `tests/test_create_sourcing.py`:
+**The assertions** - in `tests/test_create_sourcing.py`:
 
-- `TestCreateSourceTool::test_create_source_with_media_path`
-- `TestCreateCitationTool::test_create_citation_with_media_path`
-- `TestCreateSourcedEventTool::test_create_sourced_event_with_media_path`
+- `TestCreateSourceTool::test_create_source_with_media_path` - line 159
+- `TestCreateCitationTool::test_create_citation_with_media_path` - line 242,
+  **and line 248**, a fourth assertion the issue did not mention:
+  `assert text.count("image/") >= 2`, which counts two attached media by
+  their MIME type and is unsatisfiable for the same reason.
+- `TestCreateSourcedEventTool::test_create_sourced_event_with_media_path` -
+  line 340
 
-The formatters are right, the tests are wrong. `format_media`
+The formatters are right, the tests are wrong. Two tests in the same file
+already assert the correct shape and pass - `"Attached media: O"` at lines
+135 and 208 - which settles the question directly. `format_media`
 (`handlers/media_handler.py:69`) is the only place that emits a MIME type,
 and that is coherent: source, citation, person and family formatters list
 *references* (`Attached media: O0123`), not full media records. Emitting the
@@ -242,14 +286,20 @@ it is testable offline - the same seam
 - **Unknown size of commit 2.** The inventory of calls passing undeclared
   keys may reveal far more than the five known ones. If so, report before
   continuing rather than growing the commit silently.
-- **`tests/test_alignment_*.py`** hold hardcoded field inventories that must
-  track `gramps-usage-guide.md`. Adding `abbrev` to `SourceSaveParams` will
-  likely require updating an inventory - and the guide already documents the
-  field, so the update runs in the correct direction.
-- **The 500-line rule.** `tests/test_workflow_marriage.py` is 472 lines; the
-  #16 assertions will push it past the limit, which
-  `.pre-commit-config.yaml`'s `check-file-length` hook enforces on `tests/`
-  as well as `src/`. The file must be split in commit 1.
+- **One alignment inventory changes.** `abbrev` must be added to
+  `implementation_fields` in
+  `tests/test_alignment_sourcing.py:96-101`, or
+  `test_source_parameters_alignment` fails at line 116. The guide already
+  documents the field, so the update runs in the correct direction. No other
+  inventory is touched, because no other model gains a field.
+- **The 500-line rule.** `tests/test_workflow_marriage.py` is 472 lines and
+  `.pre-commit-config.yaml`'s `check-file-length` hook covers `tests/` as
+  well as `src/`. Its helpers (`create_test_note`, `create_test_media`,
+  `extract_handle`) already live in `tests/workflow_helpers.py`, so the
+  margin is smaller than it looks - but the #16 assertions may still cross
+  the limit. If they do, move `_create_or_find_person_with_attributes` into
+  `tests/workflow_helpers.py` alongside the existing
+  `create_or_find_person`.
 - **`POST /sources` accepting `abbrev`** is unproven; section 5 resolves it
   by test.
 - **Visible MCP schema changes** - `additionalProperties: false` across the
@@ -263,6 +313,7 @@ it is testable offline - the same seam
 - Deleting or tagging the 36 orphan records.
 - Tightening `PersonData.primary_name` beyond `dict[str, Any]`.
 - Hardening read-path models or `MediaFileParams`.
-- Unifying common fields across `NoteSaveParams`, `MediaSaveParams` and the
-  tag models.
+- Unifying common fields across the write models, including making
+  `EventSaveParams`, `PlaceSaveParams` and `FamilySaveParams` inherit
+  `BaseDataModel` and documenting the resulting fields in the usage guide.
 - Citation reuse in `create_sourced_event` (#12 covers source reuse only).
