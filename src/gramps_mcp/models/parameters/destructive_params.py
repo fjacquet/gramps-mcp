@@ -90,9 +90,24 @@ class MergeTypeParams(StrictModel):
     type: MergeableType = Field(
         description="Record type to merge (tags cannot be merged)"
     )
-    phoenix_handle: str = Field(description="Handle of the record that survives")
-    titanic_handle: str = Field(
-        description="Handle of the record that is absorbed and disappears"
+    phoenix_handle: str | None = Field(
+        None, description="Handle of the record that survives"
+    )
+    phoenix_gramps_id: str | None = Field(
+        None,
+        description=(
+            "Gramps ID of the record that survives (alternative to phoenix_handle)"
+        ),
+    )
+    titanic_handle: str | None = Field(
+        None, description="Handle of the record that is absorbed and disappears"
+    )
+    titanic_gramps_id: str | None = Field(
+        None,
+        description=(
+            "Gramps ID of the record that is absorbed and disappears "
+            "(alternative to titanic_handle)"
+        ),
     )
     confirm: bool = Field(
         False,
@@ -106,4 +121,51 @@ class MergeTypeParams(StrictModel):
     )
     phoenix_mother_handle: str | None = Field(
         None, description="Family merges only: which mother the result keeps"
+    )
+
+
+class FamilyMergeBody(StrictModel):
+    """
+    Optional JSON body for a family merge (MERGE_FAMILY).
+
+    Mirrors Gramps Web's FamilyMergeArgs schema, whose fields both default to
+    None server-side (keep the phoenix family's existing parent).
+    """
+
+    phoenix_father_handle: str | None = Field(
+        None,
+        description=(
+            "Handle of the person to keep as father of the merged family. "
+            "If omitted, the phoenix family's existing father is kept."
+        ),
+    )
+    phoenix_mother_handle: str | None = Field(
+        None,
+        description=(
+            "Handle of the person to keep as mother of the merged family. "
+            "If omitted, the phoenix family's existing mother is kept."
+        ),
+    )
+
+
+class PersonMergeBody(StrictModel):
+    """
+    Optional JSON body for a person merge (MERGE_PERSON).
+
+    Mirrors Gramps Web's PersonMergeArgs schema. Not exposed through
+    MergeTypeParams: merge_type_tool never populates family_merger, so a
+    person merge always sends no body and the server's own default
+    (family_merger=True) applies. This model exists only so MERGE_PERSON has
+    a registered param model in api_mapping.py, matching every other
+    endpoint that can carry a body, and so a future caller that does need to
+    set family_merger has a model already validating it correctly.
+    """
+
+    family_merger: bool | None = Field(
+        None,
+        description=(
+            "If true (the server default when omitted), merge duplicate "
+            "spouse/parent families that result from merging the two "
+            "persons."
+        ),
     )

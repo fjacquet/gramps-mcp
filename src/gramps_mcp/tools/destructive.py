@@ -226,18 +226,42 @@ async def merge_type_tool(client, arguments: dict) -> list[TextContent]:
         params = MergeTypeParams(**arguments)
         tree_id = get_settings().gramps_tree_id
 
-        if params.phoenix_handle == params.titanic_handle:
-            raise ValueError("phoenix_handle and titanic_handle must differ")
-
         endpoints = TYPE_ENDPOINTS[params.type]
         if endpoints.merge is None:
+            # Reason: unreachable today - MergeableType already excludes
+            # "tag", the only type with merge=None in TYPE_ENDPOINTS, so
+            # pydantic rejects that type before this function body runs.
+            # Kept as defense in depth for a future type that gains
+            # merge=None in TYPE_ENDPOINTS without also being removed from
+            # MergeableType.
             raise ValueError(f"{params.type} records cannot be merged")
 
+        phoenix_handle = await resolve_target_handle(
+            client,
+            tree_id,
+            params.type,
+            params.phoenix_handle,
+            params.phoenix_gramps_id,
+        )
+        titanic_handle = await resolve_target_handle(
+            client,
+            tree_id,
+            params.type,
+            params.titanic_handle,
+            params.titanic_gramps_id,
+        )
+
+        # Reason: checked after resolution, not before - two different
+        # gramps_ids can resolve to the same handle, and that must be
+        # refused just as surely as passing the same handle twice would be.
+        if phoenix_handle == titanic_handle:
+            raise ValueError("phoenix and titanic must resolve to different handles")
+
         phoenix = await client.make_api_call(
-            api_call=endpoints.get, tree_id=tree_id, handle=params.phoenix_handle
+            api_call=endpoints.get, tree_id=tree_id, handle=phoenix_handle
         )
         titanic = await client.make_api_call(
-            api_call=endpoints.get, tree_id=tree_id, handle=params.titanic_handle
+            api_call=endpoints.get, tree_id=tree_id, handle=titanic_handle
         )
 
         if not params.confirm:
@@ -258,8 +282,8 @@ async def merge_type_tool(client, arguments: dict) -> list[TextContent]:
             api_call=endpoints.merge,
             params=extra or None,
             tree_id=tree_id,
-            phoenix_handle=params.phoenix_handle,
-            titanic_handle=params.titanic_handle,
+            phoenix_handle=phoenix_handle,
+            titanic_handle=titanic_handle,
         )
 
         return [

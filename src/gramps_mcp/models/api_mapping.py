@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from .api_calls import ApiCalls
 from .parameters.base_params import BaseGetMultipleParams, BaseGetSingleParams
 from .parameters.citation_params import CitationData, GetCitationsParams
+from .parameters.destructive_params import FamilyMergeBody, PersonMergeBody
 from .parameters.event_params import EventSaveParams, EventSearchParams, EventSpanParams
 from .parameters.facts_params import FactsParams
 from .parameters.family_params import FamilySaveParams, FamilyTimelineParams
@@ -69,7 +70,7 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     ApiCalls.GET_PERSON: BaseGetSingleParams,
     ApiCalls.PUT_PERSON: PersonData,
     ApiCalls.DELETE_PERSON: None,  # Only needs handle (via URL)
-    ApiCalls.MERGE_PERSON: None,  # Handles travel in the URL
+    ApiCalls.MERGE_PERSON: PersonMergeBody,  # Handles in URL, optional JSON body
     ApiCalls.GET_PERSON_TIMELINE: PersonTimelineParams,
     ApiCalls.GET_PERSON_DNA_MATCHES: PersonDnaMatchesParams,
     # FAMILIES operations
@@ -78,7 +79,7 @@ API_CALL_PARAMS: dict[ApiCalls, type[BaseModel] | None] = {
     ApiCalls.GET_FAMILY: BaseGetSingleParams,
     ApiCalls.PUT_FAMILY: FamilySaveParams,
     ApiCalls.DELETE_FAMILY: None,  # Only needs handle (via URL)
-    ApiCalls.MERGE_FAMILY: None,  # Handles travel in the URL
+    ApiCalls.MERGE_FAMILY: FamilyMergeBody,  # Handles in URL, optional JSON body
     ApiCalls.GET_FAMILY_TIMELINE: FamilyTimelineParams,
     # EVENTS operations
     ApiCalls.GET_EVENTS: EventSearchParams,
