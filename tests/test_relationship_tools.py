@@ -7,7 +7,7 @@ details are referenced or asserted on.
 
 import pytest
 
-from src.gramps_mcp.server import TimelineQueryParams
+from src.gramps_mcp.models.parameters.analysis_params import TimelineQueryParams
 from src.gramps_mcp.tools.relationship_tools import (
     check_living_tool,
     get_relationship_tool,
