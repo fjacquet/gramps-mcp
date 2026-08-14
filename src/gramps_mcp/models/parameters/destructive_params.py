@@ -64,3 +64,18 @@ class DeleteTypeParams(StrictModel):
             "the referencing records are listed."
         ),
     )
+
+
+class DetachReferenceParams(StrictModel):
+    """Parameters for removing one element from a record's list."""
+
+    type: RecordType = Field(description="Type of the record holding the list")
+    handle: str | None = Field(None, description="Object handle")
+    gramps_id: str | None = Field(None, description="Gramps ID (alternative to handle)")
+    list_name: str = Field(
+        description=(
+            "Name of the list to edit, for example event_ref_list, "
+            "child_ref_list, media_list, note_list, citation_list, tag_list"
+        )
+    )
+    ref_handle: str = Field(description="Handle of the element to remove")

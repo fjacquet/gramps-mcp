@@ -27,8 +27,12 @@ from mcp.types import TextContent
 
 from ..client import GrampsAPIError
 from ..config import get_settings
-from ..destructive import TYPE_ENDPOINTS, should_refuse_delete
-from ..models.parameters.destructive_params import DeleteTypeParams
+from ..destructive import TYPE_ENDPOINTS, remove_from_list, should_refuse_delete
+from ..models.api_mapping import get_param_model
+from ..models.parameters.destructive_params import (
+    DeleteTypeParams,
+    DetachReferenceParams,
+)
 from .search_basic import with_client
 
 logger = logging.getLogger(__name__)
@@ -141,3 +145,61 @@ async def delete_type_tool(client, arguments: dict) -> list[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "deletion")
+
+
+@with_client
+async def detach_reference_tool(client, arguments: dict) -> list[TextContent]:
+    """Remove one element from a record's list, leaving every other list alone."""
+    try:
+        params = DetachReferenceParams(**arguments)
+        tree_id = get_settings().gramps_tree_id
+        endpoints = TYPE_ENDPOINTS[params.type]
+
+        handle = await resolve_target_handle(
+            client, tree_id, params.type, params.handle, params.gramps_id
+        )
+
+        record = await client.make_api_call(
+            api_call=endpoints.get, tree_id=tree_id, handle=handle
+        )
+        gramps_id = record.get("gramps_id", handle)
+
+        updated = remove_from_list(record, params.list_name, params.ref_handle)
+
+        # Reason: make_api_call validates a dict params argument against the
+        # endpoint's full write model, and that model has fields the API
+        # requires on every write (e.g. PersonData needs primary_name and
+        # gender) that a bare {list_name: value} payload would not carry.
+        # model_construct builds the model instance without running that
+        # required-field validation, from whatever the write model declares
+        # out of the record as read plus the edited list - every value but
+        # the edited list is therefore identical to what is already stored.
+        # replace_lists=[list_name] is what actually removes the element, and
+        # every other list keeps the union semantics of ADR 0003, so this
+        # call cannot drop unrelated data.
+        write_model = get_param_model(endpoints.put)
+        if write_model is None:
+            raise ValueError(f"No write model registered for {params.type}")
+        payload = {k: v for k, v in updated.items() if k in write_model.model_fields}
+        validated_params = write_model.model_construct(**payload)
+
+        await client.make_api_call(
+            api_call=endpoints.put,
+            params=validated_params,
+            tree_id=tree_id,
+            handle=handle,
+            replace_lists=[params.list_name],
+        )
+
+        return [
+            TextContent(
+                type="text",
+                text=(
+                    f"Detached {params.ref_handle} from {params.list_name} "
+                    f"of {params.type} {gramps_id}."
+                ),
+            )
+        ]
+
+    except Exception as e:
+        return _format_error_response(e, "detach")

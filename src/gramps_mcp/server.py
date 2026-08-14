@@ -51,7 +51,10 @@ from .models.parameters.analysis_params import (
     TreeInfoParams,
 )
 from .models.parameters.citation_params import CitationData
-from .models.parameters.destructive_params import DeleteTypeParams
+from .models.parameters.destructive_params import (
+    DeleteTypeParams,
+    DetachReferenceParams,
+)
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.family_params import FamilySaveParams
@@ -88,7 +91,7 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
-from .tools.destructive import delete_type_tool
+from .tools.destructive import delete_type_tool, detach_reference_tool
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
@@ -279,6 +282,16 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
         "schema": DeleteTypeParams,
         "handler": delete_type_tool,
+    },
+    "detach_reference": {
+        "description": (
+            "Remove one element from a record's list (event_ref_list, "
+            "child_ref_list, media_list, note_list, citation_list, tag_list). "
+            "Only the named list is rewritten; every other list keeps its "
+            "merge-on-update behaviour. Refuses if the element is not in the list"
+        ),
+        "schema": DetachReferenceParams,
+        "handler": detach_reference_tool,
     },
 }
 
