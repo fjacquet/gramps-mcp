@@ -176,21 +176,27 @@ async def detach_reference_tool(client, arguments: dict) -> list[TextContent]:
 
         updated = remove_from_list(record, params.list_name, params.ref_handle)
 
-        # Reason: make_api_call validates a dict params argument against the
-        # endpoint's full write model, and that model has fields the API
-        # requires on every write (e.g. PersonData needs primary_name and
-        # gender) that a bare {list_name: value} payload would not carry.
-        # Normal construction was tried against live data and genuinely
-        # fails for reasons unrelated to required fields: EventSaveParams'
-        # nested date sub-model forbids extra keys the raw GET record
-        # carries, and its place validator rejects the handle shape GET
-        # returns. model_construct builds the model instance without
-        # running that validation, from whatever the write model declares
-        # out of the record as read plus the edited list - every value but
-        # the edited list is therefore identical to what is already stored.
-        # replace_lists=[list_name] is what actually removes the element, and
-        # every other list keeps the union semantics of ADR 0003, so this
-        # call cannot drop unrelated data.
+        # Reason: the payload carries the edited list and nothing else.
+        # make_api_call re-GETs the record and merges this into it
+        # (merge_put_data), so every other field comes from the server's own
+        # copy and is written back byte-identical. Round-tripping the whole
+        # fetched record through the write model instead - as this did
+        # originally - was lossless only by luck: merge_put_data replaces
+        # non-list keys wholesale, so an event's `date`, a raw dict against a
+        # declared DateValue, was replaced by whatever pydantic's
+        # inferred-serialization fallback produced. That fallback is what
+        # emitted PydanticSerializationUnexpectedValue; the day it narrows to
+        # the declared fields, every event detach would silently truncate the
+        # date. Sending one field removes the warning and the truncation
+        # vector together.
+        #
+        # model_construct rather than normal construction because the write
+        # models validate: EventSaveParams' nested date sub-model forbids
+        # extra keys the raw GET record carries, and required fields such as
+        # PersonData's primary_name and gender are deliberately absent from a
+        # single-list payload. replace_lists=[list_name] is what actually
+        # removes the element; every other list keeps the union semantics of
+        # ADR 0003, so this call cannot drop unrelated data.
         write_model = get_param_model(endpoints.put)
         if write_model is None:
             # Reason: unreachable today - every TYPE_ENDPOINTS.put value is
@@ -202,8 +208,9 @@ async def detach_reference_tool(client, arguments: dict) -> list[TextContent]:
                 f"{params.list_name} cannot be edited on {params.type} records: "
                 "the write model does not declare it."
             )
-        payload = {k: v for k, v in updated.items() if k in write_model.model_fields}
-        validated_params = write_model.model_construct(**payload)
+        validated_params = write_model.model_construct(
+            **{params.list_name: updated[params.list_name]}
+        )
 
         await client.make_api_call(
             api_call=endpoints.put,
