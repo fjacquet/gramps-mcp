@@ -4,7 +4,10 @@ Date: 2025-09-11
 
 ## Status
 
-Accepted
+Superseded by ADR 0007. The union-on-update behaviour described below is
+unchanged and remains the default for every write; only this record's claim
+that removal is impossible through this server is superseded - removal now
+happens through the one explicitly named door `detach_reference` adds.
 
 ## Context
 

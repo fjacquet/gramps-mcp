@@ -1,6 +1,6 @@
-# Product requirements: gramps-mcp v1.7.1
+# Product requirements: gramps-mcp v1.9.0
 
-This document describes what gramps-mcp is as of v1.7.1 - its scope, its
+This document describes what gramps-mcp is as of v1.9.0 - its scope, its
 boundaries, and the constraints it operates under. It is descriptive, not a
 roadmap: everything here is true of the code today. [README.md](https://github.com/fjacquet/gramps-mcp#readme)
 covers what the product offers and lists the tools; the architecture decisions
@@ -56,6 +56,12 @@ What it does:
   group, and tree-wide statistics.
 - **Housekeeping.** Tag listing and creation, transaction history for auditing
   recent changes, and limited user-account creation.
+- **Destructive operations, deliberately guarded.** Delete one record
+  (`delete_type`, refused while it is still referenced unless `force=true`),
+  merge two records of the same type (`merge_type`, previewed unless
+  `confirm=true`), remove one element from one named list
+  (`detach_reference`), and undo a recorded transaction (`undo_change`). See
+  ADR 0007.
 - **Guidance shipped with the server.** Two MCP resources - the GQL reference
   and the sourcing workflow - so a client can learn the query language and the
   intended order of operations without external documentation.
@@ -72,18 +78,31 @@ of a decision recorded elsewhere in the repository.
 database, deliberately narrower than the first. Several ordinary operations
 are only possible in the UI, and the sections below name them.
 
-**It cannot remove anything from a list.** Updates are performed by reading
-the current record, merging the requested changes into it, and writing the
-whole thing back; list fields ending in `_list` are unioned rather than
-replaced (ADR 0003). That is what stops a partial update from wiping data the
-caller did not mention - but the same property means there is no path through
-this server to detach an event reference, remove a child from a family, or
-drop a media reference. Removal requires the Gramps Web UI. The single
-exception is an opt-in `replace_lists` on `create_place`, which exists because
-a place's parent is a single-valued relationship expressed as a list.
+**Ordinary updates still cannot remove anything from a list.** Updates are
+performed by reading the current record, merging the requested changes into
+it, and writing the whole thing back; list fields ending in `_list` are
+unioned rather than replaced (ADR 0003). That is what stops a partial update
+from wiping data the caller did not mention. `create_place` has long carried
+an opt-in `replace_lists` for the one case where a list is really a
+single-valued relationship (a place's parent). Beyond that, removal is not a
+side effect of any `create_*` tool - it goes through `detach_reference`
+instead (ADR 0007), which reads a record, drops one handle from one named
+list, and writes back with `replace_lists` scoped to exactly that list. Every
+other list on the record keeps the union behaviour. `detach_reference` cannot
+reach every list the read side exposes - the write models were built for
+creation, not full GET parity, so combinations like `media_list` on an event
+or `person_ref_list` on a person are refused rather than silently doing
+nothing.
 
-**It does not delete records.** No tool maps to a DELETE endpoint, for any
-object type, including tags.
+**It can delete and merge records, one at a time.** `delete_type` deletes a
+single record by handle or `gramps_id` and refuses while other records still
+reference it, listing them, unless `force=true`. `merge_type` merges two
+records of the same type - the nine Gramps Web offers a merge endpoint for;
+tags cannot be merged - previewing what would be lost unless `confirm=true`.
+Both are recoverable through `undo_change`, which reverses a transaction by
+id, though undoing a deletion currently requires `force=true` because of an
+upstream Gramps Web bug (see ADR 0007). There is still no bulk deletion: one
+object per call, deliberately.
 
 **It does not implement authentication.** It holds one set of credentials from
 its environment, obtains a JWT from Gramps Web and refreshes it on a 401. There
@@ -117,12 +136,14 @@ account on it. Testing is done against a real server with no mocks (ADR 0002),
 so most of the suite cannot run offline at all.
 
 **The API surface depended on** is the Gramps Web REST API: the object
-collection and single-object endpoints for the nine record types, the search
-endpoint, the media upload endpoint, the timeline, relation, living, facts and
-statistics endpoints, the transaction history endpoint, and the users and
-token endpoints. Gramps Query Language is passed through to the server rather
-than interpreted here, so the queries a client can express are exactly the
-queries the deployed Gramps Web version supports.
+collection and single-object endpoints for the nine record types, the delete
+endpoint for those types plus tags, the merge endpoint for the nine types
+that offer one, the search endpoint, the media upload endpoint, the timeline,
+relation, living, facts and statistics endpoints, the transaction history
+endpoint and its undo action, and the users and token endpoints. Gramps Query
+Language is passed through to the server rather than interpreted here, so the
+queries a client can express are exactly the queries the deployed Gramps Web
+version supports.
 
 **MCP Python SDK 2.x, pinned `>=2.0.0,<3`** (ADR 0001). The ceiling is
 deliberate: the SDK moved handler registration into constructor arguments and
@@ -135,7 +156,7 @@ python-dotenv, uvicorn and fastapi.
 **Source files are capped at 500 lines**, enforced by a pre-commit hook
 alongside ruff, formatting, copyright-header and no-emoji hooks (ADR 0006).
 
-## Known limitations as of v1.7.1
+## Known limitations as of v1.9.0
 
 These are specific, current and unfixed.
 
@@ -165,7 +186,9 @@ These are specific, current and unfixed.
   Tracked as issue #13.
 - `create_sourced_event` always creates a new source and cannot reuse an
   existing one, so recording two facts from one document produces duplicate
-  sources that no tool can merge or delete. Tracked as issue #12.
+  sources. `merge_type` and `delete_type` can now clean these up after the
+  fact, one pair at a time, but the underlying duplication on creation is
+  unfixed. Tracked as issue #12.
 - `tree_stats` returns a permission error even for the owner-role account used
   in the reference deployment. `get_facts` is the working alternative for
   tree-level numbers.

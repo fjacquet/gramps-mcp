@@ -60,7 +60,7 @@ No more manual data entry, no context switching between apps, no generic genealo
 
 ## Features
 
-### 23 Genealogy Tools
+### 27 Genealogy Tools
 
 #### Search & Retrieval (3 tools)
 - **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language
@@ -92,6 +92,12 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **manage_tags** - List, get, or create/update tags
 - **manage_users** - List, get, or create Gramps Web accounts with generated passwords (owner or admin rights required, see [docs/user-management.md](docs/user-management.md))
 - **get_facts** - Get interesting facts and statistics about the tree
+
+#### Destructive Operations (4 tools)
+- **delete_type** - Delete a single record; refuses while it is still referenced unless `force=true`
+- **merge_type** - Merge two records of the same type; previews unless `confirm=true` (tags cannot be merged)
+- **detach_reference** - Remove one element from one named list on a record, leaving every other list untouched
+- **undo_change** - Reverse a recorded transaction by id (the recovery path for `delete_type` and `merge_type`)
 
 ## Installation
 
@@ -249,6 +255,7 @@ src/gramps_mcp/
 |-- server.py           # MCP server, tool registry, HTTP/stdio transports
 |-- client.py           # Unified Gramps Web API client
 |-- merge.py            # Pure merge logic for PUT updates
+|-- destructive.py      # Pure decision logic for delete/detach
 |-- auth.py             # JWT authentication (singleton)
 |-- config.py           # Configuration management
 |-- utils.py            # Shared helpers
@@ -265,6 +272,7 @@ src/gramps_mcp/
 |   |-- records_tools.py
 |   |-- media_upload.py
 |   |-- sourced_event.py
+|   |-- destructive.py  # delete_type, merge_type, detach_reference, undo_change
 |   `-- user_tools.py
 |-- handlers/           # Data formatting handlers
 `-- resources/          # MCP resources (GQL docs, usage guide)
