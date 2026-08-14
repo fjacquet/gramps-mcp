@@ -400,7 +400,19 @@ async def create_media_tool(arguments: dict) -> list[TextContent]:
             media_handle = initial_media_object["handle"]
 
             # 2. Merge initial object with metadata and update via PUT
-            final_media_data = initial_media_object.copy()
+            # Reason: initial_media_object is the raw Gramps API response for
+            # the just-uploaded file. It carries server-computed fields
+            # (_class, checksum, thumb, change, gramps_id, private, tag_list,
+            # attribute_list) that MediaSaveParams does not declare and now
+            # refuses under extra="forbid" (StrictModel). Filter to the keys
+            # the model actually accepts before merging in the caller's
+            # metadata and sending the PUT.
+            allowed_keys = set(MediaSaveParams.model_fields.keys())
+            final_media_data = {
+                key: value
+                for key, value in initial_media_object.items()
+                if key in allowed_keys
+            }
             if params:
                 final_media_data.update(params.model_dump(exclude_none=True))
 

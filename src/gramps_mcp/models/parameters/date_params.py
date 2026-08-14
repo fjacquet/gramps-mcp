@@ -18,7 +18,9 @@
 Date parameter model shared by every tool that accepts a Gramps date.
 """
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
+
+from .base_params import StrictModel
 
 # Modifiers whose dateval carries a second date: range and span. Modifiers 7
 # (from) and 8 (to) are open-ended single-date modifiers carrying a
@@ -32,7 +34,7 @@ TWO_DATE_MODIFIERS = (4, 5)
 TEXT_ONLY_MODIFIER = 6
 
 
-class DateValue(BaseModel):
+class DateValue(StrictModel):
     """A Gramps date object."""
 
     dateval: list[int | bool] | None = Field(

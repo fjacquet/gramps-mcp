@@ -23,13 +23,14 @@ citation onto the event so callers never retype a handle between steps.
 
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field, field_validator
 
+from .base_params import StrictModel
 from .date_params import DateValue
 from .event_params import HANDLE_PATTERN
 
 
-class SourcedEventData(BaseModel):
+class SourcedEventData(StrictModel):
     """Composite parameters for create_sourced_event."""
 
     # Source fields

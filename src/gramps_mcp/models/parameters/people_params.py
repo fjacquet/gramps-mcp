@@ -31,10 +31,10 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .base_params import BaseDataModel
+from .base_params import BaseDataModel, StrictModel
 
 
-class EventReference(BaseModel):
+class EventReference(StrictModel):
     """Model for event references in a person's event_ref_list."""
 
     ref: str = Field(..., description="The handle of the event referenced")

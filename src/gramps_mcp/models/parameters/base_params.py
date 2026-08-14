@@ -146,7 +146,21 @@ class BaseGetSingleParams(BaseModel):
         return v
 
 
-class BaseDataModel(BaseModel):
+class StrictModel(BaseModel):
+    """
+    Base for write-path models: refuse unknown keys instead of dropping them.
+
+    Pydantic's default is extra="ignore", which silently discards any key a
+    model does not declare. On a write that means an incomplete record
+    reaches Gramps while the call reports success - the failure mode behind
+    issues #16 and #17. Read-path models keep the permissive default: a
+    dropped key there only widens a result set.
+    """
+
+    model_config = {"extra": "forbid", "populate_by_name": True}
+
+
+class BaseDataModel(StrictModel):
     """Base class for data models used in POST/PUT operations."""
 
     handle: str | None = Field(None, description="Object's unique handle identifier")
@@ -165,5 +179,3 @@ class BaseDataModel(BaseModel):
     change: int | None = Field(
         None, description="Time in epoch format the record was last modified"
     )
-
-    model_config = {"populate_by_name": True}
