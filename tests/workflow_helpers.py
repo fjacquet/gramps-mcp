@@ -21,8 +21,8 @@ from src.gramps_mcp.tools.data_management import (
     create_place_tool,
 )
 from src.gramps_mcp.tools.search_basic import (
-    find_anything_tool,
     find_place_tool,
+    find_type_tool,
 )
 from tests.constants import PREFIX
 
@@ -200,20 +200,30 @@ async def create_or_find_person_with_attributes(
 
     The person's first name carries `PREFIX` (`tests/constants.py`), the same
     marker `tests/conftest.py` uses. Two things depend on that: it keeps this
-    test's people out of `find_anything_tool`'s way of unrelated same-named
-    records left by other tests (there are unprefixed "John Smith" people in
-    the live tree from a different workflow test), and it is what makes a
-    leftover from a killed run findable by a prefix scan - see #16.
+    test's people out of the way of unrelated same-named records left by
+    other tests (there are unprefixed "John Smith" people in the live tree
+    from a different workflow test), and it is what makes a leftover from a
+    killed run findable by a prefix scan - see #16.
 
-    `find_person_tool` is not used here even though it looks like the
+    `find_person_tool` is not called directly even though it looks like the
     natural search step: it is not MCP-exposed (only `find_type` and
-    `find_anything` are, per `TOOL_REGISTRY` in `server.py`), and in the one
-    real caller that does reach it (`find_type_tool`) it is always given
-    `gql`, never `query`. Its `query` parameter is a latent trap - accepted
-    and silently ignored, because `BaseGetMultipleParams` never declares a
-    `query` field - not a live defect, since nothing in production ever
-    calls it that way. `find_anything_tool` is the tool that actually
-    supports free-text `query` (see #18 for the full writeup).
+    `find_anything` are, per `TOOL_REGISTRY` in `server.py`). It is reached
+    here through `find_type_tool`, which always supplies `gql`, never
+    `query`. `query` is a latent trap on `find_person_tool` and its
+    siblings - accepted and silently ignored, because
+    `BaseGetMultipleParams` never declares a `query` field, so a caller that
+    passes it gets an unfiltered result page back with no error. This is not
+    hypothetical: `test_workflow_marriage.py`'s source, citation and event
+    steps were passing `query` to `find_source_tool`/`find_citation_tool`/
+    `find_event_tool` this same way before this fix, and the unfiltered
+    results meant find-before-create almost never found anything, so those
+    steps kept creating duplicates every run. `find_anything_tool` is the
+    tool that actually supports free-text `query` (see #18 for the full
+    writeup), but it mixes person, family, note, media and citation records
+    in one relevance-ranked result set - an exact `gql` match via
+    `find_type_tool` is used instead precisely so the person entry cannot be
+    pushed out of the result window by unrelated noise, without relying on
+    an ever-larger `max_results` to compensate.
 
     Args:
         given_name: Person's first name
@@ -230,24 +240,35 @@ async def create_or_find_person_with_attributes(
     prefixed_first_name = f"{PREFIX} {given_name}"
     full_name = f"{prefixed_first_name} {surname}"
 
-    # First: Use find_anything to search for an existing, prefixed person.
-    # find_anything mixes person, family, note, media and citation records
-    # in one result set, so pick a handle only off a line that actually
-    # looks like a person entry - "Name (M) - I0123 - [handle]" at the start
-    # of a line, produced by format_person. A family line ("Father: Name
-    # (M) - I0123 | Mother: ... - F0456 - [handle]") or a note/media title
-    # that happens to mention the name would otherwise hand back the wrong
-    # kind of handle.
-    # Reason: find_anything_tool's default result window is small, and it
-    # is dominated by this same test's own research note and portrait
-    # media (each past run's person creation left one of each, titled with
-    # this same full_name), so the person entry can sort past the default
-    # window and never be seen - which defeats find-before-create and
-    # reintroduces the #16 leak by falling through to the create branch on
-    # every run. A generous max_results keeps the person entry visible;
-    # once it is actually found and reused, no further note/media get
-    # created for this name, so the match count stops growing.
-    find_result = await find_anything_tool({"query": full_name, "max_results": 100})
+    # First: Use find_type for an exact, person-only lookup by first name.
+    # find_type(type="person", ...) dispatches to find_person_tool, so
+    # every returned line is a person entry - no family/note/media/citation
+    # lines to filter out, unlike a mixed find_anything result set.
+    #
+    # Reason: the previous approach used find_anything_tool's free-text
+    # search with "max_results": 100 as a stopgap - find_anything mixes
+    # person, family, note, media and citation records in one relevance-
+    # ranked, unsorted result set, so max_results was really pagesize on
+    # that noise, and it only raised the ceiling without removing the
+    # underlying problem. The citation-step leak (see #16) was actively
+    # pushing more note/media noise into that same search, feeding the
+    # ceiling it was meant to guard against. An exact GQL match on
+    # primary_name.first_name returns only people and is unaffected by
+    # however much other tree noise accumulates.
+    #
+    # Note: GQL cannot traverse primary_name.surname_list.surname - the API
+    # answers "422 list indices must be integers or slices, not str" for a
+    # list-of-dict field addressed that way - so match on first_name only,
+    # which already carries PREFIX and the given name, then disambiguate on
+    # the full name (including surname) below via person_line_pattern, same
+    # as before.
+    find_result = await find_type_tool(
+        {
+            "type": "person",
+            "gql": f'primary_name.first_name="{prefixed_first_name}"',
+            "max_results": 5,
+        }
+    )
 
     assert isinstance(find_result, list) and len(find_result) == 1
     result_text = find_result[0].text
@@ -257,7 +278,7 @@ async def create_or_find_person_with_attributes(
         re.MULTILINE,
     )
     existing_handle = None
-    if "No records found" not in result_text:
+    if "No people found" not in result_text:
         person_match = person_line_pattern.search(result_text)
         if person_match:
             # In real usage, we would ask user to confirm identity

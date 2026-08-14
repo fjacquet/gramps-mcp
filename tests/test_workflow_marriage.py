@@ -25,11 +25,9 @@ from src.gramps_mcp.tools.data_management import (
     create_source_tool,
 )
 from src.gramps_mcp.tools.search_basic import (
-    find_citation_tool,
-    find_event_tool,
     find_family_tool,
     find_repository_tool,
-    find_source_tool,
+    find_type_tool,
 )
 from tests.workflow_helpers import (
     create_or_find_person_with_attributes,
@@ -180,9 +178,23 @@ class TestCompleteWorkflow:
     async def _step_2_source_creation(self, workflow_data: dict[str, Any]):
         """Step 2: Source Document Creation following usage guide."""
 
-        # First: Use find_source to search for existing source document
-        find_result = await find_source_tool(
-            {"query": "Marriage Register 1875-1880", "pagesize": 5}
+        # First: Use an exact GQL lookup to search for an existing source
+        # document. `find_source_tool`'s `SourceSearchParams` has no `query`
+        # field, so the free-text `query` this step used to pass was
+        # silently dropped by Pydantic's default extra="ignore" - the search
+        # returned an unfiltered page of sources, "Marriage Register" almost
+        # never landed in the first 5, and a duplicate source got created on
+        # every run (confirmed live: 38 duplicate "Marriage Register
+        # 1875-1880" sources in the tree before this fix). Same root cause
+        # as the event step below and the person lookup in
+        # create_or_find_person_with_attributes - an exact GQL match on the
+        # title sidesteps it entirely.
+        find_result = await find_type_tool(
+            {
+                "type": "source",
+                "gql": 'class = source and title = "Marriage Register 1875-1880"',
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
@@ -218,29 +230,26 @@ class TestCompleteWorkflow:
     async def _step_3_citation_creation(self, workflow_data: dict[str, Any]):
         """Step 3: Citation Creation following usage guide."""
 
-        # First create note and media for citation if needed
-        note_handle = await create_test_note(
-            "Research note: Found this record during genealogy research session on January 15, 2024. Quality of handwriting is excellent.",
-            "Research",
-        )
-        workflow_data["citation_note_handle"] = note_handle
-
-        media_handle = await create_test_media(
-            "tests/sample/33SQ-GP8N-NLK.jpg",
-            "Marriage Record - John Smith & Mary Jones",
+        # First: Use an exact GQL lookup to search for an existing citation.
+        # `find_citation_tool`'s `GetCitationsParams` has no `query` field
+        # either, so the free-text `query` this step used to pass was
+        # silently dropped, the search returned an unfiltered page, and
+        # "Page 67" almost never landed in it - confirmed live: 37-38
+        # duplicate citations for this exact page text already in the tree.
+        # An unfound citation also defeats the note/media fix just above:
+        # if the citation is never found, a fresh note and media get created
+        # (properly attached, but unboundedly) on every run, which would
+        # still fail the flat-count acceptance check for this step. Same
+        # root cause and fix as the source step above.
+        find_result = await find_type_tool(
             {
-                "year": 1878,
-                "month": 6,
-                "day": 15,
-                "type": "regular",
-                "quality": "regular",
-            },
-        )
-        workflow_data["citation_media_handle"] = media_handle
-
-        # First: Use find_citation to search for existing citation
-        find_result = await find_citation_tool(
-            {"query": "Page 67 Entry 15 John Smith Mary Jones", "pagesize": 5}
+                "type": "citation",
+                "gql": (
+                    'class = citation and page = "Page 67, Entry 15, '
+                    'Marriage of John Smith and Mary Jones, June 15, 1878"'
+                ),
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
@@ -257,6 +266,32 @@ class TestCompleteWorkflow:
             # Use existing citation
             workflow_data["citation_handle"] = existing_handle
         else:
+            # Create the note and media for the new citation only. Creating
+            # these unconditionally (as the old code did, before the
+            # existence check above) leaked 2 orphan records per rerun: the
+            # existing-handle branch above has no citation to attach them
+            # to, so they stayed in the live tree attached to nothing - the
+            # same defect fixed in create_or_find_person_with_attributes,
+            # here at the citation site. See #16.
+            note_handle = await create_test_note(
+                "Research note: Found this record during genealogy research session on January 15, 2024. Quality of handwriting is excellent.",
+                "Research",
+            )
+            workflow_data["citation_note_handle"] = note_handle
+
+            media_handle = await create_test_media(
+                "tests/sample/33SQ-GP8N-NLK.jpg",
+                "Marriage Record - John Smith & Mary Jones",
+                {
+                    "year": 1878,
+                    "month": 6,
+                    "day": 15,
+                    "type": "regular",
+                    "quality": "regular",
+                },
+            )
+            workflow_data["citation_media_handle"] = media_handle
+
             # Create new citation with complete attributes
             create_result = await create_citation_tool(
                 {
@@ -284,9 +319,30 @@ class TestCompleteWorkflow:
         # Create place hierarchy first (if event has place)
         await create_place_hierarchy(workflow_data)
 
-        # First: Use find_event to search for existing event
-        find_result = await find_event_tool(
-            {"query": "marriage John Smith Mary Jones 1878", "pagesize": 5}
+        # First: Use an exact GQL lookup to search for the existing marriage
+        # event. `find_event_tool`'s `EventSearchParams` has no `query`
+        # field, so the free-text `query` this step used to pass was
+        # silently dropped and the search returned an unfiltered page that
+        # almost never contained this event - confirmed live: 37 duplicate
+        # marriage events with this exact description already in the tree,
+        # E1331..E1413. A fresh event on every run is what pushed
+        # `event_ref_list` on the found person unbounded (eleven groom
+        # references on one person, see #16 and the plan's task 9 brief):
+        # each new event handle got appended to the list on the update path,
+        # and `merge.py` merges list fields on PUT rather than replacing
+        # them (deliberate, for real edits) rather than deduplicating them.
+        # Finding the existing event, instead of changing merge semantics,
+        # is the fix - the reference appended on each rerun is then the one
+        # already there.
+        find_result = await find_type_tool(
+            {
+                "type": "event",
+                "gql": (
+                    'class = event and description = "Marriage ceremony '
+                    "performed by Rev. Patrick O'Sullivan\""
+                ),
+                "max_results": 5,
+            }
         )
 
         assert isinstance(find_result, list) and len(find_result) == 1
@@ -294,7 +350,7 @@ class TestCompleteWorkflow:
 
         # Check if event already exists
         existing_handle = None
-        if "No events found" not in result_text and "marriage" in result_text:
+        if "No events found" not in result_text and "Marriage" in result_text:
             handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
             if handle_match:
                 existing_handle = handle_match.group(1)
