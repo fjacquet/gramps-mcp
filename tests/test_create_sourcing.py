@@ -19,7 +19,7 @@ from src.gramps_mcp.tools.data_management import (
     create_source_tool,
 )
 from tests.constants import PREFIX
-from tests.workflow_helpers import _handle_on_line
+from tests.workflow_helpers import handle_on_line
 
 pytestmark = pytest.mark.integration
 
@@ -150,7 +150,7 @@ class TestCreateSourceTool:
         # The formatters emit "Attached media: <gramps_id>", never a MIME
         # type - format_media is the only place a MIME type appears. Assert
         # the exact gramps_id so a raw handle cannot satisfy this by chance.
-        source_handle = _handle_on_line(text, "Inline Media Source Test")
+        source_handle = handle_on_line(text, "Inline Media Source Test")
         source_data = await gramps_client.make_api_call(
             api_call=ApiCalls.GET_SOURCE, tree_id=tree_id, handle=source_handle
         )
@@ -187,7 +187,7 @@ class TestCreateSourceTool:
         text = result[0].text
         assert "Error:" not in text, f"Expected success but got error: {text}"
 
-        source_handle = _handle_on_line(text, "Abbrev Round Trip")
+        source_handle = handle_on_line(text, "Abbrev Round Trip")
         source_data = await gramps_client.make_api_call(
             api_call=ApiCalls.GET_SOURCE,
             tree_id=tree_id,
@@ -281,7 +281,7 @@ class TestCreateCitationTool:
         # Both the pre-existing and the inline-uploaded media should be
         # attached. format_citation emits "Attached media: <gramps_id>" per
         # ref, never a MIME type, so assert each media's gramps_id directly.
-        citation_handle = _handle_on_line(text, "Page 12, inline media test")
+        citation_handle = handle_on_line(text, "Page 12, inline media test")
         citation_data = await gramps_client.make_api_call(
             api_call=ApiCalls.GET_CITATION, tree_id=tree_id, handle=citation_handle
         )

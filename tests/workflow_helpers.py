@@ -22,13 +22,12 @@ from src.gramps_mcp.tools.data_management import (
 )
 from src.gramps_mcp.tools.search_basic import (
     find_anything_tool,
-    find_person_tool,
     find_place_tool,
 )
 from tests.constants import PREFIX
 
 
-def _handle_on_line(text: str, marker: str) -> str:
+def handle_on_line(text: str, marker: str) -> str:
     """Find the [handle] on the line containing marker - avoids picking up
     an unrelated handle (e.g. a repository or media ref) from elsewhere in
     a concatenated multi-entity response."""
@@ -187,57 +186,6 @@ async def create_or_find_place(
         return extract_handle(create_result)
 
 
-async def create_or_find_person(
-    given_name: str, surname: str, gender: int, birth_year: str, context: str
-) -> str:
-    """
-    Create or find a person following the workflow guidelines (legacy method).
-
-    Args:
-        given_name: Person's first name
-        surname: Person's last name
-        gender: 0=Female, 1=Male, 2=Unknown
-        birth_year: Estimated birth year for search
-        context: Geographic context for search
-
-    Returns:
-        Person handle
-    """
-    # First: Use find_person to search for existing person
-    search_query = f"{given_name} {surname} {birth_year} {context}"
-    find_result = await find_person_tool({"query": search_query, "pagesize": 5})
-
-    assert isinstance(find_result, list) and len(find_result) == 1
-    result_text = find_result[0].text
-
-    # Check for potential matches
-    existing_handle = None
-    if "No people found" not in result_text:
-        if (
-            given_name.lower() in result_text.lower()
-            and surname.lower() in result_text.lower()
-        ):
-            handle_match = re.search(r"\[([a-f0-9]+)\]", result_text)
-            if handle_match:
-                # In real usage, we would ask user to confirm identity
-                # For this test, we assume it's a match
-                existing_handle = handle_match.group(1)
-
-    if existing_handle:
-        # Use existing person
-        return existing_handle
-    else:
-        # Create new person
-        create_result = await create_person_tool(
-            {
-                "primary_name": {"given_name": given_name, "surname": surname},
-                "gender": gender,
-            }
-        )
-
-        return extract_handle(create_result)
-
-
 async def create_or_find_person_with_attributes(
     given_name: str,
     surname: str,
@@ -282,18 +230,6 @@ async def create_or_find_person_with_attributes(
     prefixed_first_name = f"{PREFIX} {given_name}"
     full_name = f"{prefixed_first_name} {surname}"
 
-    # Create note and media for person
-    person_note_handle = await create_test_note(
-        f"Genealogy research note for {full_name}. Found in marriage records from St. Mary's Church, Boston.",
-        "Research",
-    )
-
-    person_media_handle = await create_test_media(
-        "tests/sample/33SQ-GP8N-NLK.jpg",
-        f"Portrait of {full_name}",
-        {"year": int(birth_year) + 25, "type": "about", "quality": "estimated"},
-    )
-
     # First: Use find_anything to search for an existing, prefixed person.
     # find_anything mixes person, family, note, media and citation records
     # in one result set, so pick a handle only off a line that actually
@@ -302,7 +238,16 @@ async def create_or_find_person_with_attributes(
     # (M) - I0123 | Mother: ... - F0456 - [handle]") or a note/media title
     # that happens to mention the name would otherwise hand back the wrong
     # kind of handle.
-    find_result = await find_anything_tool({"query": full_name})
+    # Reason: find_anything_tool's default result window is small, and it
+    # is dominated by this same test's own research note and portrait
+    # media (each past run's person creation left one of each, titled with
+    # this same full_name), so the person entry can sort past the default
+    # window and never be seen - which defeats find-before-create and
+    # reintroduces the #16 leak by falling through to the create branch on
+    # every run. A generous max_results keeps the person entry visible;
+    # once it is actually found and reused, no further note/media get
+    # created for this name, so the match count stops growing.
+    find_result = await find_anything_tool({"query": full_name, "max_results": 100})
 
     assert isinstance(find_result, list) and len(find_result) == 1
     result_text = find_result[0].text
@@ -347,6 +292,21 @@ async def create_or_find_person_with_attributes(
         )
         return existing_handle
     else:
+        # Create note and media for the new person only. Creating these
+        # unconditionally (as the old code did) leaked 2 orphan records per
+        # run on every update: the update branch above cannot attach them,
+        # so they end up in the live tree attached to nothing - see #16.
+        person_note_handle = await create_test_note(
+            f"Genealogy research note for {full_name}. Found in marriage records from St. Mary's Church, Boston.",
+            "Research",
+        )
+
+        person_media_handle = await create_test_media(
+            "tests/sample/33SQ-GP8N-NLK.jpg",
+            f"Portrait of {full_name}",
+            {"year": int(birth_year) + 25, "type": "about", "quality": "estimated"},
+        )
+
         # Create new person with complete attributes
         create_result = await create_person_tool(
             {

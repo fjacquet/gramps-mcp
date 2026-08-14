@@ -61,8 +61,15 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
             # Reason: check_exactly_one_source guarantees source_title is set
             # whenever source_handle is not; mypy cannot see across the
             # validator, so narrow the type explicitly instead of loosening
-            # resolve_source_handles_by_title's signature to Optional.
-            assert params.source_title is not None
+            # resolve_source_handles_by_title's signature to Optional. An
+            # `assert` would be stripped under `python -O`, letting a None
+            # title reach resolve_source_handles_by_title and blow up with
+            # an opaque AttributeError on `.replace` - raise explicitly
+            # instead, which narrows identically for mypy and survives -O.
+            if params.source_title is None:
+                raise GrampsAPIError(
+                    "source_title is required when source_handle is not set."
+                )
             existing = await resolve_source_handles_by_title(
                 client, tree_id, params.source_title
             )
@@ -72,9 +79,17 @@ async def create_sourced_event_tool(arguments: dict) -> list[TextContent]:
                 # attaching to a same-titled source would be invisible and
                 # wrong - worse than the visible duplicate this guards
                 # against. Only the caller knows if it is the same document.
+                # resolve_source_handles_by_title caps its search at 10
+                # matches, so note when the list may be a truncated subset
+                # rather than the exhaustive set of duplicates.
+                partial_note = (
+                    " (list may be partial - more than 10 matches exist)"
+                    if len(existing) >= 10
+                    else ""
+                )
                 raise GrampsAPIError(
                     f"A source titled {params.source_title!r} already exists "
-                    f"({', '.join(existing)}). Call again with "
+                    f"({', '.join(existing)}){partial_note}. Call again with "
                     "source_handle set to one of those to attach this "
                     "citation to it, or use a distinct title if this is a "
                     "different document."

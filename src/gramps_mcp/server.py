@@ -179,10 +179,13 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     },
     "create_sourced_event": {
         "description": (
-            "Composite tool: create a source, citation, and event in one "
-            "call, auto-wiring the citation to the event (and optionally "
+            "Composite tool: create a citation and event in one call, "
+            "auto-wiring the citation to the event (and optionally "
             "uploading media to the citation) - avoids copy-paste handle "
-            "mistakes"
+            "mistakes. Either create a new source via source_title, or "
+            "reuse an existing one via source_handle; a source_title that "
+            "matches an existing source's title is refused rather than "
+            "silently reused or duplicated."
         ),
         "schema": SourcedEventData,
         "handler": create_sourced_event_tool,

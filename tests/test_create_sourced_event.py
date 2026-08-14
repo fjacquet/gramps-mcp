@@ -17,7 +17,7 @@ import pytest
 from src.gramps_mcp.models.api_calls import ApiCalls
 from src.gramps_mcp.tools.sourced_event import create_sourced_event_tool
 from tests.constants import PREFIX
-from tests.workflow_helpers import _handle_on_line
+from tests.workflow_helpers import handle_on_line
 
 pytestmark = pytest.mark.integration
 
@@ -62,8 +62,8 @@ class TestCreateSourcedEventTool:
         )
         assert "Birth" in text, f"Expected event type in output but got: {text}"
 
-        citation_handle = _handle_on_line(text, "Page 7, composite test entry")
-        event_handle = _handle_on_line(text, "Birth")
+        citation_handle = handle_on_line(text, "Page 7, composite test entry")
+        event_handle = handle_on_line(text, "Birth")
 
         # The whole point of this tool: verify the event actually got the
         # citation attached, not just that the response text claims success.
@@ -109,7 +109,7 @@ class TestCreateSourcedEventTool:
             f"media_path must not leak into the response but got: {text}"
         )
 
-        citation_handle = _handle_on_line(text, "Page 9, media test entry")
+        citation_handle = handle_on_line(text, "Page 9, media test entry")
 
         citation_data = await gramps_client.make_api_call(
             api_call=ApiCalls.GET_CITATION,
@@ -153,7 +153,7 @@ class TestCreateSourcedEventTool:
         )
         first_text = first[0].text
         assert "Error:" not in first_text, first_text
-        source_handle = _handle_on_line(first_text, "Reuse Register")
+        source_handle = handle_on_line(first_text, "Reuse Register")
 
         second = await create_sourced_event_tool(
             {
@@ -168,7 +168,7 @@ class TestCreateSourcedEventTool:
             f"Second call did not attach to the existing source: {second_text}"
         )
 
-        citation_handle = _handle_on_line(second_text, "Page 1, death")
+        citation_handle = handle_on_line(second_text, "Page 1, death")
         citation_data = await gramps_client.make_api_call(
             api_call=ApiCalls.GET_CITATION,
             tree_id=tree_id,
@@ -225,7 +225,11 @@ class TestCreateSourcedEventTool:
                 "event_type": "Birth",
             }
         )
-        assert "Error:" in result[0].text
+        text = result[0].text
+        assert "Error:" in text
+        assert "supply exactly one of source_title or source_handle" in text, (
+            f"Expected the mutual-exclusivity validator's own wording, got: {text}"
+        )
 
     @pytest.mark.asyncio
     async def test_create_sourced_event_missing_required_fields(self):
