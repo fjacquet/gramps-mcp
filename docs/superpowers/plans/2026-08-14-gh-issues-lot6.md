@@ -1217,6 +1217,236 @@ Closes #13"
 
 ---
 
+### Task 9: The citation step leaks the same way (#16, third site)
+
+Found by the final-review fix wave, which fixed the person step and then
+measured the citation step still growing: note and media counts went
+35 -> 36 -> 37 across two reruns of `tests/test_workflow_marriage.py`.
+
+`_step_3_citation_creation` in `tests/test_workflow_marriage.py` has the
+identical defect the fix wave just removed from the person step: it creates a
+note and a media object **unconditionally**, before checking whether the
+citation already exists. When the citation is found, those two records are
+attached to nothing and stay in the user's live genealogy tree.
+
+This is the same leak issue #16 describes, at a third site. Shipping
+`Closes #16` while this one still bleeds two records per run would repeat the
+mistake this lot was filed to correct - the first acceptance check counted only
+people, missed notes and media, and let the person-step leak through.
+
+**Files:**
+- Modify: `tests/test_workflow_marriage.py` (`_step_3_citation_creation`)
+
+- [ ] **Step 1: Measure the leak before touching it**
+
+Count the citation-step notes and media in the live tree, run the whole test
+file twice, and count again. Record both numbers. Use the same counting method
+the fix wave used for the person step (see
+`.superpowers/sdd/2026-08-14-gh-issues-lot6/final-fix-report.md`).
+
+Expected: the count grows by two per run.
+
+- [ ] **Step 2: Move the creation onto the path that links it**
+
+Apply the same shape the fix wave applied to
+`create_or_find_person_with_attributes` in `tests/workflow_helpers.py`: the
+`create_test_note` and `create_test_media` calls move inside the branch that
+creates the citation and attaches them. The found-existing path must create
+nothing.
+
+Read that helper first and mirror it, so the two steps stay consistent for the
+next reader.
+
+- [ ] **Step 3: Prove it with counts, not with a green test**
+
+```bash
+GRAMPS_API_URL=http://localhost:80 uv run pytest tests/test_workflow_marriage.py -xvs
+GRAMPS_API_URL=http://localhost:80 uv run pytest tests/test_workflow_marriage.py -xvs
+```
+
+Count the citation-step notes and media again after each run. They must be flat
+between the second and third run. A passing test is not the deliverable; the
+flat count is.
+
+- [ ] **Step 4: Sweep the rest of the file**
+
+`_step_1_repository_creation`, `_step_2_source_creation` and
+`_step_4_event_creation` follow the same find-or-create shape. Check each for
+the same pattern - anything created before the existence check that only the
+create path attaches. Fix any you find, and state in your report which steps
+you checked and what you found, so the sweep is on the record.
+
+- [ ] **Step 5: Commit**
+
+```bash
+uv run git add tests/test_workflow_marriage.py
+uv run git commit -m "fix: stop the citation step leaking notes and media
+
+The person step was fixed earlier in this branch; the citation step had the
+same defect. It created a note and a media object before checking whether the
+citation already existed, so on every rerun those two records were attached to
+nothing and stayed in the live tree. Measured at 35 -> 36 -> 37 across two
+reruns.
+
+Refs #16"
+```
+
+---
+
+### Task 7: `get_descendants` / `get_ancestors` return nothing (#19)
+
+Added to the lot after the final review, on the user's decision. Filed as
+[#19](https://github.com/fjacquet/gramps-mcp/issues/19).
+
+Both tools return an empty response for every person. Verified live:
+`get_descendants(gramps_id="I0904")` and `get_descendants(gramps_id="I0254")`
+both produce no output at all.
+
+**The mechanism.** The tools ask Gramps for an HTML report
+(`analysis.py:198`, `report_options = {"pid": ..., "off": "html"}`), then read
+it back through a code path built for errors:
+
+1. The body is HTML. `_parse_response` (`client.py:186-196`) tries
+   `response.json()`, fails, logs `Failed to parse JSON response`, and returns
+   `{"error": "Invalid JSON response", "raw_content": <text>}`.
+2. `raw_content` is truncated to `MAX_ERROR_DETAIL`, which is **300**
+   (`client.py:43`, applied at `:191-192`).
+3. `analysis.py:258-262` reads that `raw_content` as the report body.
+4. 300 characters of an HTML document is the `<head>` - a favicon link and a
+   stylesheet. `html_to_markdown` yields an empty string.
+5. The tool returns empty text and reports success.
+
+**The cap is not the bug and must not be raised.** It exists for a documented
+privacy reason (`client.py:180-184`): Gramps can echo a submitted payload back
+in an error body, and that payload may carry data about living people. The
+defect is upstream - a legitimate non-JSON success response is being routed
+through the error channel.
+
+**Files:**
+- Modify: `src/gramps_mcp/client.py` (`make_api_call`)
+- Modify: `src/gramps_mcp/tools/analysis.py` (both report downloads)
+- Test: `tests/test_analysis.py`
+
+- [ ] **Step 1: Watch the existing tests fail**
+
+```bash
+GRAMPS_API_URL=http://localhost:80 uv run pytest tests/test_analysis.py -xvs \
+  -k "descendants_real_api or ancestors_real_api"
+```
+
+Expected: FAIL, with the payload visible as HTML head markup.
+
+- [ ] **Step 2: Give non-JSON responses their own channel**
+
+`make_api_call` already carries a `with_headers: bool = False` flag
+(`client.py:303`); follow that precedent. Add `as_text: bool = False`. When
+true, return `response.text` whole and do not call `_parse_response` at all -
+no JSON attempt, no error dict, no truncation. HTTP error handling is
+unchanged: a non-2xx response must still raise `GrampsAPIError` exactly as it
+does today. Document the flag in the docstring, and add a `# Reason:` comment
+explaining that a report download is a file fetch, not a JSON call, so it must
+not travel through the error-truncation path.
+
+- [ ] **Step 3: Use it in both report downloads**
+
+In `src/gramps_mcp/tools/analysis.py`, the two `GET_REPORT_PROCESSED` calls
+(around lines 252 and 345) pass `as_text=True`, and the block that reads
+`report_response["raw_content"]` is replaced by using the returned string
+directly. Remove the now-dead `isinstance(..., dict) and "raw_content" in ...`
+branch.
+
+- [ ] **Step 4: Verify against the live server**
+
+```bash
+GRAMPS_API_URL=http://localhost:80 uv run pytest tests/test_analysis.py -xvs \
+  -k "descendants_real_api or ancestors_real_api"
+uv run pytest -m "not integration"
+uv run mypy src/gramps_mcp --ignore-missing-imports
+```
+
+Expected: the two tests PASS, offline suite unchanged, mypy clean. The live
+suite's failure count must drop by two.
+
+- [ ] **Step 5: Commit**
+
+```bash
+uv run git add src/gramps_mcp/client.py src/gramps_mcp/tools/analysis.py
+uv run git commit -m "fix: stop routing HTML reports through the error channel
+
+get_descendants and get_ancestors returned nothing for every person. They ask
+Gramps for an HTML report, but the response reached them through
+_parse_response's JSON-failure path, which truncates raw_content to
+MAX_ERROR_DETAIL (300 bytes). Three hundred characters of an HTML document is
+the <head>, so html_to_markdown produced an empty string and the tools
+reported success with no content.
+
+make_api_call gains as_text for responses that are not JSON by design. The
+300-byte cap is untouched: it bounds error bodies, which can echo a submitted
+payload carrying data about living people.
+
+Closes #19"
+```
+
+---
+
+### Task 8: `test_find_anything` depends on data it does not create (#20)
+
+Added to the lot after the final review, on the user's decision. Filed as
+[#20](https://github.com/fjacquet/gramps-mcp/issues/20).
+
+`tests/test_search_find_anything.py:32` searches for the literal `"pietrala"`
+and asserts a match. The test never creates that record; it relies on a person
+who happens to exist in whichever live tree the suite points at. It currently
+fails with `No records found matching 'pietrala'`.
+
+The assertion cannot tell "search is broken" from "that surname is not in this
+tree", so it does not test what its name claims.
+
+**Files:**
+- Modify: `tests/test_search_find_anything.py`
+
+- [ ] **Step 1: Rewrite the test to create what it searches for**
+
+Create a person carrying `PREFIX` from `tests/constants.py` plus a per-run
+unique suffix (`uuid.uuid4().hex[:8]`), following the pattern already used in
+`tests/test_create_sourced_event.py` and the `person_handles` fixture in
+`tests/conftest.py`. Search for that unique string. Keep the `max_results`
+half of the test - it becomes meaningful once the number of matching records
+is known rather than incidental.
+
+Use `create_person_tool` with the name shape the formatters actually read:
+
+```python
+primary_name={"first_name": f"{PREFIX} {unique}", "surname_list": [{"surname": "Findable"}]}
+```
+
+- [ ] **Step 2: Run it twice**
+
+```bash
+GRAMPS_API_URL=http://localhost:80 uv run pytest \
+  tests/test_search_find_anything.py -xvs
+GRAMPS_API_URL=http://localhost:80 uv run pytest \
+  tests/test_search_find_anything.py -xvs
+```
+
+Expected: PASS both times. The unique suffix makes the second run independent
+of the first.
+
+- [ ] **Step 3: Commit**
+
+```bash
+uv run git add tests/test_search_find_anything.py
+uv run git commit -m "test: make find_anything search for a record it creates
+
+The test searched for a hardcoded surname it never created, so it passed only
+while that person happened to exist in the live tree it was pointed at, and
+could not distinguish a broken search from absent data.
+
+Closes #20"
+```
+
+---
+
 ### Task 6: Open the pull request
 
 - [ ] **Step 1: Verify the branch state**
