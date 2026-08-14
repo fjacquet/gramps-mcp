@@ -78,3 +78,83 @@ class TestDeleteLive:
 
         second = await delete_type_tool({"type": "note", "handle": handle})
         assert "Error" in second[0].text
+
+    async def test_the_backlink_guard_fires_and_force_overrides_it(
+        self, gramps_client, tree_id
+    ):
+        """
+        The refusal path and force=true, end to end against the real API.
+
+        The offline tests feed should_refuse_delete a hand-written dict, so
+        nothing there proves the real `backlinks` response shape, nor that
+        `?backlinks=true` is honoured on the GET route. If the real shape
+        differed, should_refuse_delete({}) would return None and the guard
+        would silently never fire while every offline test stayed green.
+        force=true, the most dangerous flag in the branch, had no end-to-end
+        coverage at all.
+
+        Both records are created here, so force is only ever applied to a
+        record this test owns.
+        """
+        from src.gramps_mcp.models.api_calls import ApiCalls
+        from src.gramps_mcp.models.parameters.note_params import NoteSaveParams
+        from src.gramps_mcp.models.parameters.people_params import PersonData
+        from tests.conftest import create_entity, delete_entity
+        from tests.constants import PREFIX
+
+        note = await create_entity(
+            gramps_client,
+            tree_id,
+            ApiCalls.POST_NOTES,
+            NoteSaveParams(text=f"{PREFIX} referenced note", type="Transcript"),
+            "note",
+        )
+        person = await create_entity(
+            gramps_client,
+            tree_id,
+            ApiCalls.POST_PEOPLE,
+            PersonData(
+                primary_name={
+                    "first_name": PREFIX,
+                    "surname_list": [{"surname": "Backlink"}],
+                },
+                gender=1,
+                note_list=[note],
+            ),
+            "person",
+        )
+        note_survived = True
+        try:
+            refused = await delete_type_tool({"type": "note", "handle": note})
+            text = refused[0].text
+            assert "Refused" in text, text
+            assert "person" in text
+            assert person in text
+            assert "force=true" in text
+
+            # The refusal must be real, not cosmetic: the note is still there
+            # and the person still references it.
+            still_there = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_NOTE, tree_id=tree_id, handle=note
+            )
+            assert still_there["handle"] == note
+            before = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_PERSON, tree_id=tree_id, handle=person
+            )
+            assert note in before["note_list"]
+
+            forced = await delete_type_tool(
+                {"type": "note", "handle": note, "force": True}
+            )
+            assert "Deleted" in forced[0].text
+            assert "severed" in forced[0].text
+            note_survived = False
+
+            after = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_PERSON, tree_id=tree_id, handle=person
+            )
+            assert note not in after["note_list"]
+        finally:
+            await delete_entity(gramps_client, tree_id, ApiCalls.DELETE_PERSON, person)
+            if note_survived:
+                await delete_entity(gramps_client, tree_id, ApiCalls.DELETE_NOTE, note)

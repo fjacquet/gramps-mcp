@@ -116,7 +116,38 @@ class TestUndoLive:
             params={"page": 1, "pagesize": 1, "sort": "-id"},
             tree_id=tree_id,
         )
-        transaction_id = history[0]["id"]
+        transaction = history[0]
+        transaction_id = transaction["id"]
+
+        # Reason: this tree is production data. "the newest transaction" is
+        # not the same thing as "the transaction this test just made" - a
+        # concurrent write between the delete above and this read would make
+        # the rest of this test force-undo somebody else's work, and
+        # force=True means the server's conflict check would not stop it.
+        # Refuse to undo anything that does not name the handle created
+        # here, and say so loudly rather than skipping quietly.
+        touched = {
+            change.get("obj_handle") for change in transaction.get("changes") or []
+        }
+        if not touched:
+            # Some deployments omit `changes` from the list view; ask for the
+            # single transaction, which always carries them.
+            detail = await gramps_client.make_api_call(
+                api_call=ApiCalls.GET_TRANSACTION_HISTORY,
+                tree_id=tree_id,
+                transaction_id=transaction_id,
+            )
+            entries = (
+                detail if isinstance(detail, list) else detail.get("changes") or []
+            )
+            touched = {change.get("obj_handle") for change in entries}
+
+        assert handle in touched, (
+            f"transaction {transaction_id} does not concern the note this "
+            f"test created ({handle}); it touched {sorted(h for h in touched if h)}. "
+            "Something else wrote to the tree between the delete and this "
+            "read - refusing to undo an unrelated transaction."
+        )
 
         refused = await undo_change_tool({"transaction_id": transaction_id})
         assert "Error" in refused[0].text
