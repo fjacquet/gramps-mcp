@@ -14,39 +14,145 @@ import pytest
 from dotenv import load_dotenv
 from mcp.types import TextContent
 
-from src.gramps_mcp.tools.data_management import create_note_tool
+from src.gramps_mcp.models.api_calls import ApiCalls
+from src.gramps_mcp.tools.data_management import create_note_tool, create_person_tool
 from src.gramps_mcp.tools.search_basic import find_anything_tool
+from tests.constants import PREFIX
+from tests.workflow_helpers import extract_handle
 
 # Load environment variables
 load_dotenv()
 
 
 class TestFindAnythingTool:
-    """Test find_anything_tool functionality with real API."""
+    """Test find_anything_tool functionality with real API.
+
+    The test used to search for the hardcoded surname "pietrala" without
+    ever creating a matching record - it passed only while that person
+    happened to exist in whichever live tree the suite pointed at, and
+    could not distinguish "search is broken" from "that surname is not in
+    this tree" (see #20). It now creates the people it searches for, with
+    a per-run unique marker, and deletes them afterwards.
+    """
 
     pytestmark = pytest.mark.integration
 
+    @staticmethod
+    async def _create_marker_people(marker: str, count: int) -> list[tuple[str, str]]:
+        """Create fixture people sharing a first-name marker but distinct
+        surnames, so each can be told apart in a search result.
+
+        Args:
+            marker (str): Shared unique marker (uuid4 hex) common to every
+                fixture person created for one test - this is the search
+                query.
+            count (int): Number of fixture people to create.
+
+        Returns:
+            list[tuple[str, str]]: (handle, surname_marker) pairs, where
+                surname_marker is the distinct string identifying that
+                person in formatted output (e.g. "Findable0").
+        """
+        created = []
+        for i in range(count):
+            surname_marker = f"Findable{i}"
+            result = await create_person_tool(
+                {
+                    "primary_name": {
+                        "first_name": f"{PREFIX} {marker}",
+                        "surname_list": [{"surname": surname_marker}],
+                    },
+                    "gender": 2,
+                }
+            )
+            text = result[0].text
+            assert "Error:" not in text, f"Fixture person creation failed: {text}"
+            created.append((extract_handle(result), surname_marker))
+        return created
+
+    @staticmethod
+    async def _find_anything_until(
+        query: str, expected_min: int, **kwargs
+    ) -> list[TextContent]:
+        """Poll find_anything_tool until the reported total count is reached.
+
+        Full-text search indexing can lag slightly behind object creation
+        on a live server; this retries (up to 5 attempts, 1.5s apart) so
+        eventual-consistency lag doesn't produce a flaky failure.
+
+        Args:
+            query (str): Search query to pass to find_anything_tool.
+            expected_min (int): Minimum "Found N records" count to wait for.
+            **kwargs: Additional arguments forwarded to find_anything_tool
+                (e.g. max_results).
+
+        Returns:
+            list[TextContent]: The last response received, whether or not
+                expected_min was reached within the retry budget.
+        """
+        result: list[TextContent] = []
+        for _attempt in range(5):
+            result = await find_anything_tool({"query": query, **kwargs})
+            match = re.search(r"Found (\d+) records", result[0].text)
+            if match and int(match.group(1)) >= expected_min:
+                return result
+            await asyncio.sleep(1.5)
+        return result
+
     @pytest.mark.asyncio
-    async def test_find_anything(self):
-        """Test search across all object types with query."""
-        result = await find_anything_tool({"query": "pietrala", "max_results": 3})
+    async def test_find_anything(self, gramps_client, tree_id):
+        """Search across all object types finds a record this test creates,
+        and max_results caps how many of the matches are displayed.
 
-        print("\n--- FIND ANYTHING RESULT ---")
-        print(result[0].text)
-        print("--- END ---\n")
+        Two people share a unique first-name marker (the search query) but
+        have distinct surnames, so the number of matching records is known
+        (2) and the max_results=1 cap can be checked for real: exactly one
+        of the two surname markers must appear in the response, not merely
+        "some number no greater than the cap".
+        """
+        marker = uuid.uuid4().hex[:8]
+        query = f"{PREFIX} {marker}"
+        created = await self._create_marker_people(marker, 2)
 
-        assert len(result) == 1
-        assert isinstance(result[0], TextContent)
-        assert "error" not in result[0].text.lower(), (
-            f"Error found in response: {result[0].text}"
-        )
-        assert "Found" in result[0].text and "records matching" in result[0].text
+        try:
+            result = await self._find_anything_until(
+                query, expected_min=2, max_results=1
+            )
+            text = result[0].text
 
-        # Assert max_results is respected - count actual result entries
-        if "Found" in result[0].text and "No records found" not in result[0].text:
-            # Count the number of "• **" entries which indicate individual results
-            result_count = result[0].text.count("• **")
-            assert result_count <= 3, f"Expected max 3 results, got {result_count}"
+            print("\n--- FIND ANYTHING RESULT ---")
+            print(text)
+            print("--- END ---\n")
+
+            assert len(result) == 1
+            assert isinstance(result[0], TextContent)
+            assert "error" not in text.lower(), f"Error found in response: {text}"
+            assert "Found" in text and "records matching" in text, (
+                f"Expected a 'Found N records matching' header, got: {text}"
+            )
+
+            count_match = re.search(r"Found (\d+) records", text)
+            assert count_match, f"Expected a 'Found N records' header, got: {text}"
+            assert int(count_match.group(1)) >= 2, (
+                "Expected both fixture people to be indexed and matched "
+                f"(this is an indexing-lag issue, not a search regression), got: {text}"
+            )
+
+            displayed = [sm for _handle, sm in created if sm in text]
+            assert len(displayed) == 1, (
+                f"Expected exactly 1 of 2 fixture people displayed with "
+                f"max_results=1, got {len(displayed)} ({displayed}): {text}"
+            )
+        finally:
+            for handle, _surname_marker in created:
+                try:
+                    await gramps_client.make_api_call(
+                        api_call=ApiCalls.DELETE_PERSON, tree_id=tree_id, handle=handle
+                    )
+                except Exception:
+                    # Reason: a teardown failure must not turn a passing
+                    # test red. PREFIX is what makes a leftover findable.
+                    pass
 
 
 class TestFindAnythingPagination:
