@@ -254,6 +254,67 @@ class TestWalkAncestors:
 
 
 class TestWalkDescendants:
+    def _wide_failure_chain_transport(self):
+        """
+        Build a descendants transport where each generation has one
+        succeeding handle and two failing ones, only the succeeding handle
+        having children.
+
+        Returns:
+            tuple[Callable, dict]: The transport coroutine and a mutable
+            dict with a "fetch_count" key incremented on every call - the
+            output of the code under test, not a mock's recorded arguments.
+        """
+        counters = {"fetch_count": 0}
+
+        async def _request(self, method=None, url=None, **kwargs):
+            counters["fetch_count"] += 1
+            handle = url.rstrip("/").rsplit("/", 1)[-1]
+            if handle.startswith("f"):
+                raise RuntimeError("HTTP 500")
+            if handle == "h1":
+                children = ["s0", "f0a", "f0b"]
+            else:
+                generation = int(handle[1:])
+                children = [
+                    f"s{generation + 1}",
+                    f"f{generation + 1}a",
+                    f"f{generation + 1}b",
+                ]
+            return {
+                "handle": handle,
+                "profile": {
+                    "handle": handle,
+                    "gramps_id": f"I{handle}",
+                    "name_display": handle,
+                },
+                "extended": {
+                    "families": [{"child_ref_list": [{"ref": c} for c in children]}]
+                },
+            }
+
+        return _request, counters
+
+    async def test_repeated_failures_do_not_defeat_the_visit_cap(self):
+        # Reason: a fetch that raises is recorded in result.failed and never
+        # enters result.nodes. If the cap were enforced against
+        # len(result.nodes) alone (as it once was), a level where most
+        # fetches fail leaves that counter almost unmoved, so the next
+        # level's cap check keeps passing and the walk keeps issuing
+        # requests well past visit_cap - the cap is the only bound on
+        # request count. This tree is a chain: each generation has one
+        # handle that succeeds and two that fail, and only the successful
+        # handle has children. With the old (nodes-based) check this issues
+        # 7 requests against a visit_cap of 5; the fetch counter below
+        # proves the fixed (attempts-based) check stops at 4.
+        transport, counters = self._wide_failure_chain_transport()
+        with patch.object(GrampsWebAPIClient, "_make_request", new=transport):
+            result = await walk_descendants(
+                GrampsWebAPIClient(), "default", "h1", 10, visit_cap=5
+            )
+        assert counters["fetch_count"] <= 5
+        assert result.truncated_by_cap is True
+
     async def test_follows_child_ref_list_down_the_generations(self):
         children = {"h1": ["h2", "h3"], "h2": ["h4"], "h3": [], "h4": []}
         names = {"h1": "A", "h2": "B", "h3": "C", "h4": "D"}

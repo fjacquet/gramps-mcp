@@ -57,8 +57,8 @@ async def walk_descendants(client, tree_id, start_handle, max_generations, visit
 | `root` | handle of the subject |
 | `truncated_by_cap` | the visit cap stopped the walk |
 | `unexplored` | number of handles queued but never fetched |
-| `revisited` | handles reached more than once (cycles, cousin marriages) |
 | `failed` | `dict[handle, str]` for nodes whose fetch raised |
+| `visit_cap` | the cap this walk was run with |
 
 All fetching goes through one private helper:
 
@@ -111,7 +111,7 @@ Rules:
   the existing live tests assert on.
 - Visit cap: 500 people. On reaching it the walk stops and the output ends with
   `**Truncated**: visit cap of 500 reached, N branches unexplored. Lower
-  max_generations or start from a nearer ancestor.` The cap is never silent.
+  max_generations or start from a closer person.` The cap is never silent.
 - `max_generations` keeps its default of 5 and gains an upper bound of 20 in
   `AncestorsParams` / `DescendantsParams`, which have no bound today.
 - A failed fetch for one person does not abort the walk. That node renders as

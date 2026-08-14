@@ -12,13 +12,12 @@ from dotenv import load_dotenv
 from mcp.types import TextContent
 
 from src.gramps_mcp.tools.analysis import (
+    _validate_max_generations,
     get_ancestors_tool,
     get_descendants_tool,
     get_recent_changes_tool,
     get_tree_info_tool,
 )
-
-pytestmark = pytest.mark.integration
 
 # Load environment variables from .env file
 load_dotenv()
@@ -55,6 +54,8 @@ def extract_gramps_id_from_search(search_text: str):
 
 class TestGetDescendantsTool:
     """Test get_descendants_tool functionality."""
+
+    pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
     async def test_get_descendants_real_api(self):
@@ -148,6 +149,8 @@ class TestGetDescendantsTool:
 class TestGetAncestorsTool:
     """Test get_ancestors_tool functionality."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_get_ancestors_real_api(self):
         """Test get_ancestors_tool with real API."""
@@ -218,6 +221,8 @@ class TestGetAncestorsTool:
 class TestGetRecentChangesTool:
     """Test get_recent_changes_tool functionality."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_get_recent_changes_real_api(self):
         """Test get_recent_changes_tool with real API."""
@@ -256,6 +261,8 @@ class TestGetRecentChangesTool:
 class TestGetTreeInfoTool:
     """Test get_tree_info_tool functionality."""
 
+    pytestmark = pytest.mark.integration
+
     @pytest.mark.asyncio
     async def test_get_tree_info_real_api(self):
         """Test get_tree_info_tool with real API."""
@@ -291,6 +298,8 @@ class TestGetTreeInfoTool:
 class TestBfsAncestorOutput:
     """Live checks on the BFS output shape. Needs a populated tree."""
 
+    pytestmark = pytest.mark.integration
+
     async def test_ancestors_of_i0001_name_the_known_parents(self):
         result = await get_ancestors_tool({"gramps_id": "I0001", "max_generations": 3})
         text = result[0].text
@@ -317,4 +326,34 @@ class TestBfsAncestorOutput:
 
     async def test_unknown_gramps_id_reports_an_error(self):
         result = await get_ancestors_tool({"gramps_id": "I999999"})
-        assert "Error:" in result[0].text
+        # Reason: an unknown gramps_id is an expected outcome, not an
+        # unexpected error - the design specifies this exact message, with
+        # no "Unexpected error during..." wrapper.
+        assert result[0].text == "Error: no person found with gramps_id I999999"
+
+
+class TestValidateMaxGenerations:
+    """Offline tests for the max_generations bound the stdio transport
+    otherwise skips - see _validate_max_generations's docstring."""
+
+    def test_absent_value_defaults_to_five(self):
+        assert _validate_max_generations(None) == 5
+
+    def test_zero_is_rejected_not_silently_defaulted(self):
+        with pytest.raises(ValueError, match="1 through 20"):
+            _validate_max_generations(0)
+
+    def test_above_twenty_is_rejected(self):
+        with pytest.raises(ValueError, match="1 through 20"):
+            _validate_max_generations(21)
+
+    def test_non_integer_is_rejected(self):
+        with pytest.raises(ValueError, match="1 through 20"):
+            _validate_max_generations("5")
+
+    def test_bool_is_rejected_despite_being_an_int_subclass(self):
+        with pytest.raises(ValueError, match="1 through 20"):
+            _validate_max_generations(True)
+
+    def test_valid_value_passes_through(self):
+        assert _validate_max_generations(7) == 7

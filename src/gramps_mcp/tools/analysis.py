@@ -38,7 +38,11 @@ logger = logging.getLogger(__name__)
 
 def _format_error_response(error: Exception, operation: str) -> list[TextContent]:
     """Format error into user-friendly MCP response."""
-    if isinstance(error, GrampsAPIError):
+    if isinstance(error, (GrampsAPIError, ValueError)):
+        # Reason: a ValueError raised in this package (an unknown gramps_id,
+        # an out-of-range max_generations) is an expected, validated outcome
+        # - not a surprise the "Unexpected error during..." wrapper implies.
+        # Only genuinely unforeseen exceptions get that wrapper.
         error_msg = str(error)
     else:
         error_msg = f"Unexpected error during {operation}: {str(error)}"
@@ -110,6 +114,45 @@ async def _format_recent_changes(
 # ============================================================================
 
 
+def _validate_max_generations(raw) -> int:
+    """
+    Validate the raw max_generations argument for a traversal tool.
+
+    The Pydantic parameter models (AncestorsParams, DescendantsParams)
+    already enforce ``ge=1, le=20``, but that bound only applies on the
+    HTTP transport, where server.py builds and validates a parameter model
+    before calling the handler. The stdio transport's handle_call_tool
+    passes params.arguments straight through with no validation, so this
+    function is the only bound on that path.
+
+    Args:
+        raw: The raw ``max_generations`` value from tool arguments, of any
+            type - absent keys surface here as None.
+
+    Returns:
+        int: A validated generation count, 1 through 20 inclusive. Missing
+        or None input defaults to 5.
+
+    Raises:
+        ValueError: The value is not an integer, or is outside 1-20.
+            ``bool`` is rejected even though it is a subclass of ``int`` in
+            Python - True/False are not meaningful generation counts and
+            passing one is almost certainly a mistake, not an intentional
+            1.
+    """
+    if raw is None:
+        return 5
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ValueError(
+            f"max_generations must be an integer from 1 through 20, got {raw!r}"
+        )
+    if not 1 <= raw <= 20:
+        raise ValueError(
+            f"max_generations must be an integer from 1 through 20, got {raw}"
+        )
+    return raw
+
+
 async def _traverse_and_format(
     client, arguments: dict, direction: str, walk
 ) -> list[TextContent]:
@@ -129,7 +172,7 @@ async def _traverse_and_format(
         gramps_id = arguments.get("gramps_id")
         if not gramps_id:
             raise ValueError("gramps_id is required")
-        max_generations = arguments.get("max_generations") or 5
+        max_generations = _validate_max_generations(arguments.get("max_generations"))
 
         tree_id = get_settings().gramps_tree_id
         start_handle = await resolve_person_handle(client, tree_id, gramps_id)

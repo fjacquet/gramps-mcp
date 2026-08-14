@@ -124,6 +124,6 @@ def format_traversal(result: TraversalResult, direction: str) -> str:
         text += (
             f"\n**Truncated**: visit cap of {result.visit_cap} reached, "
             f"{result.unexplored} branches unexplored. Lower max_generations "
-            "or start from a nearer ancestor.\n"
+            "or start from a closer person.\n"
         )
     return text

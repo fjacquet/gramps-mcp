@@ -189,11 +189,18 @@ async def _walk(
     result = TraversalResult(root=start_handle, visit_cap=visit_cap)
     seen: set[str] = {start_handle}
     level = [start_handle]
+    # Reason: a failed fetch is recorded in result.failed and never enters
+    # result.nodes, so len(result.nodes) alone understates how many fetches
+    # were actually attempted. A level with many failures would then leave
+    # the cap check unmoved and the walk would keep issuing requests well
+    # past visit_cap. attempted counts every fetch issued, success or not,
+    # and is what the cap is enforced against.
+    attempted = 0
 
     for iteration in range(max_generations):
         if not level:
             break
-        if len(result.nodes) + len(level) > visit_cap:
+        if attempted + len(level) > visit_cap:
             # Reason: the previous iteration already recorded edges pointing
             # at these handles, but they were never fetched - drop those
             # dangling references so the renderer does not print a phantom
@@ -210,6 +217,7 @@ async def _walk(
             break
 
         is_last_iteration = iteration == max_generations - 1
+        attempted += len(level)
         payloads = await _fetch_level(client, tree_id, level, extend)
         next_level: list[str] = []
         for handle, payload in payloads.items():

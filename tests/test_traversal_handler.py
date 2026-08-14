@@ -106,7 +106,7 @@ class TestFormatTraversal:
         text = format_traversal(result, "ancestors")
         assert text.rstrip().endswith(
             "**Truncated**: visit cap of 500 reached, 42 branches unexplored. "
-            "Lower max_generations or start from a nearer ancestor."
+            "Lower max_generations or start from a closer person."
         )
 
     def test_no_footer_when_the_walk_completed(self):

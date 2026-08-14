@@ -52,8 +52,8 @@ down the shape the walk must produce.
 - Produces:
   - `TraversalResult` dataclass in `src/gramps_mcp/traversal.py` with fields
     `root: str`, `nodes: dict[str, dict]`, `edges: dict[str, list[str]]`,
-    `truncated_by_cap: bool`, `unexplored: int`, `revisited: set[str]`,
-    `failed: dict[str, str]`
+    `truncated_by_cap: bool`, `unexplored: int`, `failed: dict[str, str]`,
+    `visit_cap: int`
   - `format_traversal(result: TraversalResult, direction: str) -> str` in
     `src/gramps_mcp/handlers/traversal_handler.py`, where `direction` is
     `"ancestors"` or `"descendants"`
