@@ -51,6 +51,7 @@ from .models.parameters.analysis_params import (
     TreeInfoParams,
 )
 from .models.parameters.citation_params import CitationData
+from .models.parameters.destructive_params import DeleteTypeParams
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.family_params import FamilySaveParams
@@ -87,6 +88,7 @@ from .tools import (
     get_recent_changes_tool,
     get_tree_info_tool,
 )
+from .tools.destructive import delete_type_tool
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
@@ -266,6 +268,17 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "Get interesting facts and statistics about the tree",
         "schema": FactsParams,
         "handler": get_facts_tool,
+    },
+    "delete_type": {
+        "description": (
+            "Delete one record (person, family, event, place, source, "
+            "citation, repository, media, note, tag). Refuses while other "
+            "records still reference it, listing them; pass force=true to "
+            "delete anyway and sever those references. Deletions can be "
+            "reversed with undo_change"
+        ),
+        "schema": DeleteTypeParams,
+        "handler": delete_type_tool,
     },
 }
 
