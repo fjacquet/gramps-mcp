@@ -85,12 +85,46 @@ class GrampsWebAPIClient:
         json_data: dict | None = None,
         retry_auth: bool = True,
         return_headers: bool = False,
+        content: bytes | None = None,
+        extra_headers: dict | None = None,
     ):
-        """Make HTTP request with error handling and auth retry."""
+        """
+        Make HTTP request with error handling and auth retry.
+
+        Args:
+            method (str): HTTP method.
+            url (str): Absolute request URL.
+            params (dict | None): Query string parameters.
+            json_data (dict | None): JSON body, used when content is None.
+            retry_auth (bool): Whether a 401 may trigger one token refresh.
+            return_headers (bool): Return (body, headers) instead of body.
+            content (bytes | None): Raw body, sent instead of json_data.
+            extra_headers (dict | None): Headers merged over the authentication
+                headers, so a caller can override Content-Type.
+
+        Returns:
+            Any: The parsed response body, or a (body, headers) tuple when
+                return_headers is set.
+
+        Raises:
+            GrampsAPIError: For any HTTP, connection, timeout or parse failure.
+        """
         try:
             headers = await self._get_headers()
+            if extra_headers:
+                headers = {**headers, **extra_headers}
+            # Reason: a media upload sends raw bytes with its own Content-Type,
+            # so it cannot use the json= path. Everything after the send - the
+            # 401 retry, the status formatting, the connect and timeout
+            # wrapping, the empty-body case - is identical, which is why the
+            # upload routes through here rather than repeating a subset of it.
             response = await self.auth_manager.client.request(
-                method=method, url=url, params=params, json=json_data, headers=headers
+                method=method,
+                url=url,
+                params=params,
+                json=json_data if content is None else None,
+                content=content,
+                headers=headers,
             )
 
             # Handle 401 with token refresh retry
@@ -104,6 +138,8 @@ class GrampsWebAPIClient:
                     json_data,
                     retry_auth=False,
                     return_headers=return_headers,
+                    content=content,
+                    extra_headers=extra_headers,
                 )
 
             response.raise_for_status()
@@ -359,18 +395,9 @@ class GrampsWebAPIClient:
                 every other request made through _make_request.
         """
         url = self._build_url(tree_id, "media/")
-        headers = await self._get_headers()
-        headers["Content-Type"] = mime_type
-
-        response = await self.auth_manager.client.request(
-            method="POST", url=url, content=file_content, headers=headers
+        return await self._make_request(
+            "POST", url, content=file_content, extra_headers={"Content-Type": mime_type}
         )
-        try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            error_msg = self._format_http_error(e)
-            raise GrampsAPIError(error_msg) from e
-        return self._parse_response_body(response)
 
 
 # Export the main classes for easy import
