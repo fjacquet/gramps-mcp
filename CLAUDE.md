@@ -108,6 +108,16 @@
 - See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
   research/data-entry workflow (sourcing chain, media attachment, match vs.
   hypothesis handling, homonym hygiene).
+- **Surname casing: no international standard mandates uppercase.** GEDCOM
+  5.5.1 explicitly says the opposite - "capitalize the first letter of each
+  part and lowercase the other letters" - and FamilySearch follows that.
+  ALL-CAPS surname (`JACQUET`) is a French-specific formal/international-
+  correspondence convention, not a universal genealogy rule. Do not write
+  surnames upper-case against Gramps to "fix" casing; store Title Case
+  (`Jacquet`), matching GEDCOM and the sibling `genecrew` repo's tested
+  `GrampsUpdateNameTool` invariant (recases `JACQUET`->`Jacquet`, never the
+  reverse). Verified 2026-08-16 via GEDCOM spec + MyHeritage/tamurajones
+  naming-convention references.
 
 ### Documentation & Explainability
 - **Update `README.md`** when new features are added, dependencies change, or setup steps are modified.
