@@ -13,6 +13,34 @@ import pytest
 from src.gramps_mcp.client import GrampsWebAPIClient
 
 
+def _assert_confined_to_people_endpoint(value: str, *, anchored: bool = False) -> None:
+    """
+    Assert value carries the people endpoint and none of the escape
+    surfaces a crafted handle could otherwise reach.
+
+    Shared by the constructed URL string and the wire request's raw_path -
+    the two representations a crafted handle passes through before this
+    test is satisfied. The endpoint-presence check differs between them:
+    the constructed string carries a scheme and host before the path, so
+    the endpoint can only be asserted present; the wire's raw_path is the
+    path alone, so it can be asserted to start with the endpoint.
+
+    Args:
+        value (str): The constructed URL, or the wire request's raw_path.
+        anchored (bool): True for the wire's raw_path, where the endpoint
+            must be the very start of what is actually sent, not merely
+            present somewhere in the value.
+    """
+    if anchored:
+        assert value.startswith("/api/people/")
+    else:
+        assert "/api/people/" in value
+    assert "/api/users" not in value
+    assert "/api/metadata" not in value
+    assert "?" not in value
+    assert "#" not in value
+
+
 class TestUrlParameterEncoding:
     @pytest.mark.parametrize(
         "crafted",
@@ -36,20 +64,16 @@ class TestUrlParameterEncoding:
         url = client._build_url_with_substitution(
             "default", "people/{handle}", {"handle": crafted}
         )
-        assert "/api/people/" in url
-        assert "/api/users" not in url
-        assert "/api/metadata" not in url
-        assert "?" not in url
-        assert "#" not in url
+        _assert_confined_to_people_endpoint(url)
+
         # Reason: the whole crafted value must remain one path segment on
         # the wire - the constructed string is not the exploitable surface,
-        # httpx normalises dot segments when it builds the request.
+        # httpx normalises dot segments when it builds the request. This
+        # segment-boundary assertion is the actual point of the test and
+        # stays here rather than moving into the shared helper: it only
+        # applies to what is actually sent, not to the constructed string.
         sent = httpx.Request("GET", url).url.raw_path.decode()
-        assert sent.startswith("/api/people/")
-        assert "/api/users" not in sent
-        assert "/api/metadata" not in sent
-        assert "?" not in sent
-        assert "#" not in sent
+        _assert_confined_to_people_endpoint(sent, anchored=True)
         assert "/" not in sent.split("/api/people/", 1)[1]
 
     def test_an_ordinary_handle_is_unchanged(self):
