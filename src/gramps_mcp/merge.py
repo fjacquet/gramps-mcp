@@ -58,6 +58,46 @@ def merge_put_data(
             and key not in replace
         ):
             merged[key] = _merge_list(existing.get(key, []), value)
+        # Reason: primary_name is required on PersonData, so it is resent on
+        # every person update - including ones that have nothing to do with
+        # the name. Replacing it wholesale destroyed surname_list, suffix,
+        # type and the name's own citations. replace_lists is honoured here
+        # too, so an explicit replacement is still available per key.
+        elif (
+            isinstance(value, dict)
+            and isinstance(existing.get(key), dict)
+            and key not in replace
+        ):
+            merged[key] = _merge_dict(existing[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _merge_dict(existing_value: dict, new_value: dict) -> dict:
+    """
+    Merge a nested object, preserving sub-keys the caller did not mention.
+
+    Applies one rule one level down, recursively: a nested dict merges with
+    the existing dict, and everything else - including a nested list -
+    replaces. Sub-keys the caller does not mention are always preserved.
+
+    Args:
+        existing_value (dict): The nested object currently stored in Gramps.
+        new_value (dict): The sub-keys the caller wants to change.
+
+    Returns:
+        dict: A new dict containing the merged object.
+    """
+    merged = existing_value.copy()
+    for key, value in new_value.items():
+        current = existing_value.get(key)
+        # Reason: a nested dict merges, but a nested LIST replaces. A list
+        # inside a descriptive object is stated, not appended to - unioning
+        # surname_list would make correcting a surname impossible, yielding
+        # both the old and the new. Only unmentioned sub-keys are preserved.
+        if isinstance(value, dict) and isinstance(current, dict):
+            merged[key] = _merge_dict(current, value)
         else:
             merged[key] = value
     return merged

@@ -331,3 +331,81 @@ class TestClientMergeLogic:
         changes = {"urls": [{"path": "https://a.example"}]}
         result = merge_put_data(existing, changes)
         assert result["urls"] == [{"path": "https://a.example"}]
+
+    def test_partial_primary_name_keeps_the_sub_keys_it_omits(self):
+        # Reason: primary_name is required on PersonData, so every person
+        # update resends it. Replacing it wholesale destroyed 13 of the 15
+        # sub-keys every person in the live tree carries.
+        existing = {
+            "primary_name": {
+                "first_name": "Jean-Pierre",
+                "surname_list": [{"surname": "Jacquet"}],
+                "suffix": "Jr",
+                "call": "JP",
+                "type": "Birth Name",
+            }
+        }
+        changes = {"primary_name": {"first_name": "Jean"}}
+        result = merge_put_data(existing, changes)
+        assert result["primary_name"] == {
+            "first_name": "Jean",
+            "surname_list": [{"surname": "Jacquet"}],
+            "suffix": "Jr",
+            "call": "JP",
+            "type": "Birth Name",
+        }
+
+    def test_a_stated_nested_list_replaces_so_a_surname_can_be_corrected(self):
+        # Reason: a list nested inside a descriptive object is stated, not
+        # appended to. Unioning it would make correcting a surname
+        # impossible - fixing Smith to Smith-Jones would yield both.
+        existing = {"primary_name": {"surname_list": [{"surname": "Smith"}]}}
+        changes = {"primary_name": {"surname_list": [{"surname": "Smith-Jones"}]}}
+        result = merge_put_data(existing, changes)
+        assert result["primary_name"]["surname_list"] == [{"surname": "Smith-Jones"}]
+
+    def test_an_unmentioned_nested_list_is_kept(self):
+        # Reason: replacement applies only to a list the caller stated. A
+        # nested list they never mentioned must survive like any sub-key.
+        existing = {
+            "primary_name": {
+                "first_name": "Jean",
+                "surname_list": [{"surname": "Jacquet"}],
+                "citation_list": ["c1"],
+            }
+        }
+        changes = {"primary_name": {"first_name": "Pierre"}}
+        result = merge_put_data(existing, changes)
+        assert result["primary_name"]["surname_list"] == [{"surname": "Jacquet"}]
+        assert result["primary_name"]["citation_list"] == ["c1"]
+
+    def test_a_partial_place_name_keeps_lang_and_date(self):
+        existing = {"name": {"value": "Lyon", "lang": "fr", "date": {"year": 1800}}}
+        changes = {"name": {"value": "Lugdunum"}}
+        result = merge_put_data(existing, changes)
+        assert result["name"] == {
+            "value": "Lugdunum",
+            "lang": "fr",
+            "date": {"year": 1800},
+        }
+
+    def test_a_dict_absent_from_existing_is_taken_as_is(self):
+        existing = {"gramps_id": "I0001"}
+        changes = {"primary_name": {"first_name": "Jean"}}
+        result = merge_put_data(existing, changes)
+        assert result["primary_name"] == {"first_name": "Jean"}
+
+    def test_a_dict_replacing_a_scalar_is_taken_as_is(self):
+        # Reason: type mismatch between existing and new means the record
+        # shape changed; merging two incompatible types would invent data.
+        existing = {"name": "Lyon"}
+        changes = {"name": {"value": "Lyon", "lang": "fr"}}
+        result = merge_put_data(existing, changes)
+        assert result["name"] == {"value": "Lyon", "lang": "fr"}
+
+    def test_neither_input_is_mutated_by_a_nested_merge(self):
+        existing = {"primary_name": {"first_name": "Jean", "suffix": "Jr"}}
+        changes = {"primary_name": {"first_name": "Pierre"}}
+        merge_put_data(existing, changes)
+        assert existing == {"primary_name": {"first_name": "Jean", "suffix": "Jr"}}
+        assert changes == {"primary_name": {"first_name": "Pierre"}}
