@@ -39,12 +39,17 @@ from pydantic import BaseModel, Field, field_validator
 # What this pattern actually constrains is narrower and does not depend on
 # guessing a handle's format: a handle lands in a URL path segment, so it
 # must not contain a character that means something there (/, ., ?, #, %,
-# whitespace, backslash, etc). That is the same property USERNAME_PATTERN
-# in tools/user_tools.py enforces on a value with the same URL-path fate,
-# for the same reason. This name-for-the-job (not "HANDLE_PATTERN") is
-# deliberate: a name that does not say which job it does is how a stricter,
-# narrower rule (place-name-vs-handle discrimination) and this URL-safety
-# rule got merged into one constant and broke each other.
+# whitespace, backslash, etc). USERNAME_PATTERN in tools/user_tools.py
+# guards a value with the same URL-path fate, for the same purpose - but
+# it is not the same property: USERNAME_PATTERN is
+# r"[A-Za-z0-9_.-]{2,64}" and allows a dot, which this pattern deliberately
+# excludes, because a dot is exactly what makes "." and ".." meaningful as
+# path segments (current directory / parent directory) - a username is
+# never compared against those, but a handle reaching a path segment must
+# not be confusable with them. This name-for-the-job (not "HANDLE_PATTERN")
+# is deliberate: a name that does not say which job it does is how a
+# stricter, narrower rule (place-name-vs-handle discrimination) and this
+# URL-safety rule got merged into one constant and broke each other.
 #
 # Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
 # needed here. re.match plus a "$" anchor accepts a trailing newline because
