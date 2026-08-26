@@ -23,19 +23,27 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-# Reason: a Gramps handle is a lowercase hexadecimal string. Live-tree
-# sampling (2026-08-13, GET_PLACES) found handles of 26-32 lowercase hex
-# characters (0-9a-f only - no uppercase, no g-z). Place names contain
-# spaces, hyphens or accents, or are simply short, so this pattern separates
-# them. The 16-char floor stays below the smallest observed handle (26) to
-# tolerate handle shapes not covered by that sample. Passing a name here
-# used to overwrite a valid handle with text that resolves to nothing - the
-# trap documented in CLAUDE.md.
+# Reason: this does NOT describe what a Gramps handle looks like - a
+# 3425-handle check across every record type in the live tree (2026-08-26)
+# found 21 real production handles that are not lowercase hex: one person
+# handle is a UUID (with dashes), and twenty citation handles equal their
+# own gramps_id (e.g. "C0055" - uppercase letters and digits, no dashes).
+# Handles come in at least three shapes in this tree alone - hex, UUID,
+# gramps_id-like - so no character-class-plus-length pattern can describe
+# "a handle" without either rejecting real records or accepting arbitrary
+# text. Do not try to narrow this again to look more handle-shaped.
+#
+# What this pattern actually constrains is narrower and does not depend on
+# guessing a handle's format: a handle lands in a URL path segment, so it
+# must not contain a character that means something there (/, ., ?, #, %,
+# whitespace, backslash, etc). That is the same property USERNAME_PATTERN
+# in tools/user_tools.py enforces on a value with the same URL-path fate,
+# for the same reason.
 #
 # Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
 # needed here. re.match plus a "$" anchor accepts a trailing newline because
 # "$" matches just before a final newline; fullmatch has no such gap.
-HANDLE_PATTERN = r"[0-9a-f]{16,}"
+HANDLE_PATTERN = r"[A-Za-z0-9_-]+"
 
 
 def validate_handle_shape(value: str | None) -> str | None:
@@ -50,8 +58,8 @@ def validate_handle_shape(value: str | None) -> str | None:
         str | None: The value unchanged when it is None or well-shaped.
 
     Raises:
-        ValueError: When the value is present and not lowercase hex of at
-            least 16 characters.
+        ValueError: When the value is present and contains a character
+            other than a letter, digit, underscore or dash.
     """
     # Reason: a handle lands in a URL path segment. Encoding in the client
     # already stops a crafted value from leaving its segment, but refusing
@@ -59,10 +67,9 @@ def validate_handle_shape(value: str | None) -> str | None:
     # rather than 404ing against an endpoint the caller never meant to hit.
     if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
         raise ValueError(
-            f"'{value}' is not a Gramps handle. A handle is lowercase hex, "
-            "at least 16 characters, as returned by a find or get call. To "
-            "identify a record by its Gramps ID instead, use the gramps_id "
-            "field."
+            f"'{value}' is not a Gramps handle. A handle may contain only "
+            "letters, digits, underscore and dash. To identify a record by "
+            "its Gramps ID instead, use the gramps_id field."
         )
     return value
 
