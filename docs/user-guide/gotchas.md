@@ -44,3 +44,23 @@ holds. That is an environment fact about Gramps Web, not something wrong with
 your setup, and no argument works around it. Use
 [`get_facts`](searching.md#reading-a-record-in-depth) when you want tree-level
 numbers.
+
+## Partial updates merge, including inside nested objects
+
+Before 2026-08-26, `merge_put_data` reasoned only about top-level keys whose
+name ended in `_list`. A partial `primary_name` replaced the whole name
+object, `urls` and `alt_names` were replaced outright, and a reference whose
+`ref` already existed was dropped even when its role differed - so adding
+someone to an event in a second role did nothing and reported success.
+
+All of it is fixed. Dispatch is by value type rather than key name, nested
+objects merge sub-key by sub-key, and a reference entry is identified by
+`(ref, role, rect)`: a differing identity is appended, while a differing
+attribute merges into the entry already stored.
+
+A list nested inside an object is the one thing that still replaces rather
+than merging. That is deliberate - unioning `primary_name.surname_list` would
+make correcting a surname impossible, yielding both the old and the new.
+
+If you need replace-outright behaviour for a specific top-level key, pass it
+in `replace_lists`, which now covers nested objects as well as lists.
