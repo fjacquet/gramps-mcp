@@ -2,7 +2,13 @@ services:
   gramps-mcp:
     image: ghcr.io/fjacquet/gramps-mcp:latest
     ports:
-      - "8000:8000"
+      # Reason: every tool in the registry - including delete_type,
+      # merge_type and manage_users - is reachable by anyone who can open
+      # this port, with the server's own owner-role Gramps credentials,
+      # and the MCP server performs no authentication of its own. Bind the
+      # publish to the loopback interface; to reach it from elsewhere, put
+      # an authenticating reverse proxy in front rather than widening this.
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     restart: unless-stopped

@@ -33,19 +33,23 @@ from pydantic import BaseModel, Field, field_validator
 from .base_params import BaseGetMultipleParams, StrictModel
 from .date_params import DateValue
 
-# Reason: a Gramps handle is a lowercase hexadecimal string. Live-tree
-# sampling (2026-08-13, GET_PLACES) found handles of 26-32 lowercase hex
-# characters (0-9a-f only - no uppercase, no g-z). Place names contain
-# spaces, hyphens or accents, or are simply short, so this pattern separates
-# them. The 16-char floor stays below the smallest observed handle (26) to
-# tolerate handle shapes not covered by that sample. Passing a name here
-# used to overwrite a valid handle with text that resolves to nothing - the
-# trap documented in CLAUDE.md.
+# Reason: this is NOT the URL-safety rule (URL_SAFE_IDENTIFIER_PATTERN in
+# base_params.py). That rule only needs to keep URL-path-breaking
+# characters out, so it is deliberately wide - wide enough to accept
+# "Lyon". This rule solves a different problem: catching a place NAME
+# passed where a place HANDLE belongs, so it must be deliberately narrow
+# enough that an ordinary word fails it. A 739-place-handle and
+# 1000-event-handle sample of the live tree (2026-08-26) found every one
+# of them lowercase hex, so this pattern is safe to keep narrow here. If
+# that ever stops being true, this pattern - not the shared URL-safety one
+# - is what needs revisiting; do not fix a future non-hex place/event
+# handle by widening this back to URL_SAFE_IDENTIFIER_PATTERN, since that
+# is exactly the merge that let "Lyon" through undetected before.
 #
 # Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
 # needed here. re.match plus a "$" anchor accepts a trailing newline because
 # "$" matches just before a final newline; fullmatch has no such gap.
-HANDLE_PATTERN = r"[0-9a-f]{16,}"
+PLACE_HANDLE_PATTERN = r"[0-9a-f]{16,}"
 
 
 class EventSearchParams(BaseGetMultipleParams):
@@ -95,9 +99,9 @@ class EventSaveParams(StrictModel):
 
         Raises:
             ValueError: If value is not None and does not match
-                HANDLE_PATTERN.
+                PLACE_HANDLE_PATTERN.
         """
-        if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
+        if value is not None and not re.fullmatch(PLACE_HANDLE_PATTERN, value):
             raise ValueError(
                 f"place must be a place handle, not a name. Got: {value!r}. "
                 "Use find_type(type='place', ...) to obtain the handle for "

@@ -24,7 +24,7 @@ for all Gramps Web API operations through the make_api_call method.
 import logging
 import re
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel
@@ -71,11 +71,23 @@ class GrampsWebAPIClient:
         return self.auth_manager.get_headers()
 
     def _build_url(self, tree_id: str, endpoint: str) -> str:
-        """Build complete URL for API endpoint."""
-        # The tree_id is handled via authentication token, not URL path
-        # Ensure base_url ends with / for proper urljoin behavior
-        base = self.base_url.rstrip("/") + "/"
-        return urljoin(base, endpoint)
+        """
+        Build the complete URL for an API endpoint.
+
+        Args:
+            tree_id (str): Family tree identifier. Unused - the tree is
+                selected by the authentication token, not by the path.
+            endpoint (str): Endpoint path, with any placeholders already
+                substituted and encoded.
+
+        Returns:
+            str: The absolute URL.
+        """
+        # Reason: urljoin treats an endpoint starting with "/" as absolute
+        # and discards the base's /api prefix, and it resolves ".." even
+        # after encoding. Straight concatenation onto the normalised base
+        # cannot do either.
+        return self.base_url.rstrip("/") + "/" + endpoint.lstrip("/")
 
     async def _make_request(
         self,
@@ -313,8 +325,26 @@ class GrampsWebAPIClient:
         for param_name, param_value in url_params.items():
             placeholder = f"{{{param_name}}}"
             if placeholder in substituted_endpoint:
+                # Reason: the value filling this placeholder is composed by
+                # an LLM that reads free text out of the tree, so it can be
+                # induced to carry "../" or "?". Unencoded, urljoin resolved
+                # those and aimed the request at an endpoint the tool never
+                # named - delete_type(handle="../users/x") issued a DELETE
+                # against /api/users/x and reported deleting a person.
+                # safe="" encodes the separators too, so the value can only
+                # ever be one path segment. quote leaves "." alone because
+                # it is unreserved, but httpx resolves "." and ".." path
+                # segments when it builds the request, so an unencoded dot
+                # segment still moves the request off its endpoint. Encoding
+                # the dot costs a legitimate value nothing: the server
+                # accepts the encoded form, verified against the one live
+                # handle that contains dots - GET /api/citations/103da162...
+                # and /api/citations/103da162%2E%2E%2E both return 200 for
+                # gramps_id C0620. (An earlier version of this comment said
+                # handles are hex and contain no dots; the full 6496-handle
+                # sweep behind URL_SAFE_IDENTIFIER_PATTERN disproved that.)
                 substituted_endpoint = substituted_endpoint.replace(
-                    placeholder, str(param_value)
+                    placeholder, quote(str(param_value), safe="").replace(".", "%2E")
                 )
 
         # Check if all required parameters were provided

@@ -133,9 +133,12 @@ class SourceSaveParams(BaseDataModel):
     media_path: str | None = Field(
         None,
         description=(
-            "Local file path to upload as media and attach to this source "
+            "Path to a file to upload as media and attach to this source "
             "(alternative to referencing an existing media handle via "
             "media_list; the resulting ref is appended to media_list, not "
-            "replacing any existing entries)"
+            "replacing any existing entries). The path must resolve inside "
+            "GRAMPS_MEDIA_IMPORT_ROOT (default /tmp) as seen by the MCP "
+            "server; the server's container has no host mount, so stage "
+            "the file there first with docker cp"
         ),
     )

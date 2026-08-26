@@ -167,6 +167,19 @@ GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
 # Optional: HTTP server bind address (defaults shown)
 GRAMPS_MCP_HOST=0.0.0.0
 GRAMPS_MCP_PORT=8000
+
+# Optional: directory that media_path values must resolve inside (default shown)
+GRAMPS_MEDIA_IMPORT_ROOT=/tmp
+```
+
+`GRAMPS_MEDIA_IMPORT_ROOT` confines every `media_path` the media, source,
+citation and sourced-event tools accept: a path resolving outside it - through
+`..` or through a symlink - is refused before any upload. The path is read by
+the MCP server, which runs in a container with no mount of the host
+filesystem, so stage files inside the root first:
+
+```bash
+docker cp ~/Desktop/acte-1878.jpg gramps-mcp-grampsweb_mcp-1:/tmp/
 ```
 
 ## MCP Client Configuration
@@ -350,6 +363,33 @@ What recent changes have been made to my family tree in the last week?
 - Input validation using Pydantic models
 - Secure HTTP transport with proper error handling
 - No sensitive data exposed in tool responses
+
+### MCP Server Network Access
+
+The MCP server has **no authentication of its own**. It uses the Gramps Web credentials from your `.env` file (owner or admin role) and assumes the caller is authorized. This is by design - MCP servers are meant to be embedded in applications your user controls.
+
+**Important**: Do not publish the MCP server port (`8000` by default) to untrusted networks. The compose files bind it to `127.0.0.1` (loopback only), but **this only takes effect when the container is recreated**. If you have a running container from before this change, it is still publishing on `0.0.0.0` (all interfaces) until you recreate it.
+
+To apply the safer binding, pass the same compose file your stack already
+runs from - `docker compose` with no `-f` resolves to `docker-compose.yml`,
+which is a **different compose project** from the sqllite and pgsql stacks, so
+running it bare would start that other project and leave your exposed
+container untouched:
+
+```bash
+docker compose -f docker-compose-sqllite.yml up -d   # or -pgsql.yml, or your own
+```
+
+This recreates the container with the new port binding. To verify it worked,
+using that same file:
+
+```bash
+docker compose -f docker-compose-sqllite.yml ps --format "{{.Names}}\t{{.Ports}}" | grep mcp
+```
+
+Look for bindings like `127.0.0.1:8000->8000/tcp` (safe) or loopback IPv6 equivalents. If you still see `0.0.0.0:8000->8000/tcp`, the container has not been recreated yet.
+
+If you need to access the MCP server from other machines, use an authenticating reverse proxy (nginx, Caddy, etc.) in front of the server rather than publishing the port to untrusted networks.
 
 
 ## Troubleshooting

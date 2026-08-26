@@ -63,8 +63,11 @@ class MediaSaveParams(StrictModel):
         None,
         min_length=1,
         description=(
-            "Local file path to upload when creating new media (required "
-            "when handle is not provided)"
+            "Path to a file to upload when creating new media (required "
+            "when handle is not provided). The path must resolve inside "
+            "GRAMPS_MEDIA_IMPORT_ROOT (default /tmp) as seen by the MCP "
+            "server; the server's container has no host mount, so stage "
+            "the file there first with docker cp"
         ),
     )
     description: str | None = Field(None, description="Media description")

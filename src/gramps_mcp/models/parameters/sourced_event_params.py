@@ -27,7 +27,7 @@ from pydantic import Field, field_validator, model_validator
 
 from .base_params import StrictModel
 from .date_params import DateValue
-from .event_params import HANDLE_PATTERN
+from .event_params import PLACE_HANDLE_PATTERN
 
 
 class SourcedEventData(StrictModel):
@@ -78,7 +78,13 @@ class SourcedEventData(StrictModel):
     # Attaches to the citation, matching this codebase's existing sourcing
     # convention (see TestCreateCitationTool)
     media_path: str | None = Field(
-        None, description="Local file to upload and attach to the citation"
+        None,
+        description=(
+            "Path to a file to upload and attach to the citation. The path "
+            "must resolve inside GRAMPS_MEDIA_IMPORT_ROOT (default /tmp) as "
+            "seen by the MCP server; the server's container has no host "
+            "mount, so stage the file there first with docker cp"
+        ),
     )
     note_list: list[str] | None = Field(
         None, description="Note handles to attach to the citation"
@@ -104,9 +110,9 @@ class SourcedEventData(StrictModel):
 
         Raises:
             ValueError: If value is not None and does not match
-                HANDLE_PATTERN.
+                PLACE_HANDLE_PATTERN.
         """
-        if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
+        if value is not None and not re.fullmatch(PLACE_HANDLE_PATTERN, value):
             raise ValueError(
                 f"event_place must be a place handle, not a name. Got: "
                 f"{value!r}. Use find_type(type='place', ...) to obtain the "
