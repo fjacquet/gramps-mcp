@@ -355,19 +355,23 @@ What recent changes have been made to my family tree in the last week?
 
 The MCP server has **no authentication of its own**. It uses the Gramps Web credentials from your `.env` file (owner or admin role) and assumes the caller is authorized. This is by design - MCP servers are meant to be embedded in applications your user controls.
 
-**Important**: Do not publish the MCP server port (`8000` by default) to untrusted networks. The compose files bind it to `127.0.0.1` (loopback only) by default. If you need to access it from other machines:
+**Important**: Do not publish the MCP server port (`8000` by default) to untrusted networks. The compose files bind it to `127.0.0.1` (loopback only), but **this only takes effect when the container is recreated**. If you have a running container from before this change, it is still publishing on `0.0.0.0` (all interfaces) until you recreate it.
 
-1. **Use an authenticating reverse proxy** (nginx, Caddy, etc.) in front of the MCP server
-2. Require authentication before requests reach port 8000
-3. Run the proxy on a public-facing port instead
+To apply the safer binding:
 
-If you have changed the port binding in your compose file, verify it only listens on trusted interfaces:
+```bash
+docker compose up -d
+```
+
+This recreates the container with the new port binding. To verify it worked:
 
 ```bash
 docker compose ps --format "{{.Names}}\t{{.Ports}}" | grep mcp
 ```
 
-Look for bindings like `127.0.0.1:8000->8000/tcp` (safe) or loopback IPv6 equivalents, not `0.0.0.0:8000->8000/tcp` (unsafe). See [CONTRIBUTING.md](CONTRIBUTING.md) for the recommended production setup.
+Look for bindings like `127.0.0.1:8000->8000/tcp` (safe) or loopback IPv6 equivalents. If you still see `0.0.0.0:8000->8000/tcp`, the container has not been recreated yet.
+
+If you need to access the MCP server from other machines, use an authenticating reverse proxy (nginx, Caddy, etc.) in front of the server rather than publishing the port to untrusted networks.
 
 
 ## Troubleshooting
