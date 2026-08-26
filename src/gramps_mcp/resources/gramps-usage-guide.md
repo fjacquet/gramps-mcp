@@ -97,10 +97,12 @@ Create the actual source document within the repository:
 - **Author** (optional): Author or compiler of the source
 - **Publication info** (optional): Publisher, publication date, edition, etc.
 - **Media** (optional): If present, use `create_media` tool first, then link to source
-- **`media_path`** (optional): Local path to a file to upload and attach in one
-  step, instead of calling `create_media` first. The resulting reference is
-  appended to `media_list`; the path is cleared after upload, so pass it only
-  when the file is not already in the tree
+- **`media_path`** (optional): Path to a file to upload and attach in one
+  step, instead of calling `create_media` first. The path must resolve inside
+  `GRAMPS_MEDIA_IMPORT_ROOT` (default `/tmp`) - see "Where `media_path` must
+  point" below. The resulting reference is appended to `media_list`; the path
+  is cleared after upload, so pass it only when the file is not already in the
+  tree
 - **Note** (optional): If present, use `create_note` tool first, then link to source
 
 **Process:**
@@ -118,10 +120,12 @@ Create a citation that references the specific page/entry in the source:
 - **Page** (optional): "Page 45, Entry 23", "Certificate #1234", specific page reference
 - **Date** (optional): Date when the citation was accessed or created
 - **Media** (optional): If present, use `create_media` tool first, then link to citation
-- **`media_path`** (optional): Local path to a file to upload and attach in one
-  step, instead of calling `create_media` first. The resulting reference is
-  appended to `media_list`; the path is cleared after upload, so pass it only
-  when the file is not already in the tree
+- **`media_path`** (optional): Path to a file to upload and attach in one
+  step, instead of calling `create_media` first. The path must resolve inside
+  `GRAMPS_MEDIA_IMPORT_ROOT` (default `/tmp`) - see "Where `media_path` must
+  point" below. The resulting reference is appended to `media_list`; the path
+  is cleared after upload, so pass it only when the file is not already in the
+  tree
 - **Notes** (optional): If present, use `create_note` tool first, then link to citation
 
 **Process:**
@@ -318,8 +322,10 @@ When potential duplicates are found:
 **Shortcut**: `create_sourced_event` performs steps 2 to 4 in a single call -
 it creates the source, the citation and the event together and wires the
 citation to the event, which avoids copy-pasting handles between calls. Pass
-`media_path` to upload a local file and attach it to the citation in the same
-call. The find-first rule still applies before you call it.
+`media_path` to upload a file and attach it to the citation in the same
+call - the path must resolve inside `GRAMPS_MEDIA_IMPORT_ROOT` (default
+`/tmp`), see "Where `media_path` must point" below. The find-first rule still
+applies before you call it.
 
 Pass exactly one of `source_title` (creates a new source) or `source_handle`
 (attaches the new citation to an existing source) - the two are mutually
@@ -377,9 +383,9 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 ### Creating Media
 **Media requires:**
 - **`desc`** (required): Descriptive title for the media
-- **`media_path`** (required when creating): Local path to the file to upload
+- **`media_path`** (required when creating): Path to the file to upload
   (image, document, etc.); it is uploaded and then cleared, so it is only
-  needed when no handle is given
+  needed when no handle is given. See "Where `media_path` must point" below
 - **`date`** (optional): Date when the media was created or taken
 
 **Media Process:**
@@ -388,6 +394,26 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 - **If found and complete**: Use existing media as-is
 - **If found but missing info**: Use `create_media` with existing handle to update media
 - **If not found**: Use `create_media` without handle to create new media
+
+### Where `media_path` must point
+
+`media_path` is read by the MCP server, not by the machine you are talking
+from, and it is confined: the path must resolve inside the directory named by
+the `GRAMPS_MEDIA_IMPORT_ROOT` environment variable, which defaults to `/tmp`.
+A path outside that root is refused before any upload is attempted, and so is
+a symlink that points out of it.
+
+The MCP server runs in a container with no mount of the host filesystem, so a
+path that exists on the host does not exist for the server. Stage the file
+inside the import root first:
+
+```bash
+docker cp ~/Desktop/acte-1878.jpg gramps-mcp-grampsweb_mcp-1:/tmp/
+```
+
+then pass `media_path="/tmp/acte-1878.jpg"`. This applies to every tool that
+takes `media_path`: `create_media`, `create_source`, `create_citation` and
+`create_sourced_event`.
 
 ## Analysis and Administration Tools
 

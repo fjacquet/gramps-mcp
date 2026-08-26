@@ -167,6 +167,19 @@ GRAMPS_TREE_ID=your-tree-id  # Find this under System Information in Gramps Web
 # Optional: HTTP server bind address (defaults shown)
 GRAMPS_MCP_HOST=0.0.0.0
 GRAMPS_MCP_PORT=8000
+
+# Optional: directory that media_path values must resolve inside (default shown)
+GRAMPS_MEDIA_IMPORT_ROOT=/tmp
+```
+
+`GRAMPS_MEDIA_IMPORT_ROOT` confines every `media_path` the media, source,
+citation and sourced-event tools accept: a path resolving outside it - through
+`..` or through a symlink - is refused before any upload. The path is read by
+the MCP server, which runs in a container with no mount of the host
+filesystem, so stage files inside the root first:
+
+```bash
+docker cp ~/Desktop/acte-1878.jpg gramps-mcp-grampsweb_mcp-1:/tmp/
 ```
 
 ## MCP Client Configuration

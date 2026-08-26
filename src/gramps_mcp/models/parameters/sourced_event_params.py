@@ -78,7 +78,13 @@ class SourcedEventData(StrictModel):
     # Attaches to the citation, matching this codebase's existing sourcing
     # convention (see TestCreateCitationTool)
     media_path: str | None = Field(
-        None, description="Local file to upload and attach to the citation"
+        None,
+        description=(
+            "Path to a file to upload and attach to the citation. The path "
+            "must resolve inside GRAMPS_MEDIA_IMPORT_ROOT (default /tmp) as "
+            "seen by the MCP server; the server's container has no host "
+            "mount, so stage the file there first with docker cp"
+        ),
     )
     note_list: list[str] | None = Field(
         None, description="Note handles to attach to the citation"
