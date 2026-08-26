@@ -27,6 +27,50 @@ import mimetypes
 import os
 
 from ..client import GrampsAPIError, GrampsWebAPIClient
+from ..config import get_settings
+
+# Reason: the whole file is read into memory before upload, so an unbounded
+# read is a denial of service on the MCP process - cap it well above any
+# real scan/photo but far below what would exhaust the container's memory.
+MAX_MEDIA_BYTES = 100 * 1024 * 1024
+
+
+def resolve_media_path(file_location: str, import_root: str) -> str:
+    """
+    Resolve a caller-supplied media path, refusing anything outside the root.
+
+    Args:
+        file_location (str): The path the caller asked to upload.
+        import_root (str): Directory the path must resolve inside.
+
+    Returns:
+        str: The fully resolved path, safe to open.
+
+    Raises:
+        FileNotFoundError: When no regular file exists at the path.
+        ValueError: When the resolved path lies outside import_root.
+    """
+    # Reason: realpath resolves symlinks and ".." before the comparison.
+    # os.path.isfile alone followed a symlink, so a link inside the root
+    # pointing at the server's own .env passed the old check - and the
+    # file's bytes then became tree content readable through the media API.
+    resolved = os.path.realpath(file_location)
+    root = os.path.realpath(import_root)
+    # Reason: commonpath raises ValueError for inputs on different drives or
+    # a mix of absolute/relative paths - that is not containment, so it must
+    # be treated as a refusal, not allowed to crash past the check.
+    try:
+        inside_root = os.path.commonpath([resolved, root]) == root
+    except ValueError:
+        inside_root = False
+    if not inside_root:
+        raise ValueError(
+            f"'{file_location}' resolves outside the media import root "
+            f"({root}). Copy the file into that directory first."
+        )
+    if not os.path.isfile(resolved):
+        raise FileNotFoundError(f"File not found: {file_location}")
+    return resolved
 
 
 async def upload_media_from_path(
@@ -47,12 +91,21 @@ async def upload_media_from_path(
         dict: The newly created media object as returned by the API,
             including its "handle".
     """
-    if not os.path.isfile(file_location):
-        raise FileNotFoundError(f"File not found: {file_location}")
+    settings = get_settings()
+    resolved = resolve_media_path(file_location, settings.gramps_media_import_root)
 
-    with open(file_location, "rb") as f:
+    # Reason: the whole file is read into memory before upload, so an
+    # unbounded read is a denial of service on the MCP process.
+    size = os.path.getsize(resolved)
+    if size > MAX_MEDIA_BYTES:
+        raise ValueError(
+            f"'{file_location}' is {size} bytes, over the "
+            f"{MAX_MEDIA_BYTES}-byte upload limit."
+        )
+
+    with open(resolved, "rb") as f:
         file_content = f.read()
-    mime_type, _ = mimetypes.guess_type(file_location)
+    mime_type, _ = mimetypes.guess_type(resolved)
     if not mime_type:
         mime_type = "application/octet-stream"
 

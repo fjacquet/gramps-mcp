@@ -135,8 +135,10 @@ create_media(desc="Acte de mariage Vilpellet x Cocu, 1885",
 `media_path` is read from the filesystem of the process running the MCP server,
 not from your laptop. If the server runs in a container without a mount onto
 your files, copy the file into the container first - `docker cp` into the
-gramps-mcp container's `/tmp/` is the usual move. A path that exists on your
-machine but not the server's fails with a file-not-found error.
+gramps-mcp container's `/tmp/` is the usual move. The destination must be
+inside `GRAMPS_MEDIA_IMPORT_ROOT` (defaults to `/tmp`); a path that resolves
+outside it is refused, and a path that exists on your machine but not the
+server's fails with a file-not-found error.
 
 An upload always appends. The resulting reference is added to `media_list`,
 never replacing entries that were already there.

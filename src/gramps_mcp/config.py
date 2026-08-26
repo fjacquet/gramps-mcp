@@ -44,6 +44,16 @@ class Settings(BaseModel):
         8000, description="Port for the MCP HTTP server to listen on"
     )
 
+    # Media upload confinement
+    gramps_media_import_root: str = Field(
+        "/tmp",
+        description=(
+            "Directory that media_path values must resolve inside. The MCP "
+            "container has no host mount, so files arrive by docker cp, "
+            "conventionally into /tmp."
+        ),
+    )
+
 
 def get_settings() -> Settings:
     """Get settings from environment variables."""
@@ -55,6 +65,7 @@ def get_settings() -> Settings:
             gramps_tree_id=os.environ["GRAMPS_TREE_ID"],
             gramps_mcp_host=os.environ.get("GRAMPS_MCP_HOST", "0.0.0.0"),
             gramps_mcp_port=int(os.environ.get("GRAMPS_MCP_PORT", "8000")),
+            gramps_media_import_root=os.environ.get("GRAMPS_MEDIA_IMPORT_ROOT", "/tmp"),
         )
     except KeyError as e:
         raise ValueError(f"Missing required environment variable: {e}")
