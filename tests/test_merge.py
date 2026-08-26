@@ -240,3 +240,78 @@ class TestAttributeDeduplication:
             {"ref": "m2", "private": True},
             {"ref": "m3"},
         ]
+
+    def test_live_media_reference_shape_deduplicates(self):
+        # Reason: every media reference the live server stores carries
+        # "rect": [] - a falsy-but-present list - while the shape this
+        # codebase's own tools recommend sending back is bare {"ref": ...}.
+        # Both must resolve to the same identity or the same photo gets
+        # attached twice on every no-op resend.
+        existing = {
+            "media_list": [
+                {
+                    "attribute_list": [],
+                    "citation_list": [],
+                    "note_list": ["n1"],
+                    "private": False,
+                    "rect": [],
+                    "ref": "m1",
+                }
+            ]
+        }
+        changes = {"media_list": [{"ref": "m1"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert len(merged["media_list"]) == 1
+        assert merged["media_list"][0]["private"] is False
+        assert merged["media_list"][0]["note_list"] == ["n1"]
+
+    def test_unhashable_role_does_not_raise(self):
+        # Reason: an LLM caller can compose a role as a nested object (e.g.
+        # {"_class": "EventRoleType", "string": "Primary"}) rather than a
+        # plain string. Identity must fall back to a stable key instead of
+        # crashing the whole write on an unhashable dict.
+        existing = {
+            "event_ref_list": [
+                {"ref": "e1", "role": {"_class": "EventRoleType", "string": "Primary"}}
+            ]
+        }
+        changes = {
+            "event_ref_list": [
+                {"ref": "e1", "role": {"_class": "EventRoleType", "string": "Primary"}}
+            ]
+        }
+
+        merged = merge_put_data(existing, changes)
+
+        assert len(merged["event_ref_list"]) == 1
+
+    def test_unhashable_rect_does_not_raise(self):
+        # Reason: same failure mode as role, but for rect - a list of lists
+        # ([[0, 0], [1, 1]]) rather than a flat list.
+        existing = {"media_list": [{"ref": "m1", "rect": [[0, 0], [1, 1]]}]}
+        changes = {"media_list": [{"ref": "m1", "rect": [[0, 0], [1, 1]]}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert len(merged["media_list"]) == 1
+
+    def test_nested_dict_inside_a_reference_entry_is_preserved(self):
+        # Reason: the in-place entry merge used a shallow dict spread, so a
+        # nested object (e.g. "date") inside a placeref_list entry was
+        # replaced wholesale instead of merged sub-key by sub-key - the same
+        # destructive behaviour this branch exists to kill, one level deeper.
+        existing = {
+            "placeref_list": [{"ref": "P1", "date": {"year": 1800, "text": "1800"}}]
+        }
+        changes = {"placeref_list": [{"ref": "P1", "date": {"modifier": 1}}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["placeref_list"] == [
+            {
+                "ref": "P1",
+                "date": {"year": 1800, "text": "1800", "modifier": 1},
+            }
+        ]

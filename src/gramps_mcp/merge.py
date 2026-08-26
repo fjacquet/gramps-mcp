@@ -24,6 +24,8 @@ as a pure, side-effect-free function so it can be unit-tested without a live
 server.
 """
 
+import json
+
 
 def merge_put_data(
     existing: dict, changes: dict, replace_lists: list[str] | None = None
@@ -163,7 +165,13 @@ def _merge_list(existing_items: list, new_items: list) -> list:
                 # Merge new attributes over existing entry at this position
                 idx = identity_to_index[identity]
                 if isinstance(result[idx], dict) and isinstance(new_item, dict):
-                    result[idx] = {**result[idx], **new_item}
+                    # Reason: a shallow spread here replaced any nested dict
+                    # (e.g. a placeref_list entry's "date") wholesale instead
+                    # of merging it sub-key by sub-key - the exact destructive
+                    # behaviour this module exists to kill, one level deeper.
+                    # _merge_dict keeps the same nested-dict-merges,
+                    # nested-list-replaces rule used at the top level.
+                    result[idx] = _merge_dict(result[idx], new_item)
             else:
                 # New identity, append as new entry
                 result.append(new_item)
@@ -184,7 +192,7 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     return existing_items + new_items
 
 
-def _entry_key(item: dict | str | list) -> tuple:
+def _entry_key(item: dict | str | list) -> object:
     """
     Build an identity key for a reference-list entry.
 
@@ -192,10 +200,19 @@ def _entry_key(item: dict | str | list) -> tuple:
         item: One element of a reference list, normally a dict.
 
     Returns:
-        tuple: A key based on ref, role, and rect only. These are the fields
-        that Gramps uses to express multiplicity in a list. Missing keys
-        contribute None, so a dict with only ref is distinct from one with
-        ref and role.
+        object: A hashable key based on ref, role, and rect only. These are
+        the fields that Gramps uses to express multiplicity in a list.
+        Missing keys contribute None, so a dict with only ref is distinct
+        from one with ref and role. The live server sends "role": [] or
+        "rect": [] rather than omitting the key, so both are normalised to
+        None when falsy - otherwise the same entry sent back in the
+        documented {"ref": ...}-only shape would get a different identity
+        and be appended as a duplicate instead of recognised as the same
+        entry. When role or rect is itself an unhashable shape (a dict, or a
+        list of lists), the normal tuple key cannot be built or stored in a
+        dict; falling back to a JSON-based key keeps the entry usable
+        (treated as distinct rather than merged) instead of crashing the
+        whole write.
     """
     # Reason: identity must distinguish structural cases (same person in
     # different roles, or same photo with different crop regions), while
@@ -203,12 +220,21 @@ def _entry_key(item: dict | str | list) -> tuple:
     # not duplicates to discard or append.
     if isinstance(item, dict):
         ref = item.get("ref")
-        role = item.get("role")
-        rect = item.get("rect")
-        # Convert rect list to tuple for hashability
+        role = item.get("role") or None
+        rect = item.get("rect") or None
         if isinstance(rect, list):
             rect = tuple(rect)
-        return (ref, role, rect)
+        key = (ref, role, rect)
+        try:
+            hash(key)
+            return key
+        except TypeError:
+            # Reason: role or rect can arrive as an unhashable shape (a dict
+            # for role, a list-of-lists for rect) from an LLM-composed call.
+            # The original json.dumps-based identity carried this same
+            # protection so an unmergeable entry falls through as distinct
+            # rather than crashing the whole write.
+            return json.dumps(item, sort_keys=True, default=str)
     return (item, None, None)
 
 
