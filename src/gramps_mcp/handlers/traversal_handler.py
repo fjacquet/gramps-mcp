@@ -20,9 +20,52 @@ Markdown rendering for breadth-first traversal results.
 No I/O: everything here operates on an in-memory TraversalResult.
 """
 
-from ..traversal import TraversalResult
+from ..traversal import Link, TraversalResult
 
 INDENT = "  "
+
+POLICY_FOOTER = (
+    "**Non-birth links**: a relationship other than birth (Adopted, "
+    "Stepchild, Foster, Sponsored, None, Unknown, or a custom type) is "
+    "reported but its line is not followed."
+)
+
+SECONDARY_FAMILY_FOOTER = (
+    "**Other parents families**: Gramps designates the first parent family "
+    "as the main one; a parent from any other is marked."
+)
+
+
+def _markers(link: Link | None, followed: bool) -> str:
+    """
+    Render the bracketed annotations qualifying one link, if any.
+
+    Args:
+        link (Link | None): The link leading to this person, None at the root.
+        followed (bool): Whether the finished walk read this person's own
+            relatives - which a birth link from some other path can make
+            true even when this link alone would have stopped here.
+
+    Returns:
+        str: For example " [Adopted, line not followed]", or "" when the
+        link is an unremarkable birth link inside the main parent family.
+    """
+    if link is None:
+        return ""
+    parts = []
+    if link.relation is not None:
+        # Reason: the marker reports what the walk actually did, not what
+        # the link predicted at discovery time. Naming the relationship
+        # without saying the walk stopped would let the silence beyond read
+        # as "no relatives recorded"; claiming it stopped while the line is
+        # rendered underneath misattributes that whole branch. Only the
+        # finished walk knows which of the two happened.
+        parts.append(
+            link.relation if followed else f"{link.relation}, line not followed"
+        )
+    if link.secondary_family:
+        parts.append("other parents family")
+    return f" [{'; '.join(parts)}]" if parts else ""
 
 
 def _format_event(event: dict | None, prefix: str) -> str:
@@ -65,7 +108,12 @@ def _format_person(profile: dict) -> str:
 
 
 def _walk_lines(
-    result: TraversalResult, handle: str, depth: int, seen: set[str], lines: list[str]
+    result: TraversalResult,
+    handle: str,
+    depth: int,
+    seen: set[str],
+    lines: list[str],
+    link: Link | None = None,
 ) -> int:
     """
     Append the markdown lines for one subtree, depth-first for readability.
@@ -76,6 +124,7 @@ def _walk_lines(
         depth (int): Current generation, zero for the root.
         seen (set[str]): Handles already rendered somewhere above.
         lines (list[str]): Accumulator, mutated in place.
+        link (Link | None): The link that led here, None at the root.
 
     Returns:
         int: The deepest generation reached under this handle, one-based.
@@ -89,13 +138,24 @@ def _walk_lines(
         lines.append(f"{pad}- (handle {handle}) [unavailable: not fetched]")
         return depth + 1
     if handle in seen:
-        lines.append(f"{pad}- {_format_person(profile)} [already listed above]")
+        # Reason: the markers describe the path that reached this position,
+        # so they belong on the repeat too. A person who is the birth child
+        # of one parent and the adopted child of another would otherwise
+        # render unmarked under the adoptive one.
+        lines.append(
+            f"{pad}- {_format_person(profile)}"
+            f"{_markers(link, bool(result.edges.get(handle)))}"
+            " [already listed above]"
+        )
         return depth + 1
     seen.add(handle)
-    lines.append(f"{pad}- {_format_person(profile)}")
+    children = result.edges.get(handle, [])
+    lines.append(f"{pad}- {_format_person(profile)}{_markers(link, bool(children))}")
     deepest = depth + 1
-    for child in result.edges.get(handle, []):
-        deepest = max(deepest, _walk_lines(result, child, depth + 1, seen, lines))
+    for child in children:
+        deepest = max(
+            deepest, _walk_lines(result, child.handle, depth + 1, seen, lines, child)
+        )
     return deepest
 
 
@@ -120,6 +180,20 @@ def format_traversal(result: TraversalResult, direction: str) -> str:
         f"{generations} generations, {len(result.nodes)} people"
     )
     text = header + "\n\n" + "\n".join(lines) + "\n"
+    every_link = [link for links in result.edges.values() for link in links]
+    # Reason: each marker explains itself in the output. The usage guide
+    # documents both, but it is a separate resource a client may never have
+    # loaded, and an unexplained bracket is a question with no answer.
+    # Reason: the policy footer is only true when the policy actually bit.
+    # A non-birth relative whose line a birth link elsewhere reopened is
+    # marked with the bare relationship, which explains itself.
+    if any(
+        link.relation is not None and not result.edges.get(link.handle)
+        for link in every_link
+    ):
+        text += f"\n{POLICY_FOOTER}\n"
+    if any(link.secondary_family for link in every_link):
+        text += f"\n{SECONDARY_FAMILY_FOOTER}\n"
     if result.truncated_by_cap:
         text += (
             f"\n**Truncated**: visit cap of {result.visit_cap} reached, "
