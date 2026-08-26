@@ -30,22 +30,13 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
-from .base_params import BaseGetMultipleParams, StrictModel
+from .base_params import HANDLE_PATTERN, BaseGetMultipleParams, StrictModel
 from .date_params import DateValue
 
-# Reason: a Gramps handle is a lowercase hexadecimal string. Live-tree
-# sampling (2026-08-13, GET_PLACES) found handles of 26-32 lowercase hex
-# characters (0-9a-f only - no uppercase, no g-z). Place names contain
-# spaces, hyphens or accents, or are simply short, so this pattern separates
-# them. The 16-char floor stays below the smallest observed handle (26) to
-# tolerate handle shapes not covered by that sample. Passing a name here
-# used to overwrite a valid handle with text that resolves to nothing - the
-# trap documented in CLAUDE.md.
-#
-# Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
-# needed here. re.match plus a "$" anchor accepts a trailing newline because
-# "$" matches just before a final newline; fullmatch has no such gap.
-HANDLE_PATTERN = r"[0-9a-f]{16,}"
+# Reason: HANDLE_PATTERN now lives in base_params.py so it can back a shared
+# validator used by the destructive-tool models too. It is re-exported here
+# (as `event_params.HANDLE_PATTERN`) because sourced_event_params.py imports
+# it from this module rather than from base_params directly.
 
 
 class EventSearchParams(BaseGetMultipleParams):

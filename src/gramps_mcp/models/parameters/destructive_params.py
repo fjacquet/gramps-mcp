@@ -18,9 +18,9 @@
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
-from .base_params import StrictModel
+from .base_params import StrictModel, validate_handle_shape
 
 RecordType = Literal[
     "person",
@@ -65,6 +65,12 @@ class DeleteTypeParams(StrictModel):
         ),
     )
 
+    @field_validator("handle")
+    @classmethod
+    def _check_handle_shape(cls, value: str | None) -> str | None:
+        """Reject a handle that is not shaped like a Gramps handle."""
+        return validate_handle_shape(value)
+
 
 class DetachReferenceParams(StrictModel):
     """Parameters for removing one element from a record's list."""
@@ -82,6 +88,12 @@ class DetachReferenceParams(StrictModel):
         )
     )
     ref_handle: str = Field(description="Handle of the element to remove")
+
+    @field_validator("handle", "ref_handle")
+    @classmethod
+    def _check_handle_shape(cls, value: str | None) -> str | None:
+        """Reject a handle that is not shaped like a Gramps handle."""
+        return validate_handle_shape(value)
 
 
 class MergeTypeParams(StrictModel):
@@ -122,6 +134,12 @@ class MergeTypeParams(StrictModel):
     phoenix_mother_handle: str | None = Field(
         None, description="Family merges only: which mother the result keeps"
     )
+
+    @field_validator("phoenix_handle", "titanic_handle")
+    @classmethod
+    def _check_handle_shape(cls, value: str | None) -> str | None:
+        """Reject a handle that is not shaped like a Gramps handle."""
+        return validate_handle_shape(value)
 
 
 class FamilyMergeBody(StrictModel):

@@ -18,9 +18,54 @@
 Base parameter classes for common patterns across Gramps API operations.
 """
 
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+# Reason: a Gramps handle is a lowercase hexadecimal string. Live-tree
+# sampling (2026-08-13, GET_PLACES) found handles of 26-32 lowercase hex
+# characters (0-9a-f only - no uppercase, no g-z). Place names contain
+# spaces, hyphens or accents, or are simply short, so this pattern separates
+# them. The 16-char floor stays below the smallest observed handle (26) to
+# tolerate handle shapes not covered by that sample. Passing a name here
+# used to overwrite a valid handle with text that resolves to nothing - the
+# trap documented in CLAUDE.md.
+#
+# Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
+# needed here. re.match plus a "$" anchor accepts a trailing newline because
+# "$" matches just before a final newline; fullmatch has no such gap.
+HANDLE_PATTERN = r"[0-9a-f]{16,}"
+
+
+def validate_handle_shape(value: str | None) -> str | None:
+    """
+    Reject a value that is not shaped like a Gramps handle.
+
+    Args:
+        value (str | None): The candidate handle, or None when the field
+            is optional and unset.
+
+    Returns:
+        str | None: The value unchanged when it is None or well-shaped.
+
+    Raises:
+        ValueError: When the value is present and not lowercase hex of at
+            least 16 characters.
+    """
+    # Reason: a handle lands in a URL path segment. Encoding in the client
+    # already stops a crafted value from leaving its segment, but refusing
+    # it here fails before any request is issued and names the problem,
+    # rather than 404ing against an endpoint the caller never meant to hit.
+    if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
+        raise ValueError(
+            f"'{value}' is not a Gramps handle. A handle is lowercase hex, "
+            "at least 16 characters, as returned by a find or get call. To "
+            "identify a record by its Gramps ID instead, use the gramps_id "
+            "field."
+        )
+    return value
+
 
 # Common choices for validation
 PROFILE_CHOICES = [
