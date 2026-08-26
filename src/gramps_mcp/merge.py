@@ -24,6 +24,17 @@ as a pure, side-effect-free function so it can be unit-tested without a live
 server.
 """
 
+# Reason: which extra field expresses multiplicity is a per-list fact about
+# raw server JSON, not derivable from the Pydantic parameter models - merge()
+# never sees a validated model instance. reporef_list/child_ref_list/
+# placeref_list are deliberately absent: frel proves "second entry" is the
+# wrong default, and whether a repeated call number is a correction or a
+# second entry is an undecided product question either way.
+_IDENTITY_FIELDS: dict[str, tuple[str, ...]] = {
+    "event_ref_list": ("role",),
+    "media_list": ("rect",),
+}
+
 
 def merge_put_data(
     existing: dict, changes: dict, replace_lists: list[str] | None = None
@@ -57,7 +68,7 @@ def merge_put_data(
             and isinstance(existing.get(key), list)
             and key not in replace
         ):
-            merged[key] = _merge_list(existing.get(key, []), value)
+            merged[key] = _merge_list(existing.get(key, []), value, key)
         # Reason: primary_name is required on PersonData, so it is resent on
         # every person update - including ones that have nothing to do with
         # the name. Replacing it wholesale destroyed surname_list, suffix,
@@ -125,7 +136,7 @@ def _merge_ref_entry(existing_entry: dict, new_entry: dict) -> dict:
     for key, value in new_entry.items():
         current = existing_entry.get(key)
         if isinstance(value, list) and isinstance(current, list):
-            merged[key] = _merge_list(current, value)
+            merged[key] = _merge_list(current, value, key)
         elif isinstance(value, dict) and isinstance(current, dict):
             merged[key] = _merge_dict(current, value)
         else:
@@ -133,24 +144,31 @@ def _merge_ref_entry(existing_entry: dict, new_entry: dict) -> dict:
     return merged
 
 
-def _merge_list(existing_items: list, new_items: list) -> list:
+def _merge_list(
+    existing_items: list, new_items: list, list_name: str | None = None
+) -> list:
     """
     Merge two lists, deduplicating when the item type supports it.
 
     Dicts with a "ref" field (event_ref_list, media_list, ...) are
-    deduplicated by identity (ref, role, rect); matching identity merges
-    new attributes over the existing entry in place. Dicts without "ref"
-    (attribute_list, ...) deduplicate by whole content, and strings by
-    value. Existing order is preserved. Mixed or unknown item types are
-    concatenated as-is.
+    deduplicated by identity - "ref" plus whatever extra fields
+    _IDENTITY_FIELDS declares for list_name; matching identity merges new
+    attributes over the existing entry in place via _merge_ref_entry. Dicts
+    without "ref" (attribute_list, ...) deduplicate by whole content, and
+    strings by value. Existing order is preserved. Mixed or unknown item
+    types are concatenated as-is.
 
     Args:
         existing_items (List): Items already stored in Gramps.
         new_items (List): Items requested in the update.
+        list_name (str | None): Key this list is stored under, looked up in
+            _IDENTITY_FIELDS for extra identity fields. None (or an
+            unregistered name) means "ref" alone is the identity.
 
     Returns:
         List: The merged list.
     """
+    identity_fields = _IDENTITY_FIELDS.get(list_name or "", ())
     if not existing_items and not new_items:
         return []
 
@@ -178,17 +196,17 @@ def _merge_list(existing_items: list, new_items: list) -> list:
         and isinstance(sample_new, dict)
         and "ref" in sample_new
     ):
-        # Reason: identity for reference entries is (ref, role, rect) - the
-        # fields Gramps uses to express multiplicity. Other keys are attributes
-        # that update in place, not separate entries. Same person, same event,
-        # different role is two entries. Same photo with different private flag
-        # is one entry with updated metadata.
+        # Reason: identity is "ref" plus whatever extra fields this list
+        # declares in _IDENTITY_FIELDS; every other key is an attribute that
+        # updates in place. Same event, different role is two entries; same
+        # photo, different private flag is one entry with updated metadata.
         identity_to_index = {
-            _entry_key(item): i for i, item in enumerate(existing_items)
+            _entry_key(item, identity_fields): i
+            for i, item in enumerate(existing_items)
         }
         result = list(existing_items)
         for new_item in new_items:
-            identity = _entry_key(new_item)
+            identity = _entry_key(new_item, identity_fields)
             if identity in identity_to_index:
                 # Merge new attributes over existing entry at this position
                 idx = identity_to_index[identity]
@@ -244,31 +262,28 @@ def _freeze(value: object) -> object:
     return value
 
 
-def _entry_key(item: dict | str | list) -> object:
+def _entry_key(
+    item: dict | str | list, identity_fields: tuple[str, ...] = ()
+) -> object:
     """
     Build an identity key for a reference-list entry.
 
     Args:
         item: One element of a reference list, normally a dict.
+        identity_fields (tuple[str, ...]): Extra field names (beyond "ref")
+            this list uses to express multiplicity, from _IDENTITY_FIELDS.
 
     Returns:
-        object: A hashable key based on ref, role, and rect only, each
-        passed through _freeze. Missing fields contribute None, and falsy
-        values (the server sends "role": [] rather than omitting the key)
-        are normalised to None first, so that shape and the documented
-        {"ref": ...}-only shape share one identity instead of being treated
-        as different entries.
+        object: A hashable key of "ref" plus identity_fields, each passed
+        through _freeze. Falsy values (the server sends "role": [] rather
+        than omitting the key) are normalised to None first, so that shape
+        and the documented {"ref": ...}-only shape share one identity.
     """
-    # Reason: identity must distinguish structural cases (same person in
-    # different roles, or same photo with different crop regions), while
-    # treating metadata changes (private flag) as updates to the same entry,
-    # not duplicates to discard or append.
     if isinstance(item, dict):
         ref = item.get("ref")
-        role = _freeze(item.get("role") or None)
-        rect = _freeze(item.get("rect") or None)
-        return (_freeze(ref), role, rect)
-    return (_freeze(item), None, None)
+        extra = tuple(_freeze(item.get(field) or None) for field in identity_fields)
+        return (_freeze(ref),) + extra
+    return (_freeze(item),) + tuple(None for _ in identity_fields)
 
 
 def _dedupe_dicts_without_ref(existing_items: list, new_items: list) -> list:

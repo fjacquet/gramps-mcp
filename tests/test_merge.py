@@ -335,3 +335,17 @@ class TestAttributeDeduplication:
                 "date": {"year": 1800, "text": "1800", "modifier": 1},
             }
         ]
+
+    def test_list_not_in_identity_table_falls_back_to_ref_alone(self):
+        # Reason: child_ref_list is deliberately absent from _IDENTITY_FIELDS
+        # - whether a second call number on the same repository is a
+        # correction or a second entry is an undecided product question, and
+        # frel proves the "second entry" default is wrong here: correcting
+        # frel from Birth to Adopted must update the one entry, not append a
+        # second child reference.
+        existing = {"child_ref_list": [{"ref": "c1", "frel": "Birth"}]}
+        changes = {"child_ref_list": [{"ref": "c1", "frel": "Adopted"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["child_ref_list"] == [{"ref": "c1", "frel": "Adopted"}]
