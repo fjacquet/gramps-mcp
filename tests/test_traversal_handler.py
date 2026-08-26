@@ -159,6 +159,21 @@ class TestFormatTraversal:
             "is reported but its line is not followed." in text
         )
 
+    def test_no_policy_footer_when_no_line_was_actually_stopped(self):
+        # Reason: the footer states the not-following policy. When every
+        # non-birth line was reopened by a birth link elsewhere, the policy
+        # never bit, and printing it would contradict the tree above it.
+        # The bare "[Adopted]" marker needs no footer: it names a
+        # relationship rather than claiming anything about the walk.
+        result = _result(
+            edges={
+                "h1": [Link("h2", relation="Adopted", expand=False)],
+                "h2": [Link("h3")],
+            }
+        )
+        text = format_traversal(result, "ancestors")
+        assert "Non-birth links" not in text
+
     def test_no_policy_footer_when_every_link_is_a_birth_link(self):
         text = format_traversal(_result(), "ancestors")
         assert "Non-birth links" not in text
@@ -171,6 +186,69 @@ class TestFormatTraversal:
         text = format_traversal(result, "ancestors")
         assert "not fetched" not in text
         assert "JACQUET, Yvan" in text
+
+    def test_a_followed_link_never_claims_its_line_was_not_followed(self):
+        # Reason: the marker must describe what the walk actually did, not
+        # what the relationship alone suggested. Printing "line not
+        # followed" directly above the followed line tells the reader the
+        # opposite of the truth and misattributes the branch.
+        result = _result(
+            edges={
+                "h1": [Link("h2", relation="Adopted", expand=True)],
+                "h2": [Link("h3")],
+            }
+        )
+        text = format_traversal(result, "ancestors")
+        assert "  - JACQUET, Yvan (I0042), b. 1948 Lyon, d. 2011 [Adopted]" in text
+        assert "line not followed" not in text
+        assert "    - MARIAUD, Odile (I0129)" in text
+
+    def test_a_line_reopened_by_another_path_is_not_called_unfollowed(self):
+        # Reason: the link itself is a non-birth link and says expand=False,
+        # but the walk reached this person's relatives through a birth link
+        # elsewhere and rendered them here. Whether the line was followed is
+        # a fact about the finished walk, not about the link that named it.
+        result = _result(
+            edges={
+                "h1": [Link("h2", relation="Adopted", expand=False)],
+                "h2": [Link("h3")],
+            }
+        )
+        text = format_traversal(result, "ancestors")
+        assert "  - JACQUET, Yvan (I0042), b. 1948 Lyon, d. 2011 [Adopted]" in text
+        assert "line not followed" not in text
+        assert "    - MARIAUD, Odile (I0129)" in text
+
+    def test_a_repeated_person_keeps_the_markers_of_the_path_that_reached_them(self):
+        # Reason: a person can be the birth child of one parent and the
+        # adopted child of another. Dropping the marker on the repeat
+        # renders the adoption as an unqualified link - the exact
+        # misattribution this whole change exists to prevent.
+        # h3 is reached first as a plain birth link, then again through h2
+        # as an adopted one. The repeat is the marked position.
+        result = _result(
+            edges={
+                "h1": [Link("h3"), Link("h2")],
+                "h2": [Link("h3", relation="Adopted", expand=False)],
+            }
+        )
+        text = format_traversal(result, "ancestors")
+        first, second = [line for line in text.splitlines() if "MARIAUD" in line]
+        assert first.strip() == "- MARIAUD, Odile (I0129)"
+        assert "[Adopted, line not followed]" in second
+        assert "[already listed above]" in second
+
+    def test_the_secondary_family_marker_is_explained_when_it_appears_alone(self):
+        # Reason: the usage guide documents the marker, but it is a
+        # separate resource a client may never have loaded. An unexplained
+        # bracket in the output is a question the reader cannot answer.
+        result = _result(edges={"h1": [Link("h3", secondary_family=True)]})
+        text = format_traversal(result, "ancestors")
+        assert (
+            "**Other parents families**: Gramps designates the first parent "
+            "family as the main one; a parent from any other is marked." in text
+        )
+        assert "Non-birth links" not in text
 
     def test_lone_person_with_no_relatives_reads_as_one_generation(self):
         result = _result(

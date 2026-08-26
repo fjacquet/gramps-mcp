@@ -16,6 +16,16 @@ get_descendants(gramps_id="I0123", max_generations=4)
 `get_relationship` and `check_living` accept a handle or a `gramps_id`;
 `get_ancestors` and `get_descendants` take `gramps_id` only.
 
+`get_ancestors` and `get_descendants` walk the **birth line only**. Gramps
+records a relationship on each parent separately, and any value other than
+Birth - Adopted, Stepchild, Foster, Sponsored, None, Unknown, or a custom
+type - names a relationship that is real but not biological. Such a relative
+is listed and named, marked `[Adopted, line not followed]`, and the walk
+stops there: their own ancestors are not yours. A parent from a parent
+family beyond the first is marked `[other parents family]`, since Gramps
+treats the first as the main one. Both markers are explained in a footer
+under the tree whenever they appear.
+
 `get_relationship` returns the most direct relationship by default. Pass
 `all_relationships=true` when two people are related by more than one path -
 common in a village tree - and `depth` to change how many generations the

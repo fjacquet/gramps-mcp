@@ -166,7 +166,7 @@ def _relation(raw: str | None) -> str | None:
     # fields alongside them - verified against the live server, where
     # locale=fr turns profile.relationship into "Maries" while frel stays
     # "Birth". Comparing to the English constant is therefore safe.
-    if raw is None or raw == BIRTH_RELATION:
+    if not raw or raw == BIRTH_RELATION:
         return None
     return raw
 
@@ -188,6 +188,39 @@ def _subject_child_ref(family: dict, subject: str | None) -> dict:
         if child_ref.get("ref") == subject:
             return child_ref
     return {}
+
+
+def _reconcile(links: list[Link]) -> list[Link]:
+    """
+    Collapse repeated links to the same relative into one, birth winning.
+
+    Two parent families can name the same man - an adoptive father who is
+    also the birth father. Left as two entries the renderer prints him
+    twice and contradicts itself about whether his line was followed.
+
+    Args:
+        links (list[Link]): Links as read from the payload, in order.
+
+    Returns:
+        list[Link]: One link per relative, first-seen order preserved.
+    """
+    merged: dict[str, Link] = {}
+    for link in links:
+        seen = merged.get(link.handle)
+        if seen is None:
+            merged[link.handle] = link
+            continue
+        # Reason: a birth link anywhere makes the relative a birth relative,
+        # so the lineage through them is genuine and must be walked. The
+        # annotation goes with it: calling a real birth father "Adopted"
+        # would be as wrong as the silence this change replaced.
+        merged[link.handle] = Link(
+            handle=link.handle,
+            relation=None if (seen.expand or link.expand) else seen.relation,
+            expand=seen.expand or link.expand,
+            secondary_family=seen.secondary_family and link.secondary_family,
+        )
+    return list(merged.values())
 
 
 def _parents_of(payload: dict) -> list[Link]:
@@ -227,7 +260,7 @@ def _parents_of(payload: dict) -> list[Link]:
                     secondary_family=index > 0,
                 )
             )
-    return links
+    return _reconcile(links)
 
 
 def _children_of(payload: dict) -> list[Link]:
@@ -260,12 +293,19 @@ def _children_of(payload: dict) -> list[Link]:
                 # Reason: the payload does not say which parent the subject
                 # is, so neither side can be ruled out. Report a non-birth
                 # relationship rather than default to a birth link that
-                # nothing in the data vouches for.
+                # nothing in the data vouches for - but say so, because
+                # this branch silently stops a whole descendancy and the
+                # payload shape that triggers it should not occur.
+                logger.warning(
+                    f"Traversal found {subject} in a family of their own "
+                    f"family_list without being its father or mother; "
+                    f"falling back to the stricter of frel and mrel"
+                )
                 relation = frel or mrel
             links.append(
                 Link(handle=handle, relation=relation, expand=relation is None)
             )
-    return links
+    return _reconcile(links)
 
 
 async def _walk(
@@ -298,7 +338,15 @@ async def _walk(
     level = [start_handle]
     # Reason: handles fetched for their name only, reached solely through a
     # non-birth link. Empty at the root: the subject is always expanded.
+    # Persistent across levels, because a birth link to the same person can
+    # surface a generation later - a grandfather who adopted his own
+    # grandchild is reached first as an adoptive father and only then
+    # through the birth mother. A per-level set would strand his real
+    # ancestry behind the earlier non-birth link.
     terminal: set[str] = set()
+    # Reason: bounds re-queueing to one promotion per person, so a cycle
+    # that keeps re-offering the same handle cannot spin the walk forever.
+    promoted: set[str] = set()
     # Reason: a failed fetch is recorded in result.failed and never enters
     # result.nodes, so len(result.nodes) alone understates how many fetches
     # were actually attempted. A level with many failures would then leave
@@ -350,20 +398,25 @@ async def _walk(
             if links and not is_last_iteration:
                 result.edges[handle] = links
             for link in links:
-                # Reason: promotion. The same person can be reached by a
-                # birth link and a non-birth one - an adoptive father who is
-                # also the birth father. The birth link wins, whichever
-                # order the two arrive in, or a real lineage is dropped.
-                if link.expand:
-                    next_terminal.discard(link.handle)
                 if link.handle in seen:
+                    # Reason: promotion. A birth link to someone already
+                    # stopped at as a non-birth relative reopens their
+                    # lineage - it is genuine ancestry, and the order the
+                    # two links happened to surface in must not decide
+                    # whether it is walked. Re-queue them for a fetch we
+                    # already made, once, so their relatives are read.
+                    if link.expand and link.handle in terminal:
+                        terminal.discard(link.handle)
+                        if link.handle not in promoted:
+                            promoted.add(link.handle)
+                            next_level.append(link.handle)
                     continue
                 seen.add(link.handle)
                 next_level.append(link.handle)
                 if not link.expand:
                     next_terminal.add(link.handle)
         level = next_level
-        terminal = next_terminal
+        terminal |= next_terminal
 
     result.unexplored += len(level)
     return result
