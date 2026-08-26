@@ -56,9 +56,14 @@ def resolve_media_path(file_location: str, import_root: str) -> str:
     # file's bytes then became tree content readable through the media API.
     resolved = os.path.realpath(file_location)
     root = os.path.realpath(import_root)
-    # Reason: commonpath raises ValueError for inputs on different drives or
-    # a mix of absolute/relative paths - that is not containment, so it must
-    # be treated as a refusal, not allowed to crash past the check.
+    # Reason: commonpath raises ValueError when its inputs do not share a
+    # drive, or mix absolute and relative forms. Both arguments here are
+    # os.path.realpath output, which is always absolute on POSIX, so this
+    # branch is unreachable from this function's own preconditions - kept
+    # as defence, not a live case. (A NUL byte in the path makes realpath
+    # itself raise ValueError before commonpath is ever reached, so that
+    # input does not take this branch either.) Any escape is a refusal,
+    # never an uncaught crash.
     try:
         inside_root = os.path.commonpath([resolved, root]) == root
     except ValueError:
@@ -94,8 +99,14 @@ async def upload_media_from_path(
     settings = get_settings()
     resolved = resolve_media_path(file_location, settings.gramps_media_import_root)
 
-    # Reason: the whole file is read into memory before upload, so an
-    # unbounded read is a denial of service on the MCP process.
+    # Reason: this stat-then-read is checked twice for two different jobs.
+    # The stat below gives an early, precise error naming the file's actual
+    # size. It is not the enforcement, though: a stat and a later read are
+    # two separate syscalls, and a file that grows between them would let a
+    # read based on the stat's size read past the limit (TOCTOU). The
+    # bounded f.read() after it is the real enforcement - it reads at most
+    # one byte over the cap and refuses if that extra byte is present,
+    # regardless of what the earlier stat reported.
     size = os.path.getsize(resolved)
     if size > MAX_MEDIA_BYTES:
         raise ValueError(
@@ -104,7 +115,11 @@ async def upload_media_from_path(
         )
 
     with open(resolved, "rb") as f:
-        file_content = f.read()
+        file_content = f.read(MAX_MEDIA_BYTES + 1)
+    if len(file_content) > MAX_MEDIA_BYTES:
+        raise ValueError(
+            f"'{file_location}' is over the {MAX_MEDIA_BYTES}-byte upload limit."
+        )
     mime_type, _ = mimetypes.guess_type(resolved)
     if not mime_type:
         mime_type = "application/octet-stream"
