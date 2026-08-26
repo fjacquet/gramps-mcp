@@ -31,9 +31,9 @@ def merge_put_data(
     """
     Merge requested changes into an existing record for a PUT update.
 
-    Keys ending in "_list" whose value is a list and which are present in
-    the existing record are merged with deduplication; every other key in
-    changes replaces the existing value. Neither input is mutated.
+    Keys whose value is a list and whose existing value is also a list are
+    merged with deduplication; every other key in changes replaces the
+    existing value. Neither input is mutated.
 
     Args:
         existing (Dict): The record currently stored in Gramps.
@@ -48,14 +48,13 @@ def merge_put_data(
     replace = set(replace_lists or ())
     merged = existing.copy()
     for key, value in changes.items():
-        # Reason: union is the default because a partial update must not wipe
-        # lists the caller did not mention, and attaching media relies on it.
-        # Replacement is opt-in per key so the intent is visible at the call
-        # site rather than inferred from the key's name.
+        # Reason: dispatch on the value being a list, not on the key's name.
+        # urls and alt_names are writable lists whose names do not end in
+        # _list; keying off the suffix sent them down the replace branch and
+        # destroyed entries the caller never mentioned.
         if (
-            key.endswith("_list")
-            and isinstance(value, list)
-            and key in existing
+            isinstance(value, list)
+            and isinstance(existing.get(key), list)
             and key not in replace
         ):
             merged[key] = _merge_list(existing.get(key, []), value)

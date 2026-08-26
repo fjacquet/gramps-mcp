@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from src.gramps_mcp.client import GrampsWebAPIClient
+from src.gramps_mcp.merge import merge_put_data
 from src.gramps_mcp.models.api_calls import ApiCalls
 
 
@@ -286,3 +287,47 @@ class TestClientMergeLogic:
             assert set(put_data["note_list"]) == {"note1", "note2"}
 
         await client.close()
+
+    def test_urls_merge_instead_of_replacing(self):
+        # Reason: urls is a declared writable list on person, family, place
+        # and repository, but its name does not end in _list. Dispatching on
+        # the name rather than the value replaced it, destroying every URL
+        # the caller did not resend.
+        existing = {"urls": [{"path": "https://a.example", "desc": "A"}]}
+        changes = {"urls": [{"path": "https://b.example", "desc": "B"}]}
+        result = merge_put_data(existing, changes)
+        assert result["urls"] == [
+            {"path": "https://a.example", "desc": "A"},
+            {"path": "https://b.example", "desc": "B"},
+        ]
+
+    def test_alt_names_merge_instead_of_replacing(self):
+        existing = {"alt_names": [{"value": "Lugdunum"}, {"value": "Lyon"}]}
+        changes = {"alt_names": [{"value": "Lyons"}]}
+        result = merge_put_data(existing, changes)
+        assert result["alt_names"] == [
+            {"value": "Lugdunum"},
+            {"value": "Lyon"},
+            {"value": "Lyons"},
+        ]
+
+    def test_replace_lists_still_wins_for_a_non_list_suffixed_key(self):
+        existing = {"urls": [{"path": "https://a.example"}]}
+        changes = {"urls": [{"path": "https://b.example"}]}
+        result = merge_put_data(existing, changes, replace_lists=["urls"])
+        assert result["urls"] == [{"path": "https://b.example"}]
+
+    def test_a_non_list_value_still_replaces(self):
+        # Reason: widening the rule must not turn scalar replacement into
+        # anything else - a changed surname must overwrite the old one.
+        existing = {"gender": 1, "gramps_id": "I0001"}
+        changes = {"gender": 0}
+        result = merge_put_data(existing, changes)
+        assert result["gender"] == 0
+        assert result["gramps_id"] == "I0001"
+
+    def test_a_list_absent_from_existing_is_taken_as_is(self):
+        existing = {"gramps_id": "I0001"}
+        changes = {"urls": [{"path": "https://a.example"}]}
+        result = merge_put_data(existing, changes)
+        assert result["urls"] == [{"path": "https://a.example"}]
