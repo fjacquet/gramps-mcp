@@ -351,6 +351,24 @@ What recent changes have been made to my family tree in the last week?
 - Secure HTTP transport with proper error handling
 - No sensitive data exposed in tool responses
 
+### MCP Server Network Access
+
+The MCP server has **no authentication of its own**. It uses the Gramps Web credentials from your `.env` file (owner or admin role) and assumes the caller is authorized. This is by design - MCP servers are meant to be embedded in applications your user controls.
+
+**Important**: Do not publish the MCP server port (`8000` by default) to untrusted networks. The compose files bind it to `127.0.0.1` (loopback only) by default. If you need to access it from other machines:
+
+1. **Use an authenticating reverse proxy** (nginx, Caddy, etc.) in front of the MCP server
+2. Require authentication before requests reach port 8000
+3. Run the proxy on a public-facing port instead
+
+If you have changed the port binding in your compose file, verify it only listens on trusted interfaces:
+
+```bash
+docker compose ps --format "{{.Names}}\t{{.Ports}}" | grep mcp
+```
+
+Look for bindings like `127.0.0.1:8000->8000/tcp` (safe) or loopback IPv6 equivalents, not `0.0.0.0:8000->8000/tcp` (unsafe). See [CONTRIBUTING.md](CONTRIBUTING.md) for the recommended production setup.
+
 
 ## Troubleshooting
 
