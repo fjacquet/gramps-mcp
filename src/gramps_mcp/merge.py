@@ -24,8 +24,6 @@ as a pure, side-effect-free function so it can be unit-tested without a live
 server.
 """
 
-import json
-
 
 def merge_put_data(
     existing: dict, changes: dict, replace_lists: list[str] | None = None
@@ -148,15 +146,27 @@ def _merge_list(existing_items: list, new_items: list) -> list:
         and isinstance(sample_new, dict)
         and "ref" in sample_new
     ):
-        # Reason: deduplicating on ref alone discarded a genuine change and
-        # reported success - the same person on the same event in a second
-        # role, or the same photo cropped to a second face. Two entries are
-        # the same entry only when everything about them matches.
-        existing_keys = {_entry_key(item) for item in existing_items}
-        additions = [
-            item for item in new_items if _entry_key(item) not in existing_keys
-        ]
-        return existing_items + additions
+        # Reason: identity for reference entries is (ref, role, rect) - the
+        # fields Gramps uses to express multiplicity. Other keys are attributes
+        # that update in place, not separate entries. Same person, same event,
+        # different role is two entries. Same photo with different private flag
+        # is one entry with updated metadata.
+        identity_to_index = {
+            _entry_key(item): i for i, item in enumerate(existing_items)
+        }
+        result = list(existing_items)
+        for new_item in new_items:
+            identity = _entry_key(new_item)
+            if identity in identity_to_index:
+                # Merge new attributes over existing entry at this position
+                idx = identity_to_index[identity]
+                if isinstance(result[idx], dict) and isinstance(new_item, dict):
+                    result[idx] = {**result[idx], **new_item}
+            else:
+                # New identity, append as new entry
+                result.append(new_item)
+                identity_to_index[identity] = len(result) - 1
+        return result
 
     if isinstance(sample_existing, str) and isinstance(sample_new, str):
         existing_set = set(existing_items)
@@ -172,21 +182,32 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     return existing_items + new_items
 
 
-def _entry_key(item) -> str:
+def _entry_key(item) -> tuple:
     """
-    Build a stable identity for a reference-list entry.
+    Build an identity key for a reference-list entry.
 
     Args:
         item: One element of a reference list, normally a dict.
 
     Returns:
-        str: A key equal for two entries exactly when their whole content
-        matches, so a differing role, rel or rect counts as a new entry.
+        tuple: A key based on ref, role, and rect only. These are the fields
+        that Gramps uses to express multiplicity in a list. Missing keys
+        contribute None, so a dict with only ref is distinct from one with
+        ref and role.
     """
-    # Reason: sort_keys makes the key independent of dict ordering, and
-    # default=str keeps a non-serialisable value from raising here - an
-    # unmergeable entry should fall through as distinct, not crash a write.
-    return json.dumps(item, sort_keys=True, default=str)
+    # Reason: identity must distinguish structural cases (same person in
+    # different roles, or same photo with different crop regions), while
+    # treating metadata changes (private flag) as updates to the same entry,
+    # not duplicates to discard or append.
+    if isinstance(item, dict):
+        ref = item.get("ref")
+        role = item.get("role")
+        rect = item.get("rect")
+        # Convert rect list to tuple for hashability
+        if isinstance(rect, list):
+            rect = tuple(rect)
+        return (ref, role, rect)
+    return (item, None, None)
 
 
 def _dedupe_dicts_without_ref(existing_items: list, new_items: list) -> list:

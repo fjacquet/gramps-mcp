@@ -144,16 +144,16 @@ class TestAttributeDeduplication:
             {"type": "Occupation", "value": "Meunier"},
         ]
 
-    def test_ref_dicts_still_deduplicate_on_ref_alone(self):
-        # Reason: two refs to the same object differ in their other keys but
-        # must still count as one; ref identity must keep winning over
-        # whole-content identity.
+    def test_a_changed_attribute_updates_the_entry_in_place(self):
+        # Reason: identity is ref plus role and rect; every other key is an
+        # attribute, and a changed attribute updates the entry rather than
+        # adding a duplicate or being discarded.
         existing = {"media_list": [{"ref": "AAA", "private": False}]}
         changes = {"media_list": [{"ref": "AAA", "private": True}]}
 
         merged = merge_put_data(existing, changes)
 
-        assert merged["media_list"] == [{"ref": "AAA", "private": False}]
+        assert merged["media_list"] == [{"ref": "AAA", "private": True}]
 
     def test_attribute_with_nested_dict_value_deduplicates(self):
         # Reason: if an attribute's value is itself a dict (e.g., structured
@@ -205,3 +205,38 @@ class TestAttributeDeduplication:
         merged = merge_put_data(existing, changes)
 
         assert merged["attribute_list"] == [attribute]
+
+    def test_an_unmentioned_attribute_survives_an_update(self):
+        # Reason: when updating an entry with matching identity, unmentioned
+        # attributes must survive so a caller can update one attribute without
+        # losing others they never mentioned.
+        existing = {
+            "media_list": [{"ref": "m1", "private": False, "note_list": ["n1"]}]
+        }
+        changes = {"media_list": [{"ref": "m1", "private": True}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [
+            {"ref": "m1", "private": True, "note_list": ["n1"]}
+        ]
+
+    def test_order_is_preserved_when_a_middle_entry_is_updated(self):
+        # Reason: when updating an entry in a list, it must stay at its
+        # existing position; the order of the list must not change.
+        existing = {
+            "media_list": [
+                {"ref": "m1"},
+                {"ref": "m2", "private": False},
+                {"ref": "m3"},
+            ]
+        }
+        changes = {"media_list": [{"ref": "m2", "private": True}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [
+            {"ref": "m1"},
+            {"ref": "m2", "private": True},
+            {"ref": "m3"},
+        ]
