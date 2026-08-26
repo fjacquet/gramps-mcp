@@ -7,6 +7,7 @@ tests pin that no such value can move the request to a different endpoint.
 Pure string building - no server, no transport.
 """
 
+import httpx
 import pytest
 
 from src.gramps_mcp.client import GrampsWebAPIClient
@@ -40,10 +41,16 @@ class TestUrlParameterEncoding:
         assert "/api/metadata" not in url
         assert "?" not in url
         assert "#" not in url
-        # Reason: the whole crafted value must sit in the single segment
-        # after /api/people/, so nothing after that prefix may be a slash.
-        tail = url.split("/api/people/", 1)[1]
-        assert "/" not in tail
+        # Reason: the whole crafted value must remain one path segment on
+        # the wire - the constructed string is not the exploitable surface,
+        # httpx normalises dot segments when it builds the request.
+        sent = httpx.Request("GET", url).url.raw_path.decode()
+        assert sent.startswith("/api/people/")
+        assert "/api/users" not in sent
+        assert "/api/metadata" not in sent
+        assert "?" not in sent
+        assert "#" not in sent
+        assert "/" not in sent.split("/api/people/", 1)[1]
 
     def test_an_ordinary_handle_is_unchanged(self):
         client = GrampsWebAPIClient()
@@ -51,6 +58,10 @@ class TestUrlParameterEncoding:
             "default", "people/{handle}", {"handle": "103bcbfa97824cbb051f1c7a28b"}
         )
         assert url.endswith("/api/people/103bcbfa97824cbb051f1c7a28b")
+        # Reason: assert the raw_path ends with the hex handle unmodified,
+        # so we know the encoding did not damage the normal path.
+        sent = httpx.Request("GET", url).url.raw_path.decode()
+        assert sent.endswith("/api/people/103bcbfa97824cbb051f1c7a28b")
 
     def test_the_api_prefix_survives_an_endpoint_with_a_leading_slash(self):
         # Reason: urljoin discards the base path when the second argument

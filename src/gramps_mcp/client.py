@@ -332,9 +332,14 @@ class GrampsWebAPIClient:
                 # named - delete_type(handle="../users/x") issued a DELETE
                 # against /api/users/x and reported deleting a person.
                 # safe="" encodes the separators too, so the value can only
-                # ever be one path segment.
+                # ever be one path segment. quote leaves "." alone because
+                # it is unreserved, but httpx resolves "." and ".." path
+                # segments when it builds the request, so an unencoded dot
+                # segment still moves the request off its endpoint. A Gramps
+                # handle is hex and contains no dots, so this costs the
+                # normal path nothing.
                 substituted_endpoint = substituted_endpoint.replace(
-                    placeholder, quote(str(param_value), safe="")
+                    placeholder, quote(str(param_value), safe="").replace(".", "%2E")
                 )
 
         # Check if all required parameters were provided
