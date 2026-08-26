@@ -4,16 +4,16 @@ These are the behaviours that catch people out. Read them before your first
 data-entry session rather than after it - the first one in particular shapes
 how carefully you should check a write before submitting it.
 
-**Updates merge, and nothing can be removed from a list.** A write is a read
+**Updates merge, and removal is possible through detach_reference.** A write is a read
 followed by a full replacement, so the client fetches the current record and
-merges your changes into it before sending. Fields you did not mention keep
-their values, and list fields ending in `_list` are unioned with what is
-already stored rather than replaced. That protects you from silently wiping
-data - but it also means no tool can take an item out of a list. There is no
-path through this server to detach an event reference, remove a child from a
-family, or drop a media reference. Removal requires the Gramps Web UI. Check
-`child_handles`, `father_handle` and `mother_handle` before submitting a
-family; a wrong child cannot be taken back out here.
+merges your changes into it before sending. Fields you do not mention keep
+their values, and any list you supply is added to what is already stored rather
+than replacing it. That protects you from silently wiping data. When you do need
+to remove an item from a list, use `detach_reference`; when you need to remove a
+whole record, use `delete_type`. Still, check `child_handles`, `father_handle`
+and `mother_handle` before submitting a family - while `detach_reference` can
+remove a child, it is easier to add one by mistake than to remove it deliberately,
+and the safer habit is to review the link before you commit.
 
 The one escape hatch is `replace_lists` on `create_place`, which names list
 fields to overwrite rather than add to - `replace_lists=["placeref_list"]` to
