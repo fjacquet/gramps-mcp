@@ -335,9 +335,14 @@ class GrampsWebAPIClient:
                 # ever be one path segment. quote leaves "." alone because
                 # it is unreserved, but httpx resolves "." and ".." path
                 # segments when it builds the request, so an unencoded dot
-                # segment still moves the request off its endpoint. A Gramps
-                # handle is hex and contains no dots, so this costs the
-                # normal path nothing.
+                # segment still moves the request off its endpoint. Encoding
+                # the dot costs a legitimate value nothing: the server
+                # accepts the encoded form, verified against the one live
+                # handle that contains dots - GET /api/citations/103da162...
+                # and /api/citations/103da162%2E%2E%2E both return 200 for
+                # gramps_id C0620. (An earlier version of this comment said
+                # handles are hex and contain no dots; the full 6496-handle
+                # sweep behind URL_SAFE_IDENTIFIER_PATTERN disproved that.)
                 substituted_endpoint = substituted_endpoint.replace(
                     placeholder, quote(str(param_value), safe="").replace(".", "%2E")
                 )
