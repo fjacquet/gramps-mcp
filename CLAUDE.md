@@ -31,11 +31,17 @@
     - `client.py` - Gramps Web API client
     - `merge.py` - Pure merge logic for PUT updates (preserves existing
       fields/lists not mentioned in a change) - unit-tested without a live server
+    - `destructive.py` - Pure decision logic for deletions/list-element removal
+      (same unit-testable pattern as merge.py)
     - `auth.py` - JWT authentication handling (singleton `AuthManager`)
     - `models/` directory - Pydantic models for validation (`parameters/` per domain)
     - `config.py` - Configuration management
     - `utils.py` - Shared helpers
     - `resources/` directory - MCP resources (GQL docs, usage guide)
+    - `tool_registry.py` - Single source of truth mapping tool name -> description/
+      schema/handler; split out of server.py to stay under the 500-line limit
+    - `traversal.py` - Pure breadth-first graph traversal of the family tree
+      (rendering lives in `handlers/traversal_handler.py`)
 - **Use clear, consistent imports** (prefer relative imports within packages).
 - **Use python_dotenv and load_dotenv()** for environment variables.
 
@@ -69,6 +75,20 @@
 - **`tree_stats` returns a permission error even for the owner-role account
   in `.env`.** A `tree_stats` failure ("Permission denied for this
   operation") is an environment fact, not a regression.
+- **The running server comes from `docker-compose-sqllite.yml`**, on the
+  upstream `ghcr.io/gramps-project/grampsweb:latest` image - *not* the local
+  build in `docker/grampsweb/` (that one belongs to the pgsql compose, which
+  is not running). Confirm with `docker inspect gramps-mcp-grampsweb-1
+  --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}'`
+  before reasoning about what is installed server-side.
+- **Back up the live tree before any risky change.** The client has no export
+  support, so GET `/api/exporters/gramps/file` with a bearer token from
+  `AuthManager`. Gzipped Gramps XML, lossless, ~500 KB. Media files are *not*
+  included - the XML carries only `<object>` references.
+- **Traversal tests must assert on the rendered output, not only on
+  `TraversalResult.edges`.** Two defects shipped in #27 because the tests
+  checked the graph and never called `format_traversal` on the tree they had
+  just built. The renderer is where the output lies to the reader.
 - **The `tests/test_alignment_*.py` modules hold hardcoded field inventories
   that must track `src/gramps_mcp/resources/gramps-usage-guide.md`.** Adding a
   field to a parameter model without documenting it in that guide fails these
@@ -90,6 +110,11 @@
 - **Use `pydantic` for data validation**.
 - Use `httpx` for async HTTP client (no FastAPI needed for MCP servers).
 - Use `MCP Python SDK` for MCP server implementation.
+- **Raw Gramps object fields are not localised; profile fields are.** With
+  `locale=fr`, `profile.relationship` becomes `Maries` and
+  `profile.events[].type` becomes `Naissance`, while raw `family.type` stays
+  `Married` and `child_ref_list[].frel` stays `Birth`. Compare against
+  English constants only on raw fields, never on profile fields.
 - Write **docstrings for every function** using the Google style:
   ```python
   def example():
@@ -130,6 +155,9 @@
 - **Always confirm file paths and module names** exist before referencing them in code or tests.
 - **Never delete or overwrite existing code** unless explicitly instructed to
 - **Do not use emojis in the code** to maintain a clean and professional coding style.
-- **Never use `git stash`.** Compare against `main` with `git show
-  main:<path>` instead. An uncommitted change was lost in this repo, most
-  likely to a stash cycle.
+- **Never use `git stash` or `git reset --hard`.** Both have destroyed
+  uncommitted work in this repo. Compare against `main` with `git show
+  main:<path>`; move a misplaced commit with `git branch <name> <sha>` then
+  `git reset --keep`. If work is lost anyway, pre-commit archives unstaged
+  files at every commit: `ls -lat ~/.cache/pre-commit/patch*`, then
+  `git apply <patch>`.
