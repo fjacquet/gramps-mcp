@@ -37,22 +37,51 @@ merged record is what goes on the wire.
 
 `merge.py` is pure and side-effect-free, so it is unit-testable without a
 server - the one deliberate exemption from the live-server testing rule
-(see ADR 0002). The rule it implements:
+(see ADR 0002). The rule it implements, as of the `fix/merge-semantics`
+branch (2026-08-26), is dispatch by value type rather than by key name:
 
-- A key ending in `_list`, whose value is a list, which is present in the
-  existing record, and which is not named in `replace_lists`, is merged as a
-  union with existing items first.
-- Every other key replaces the existing value outright.
+- A value that is a list, whose key is present as a list in the existing
+  record, and which is not named in `replace_lists`, is merged as a union
+  with existing items first. This replaced the earlier `_list`-suffix
+  check, which missed `urls` and `alt_names` - writable lists whose names
+  do not end in `_list` - and sent them down the replace branch, destroying
+  entries the caller never mentioned.
+- A value that is a dict, whose key is present as a dict in the existing
+  record, and which is not named in `replace_lists`, merges sub-key by
+  sub-key, recursively, applying the same two rules one level down: a
+  nested dict merges, a nested list replaces. This covers `primary_name`,
+  which is required on every `PersonData` PUT and so is resent on updates
+  that have nothing to do with the name; replacing it wholesale used to
+  destroy `surname_list`, `suffix`, `type` and the name's own citations.
+  The same rule now also applies inside a reference-list entry (a
+  `placeref_list` item's `date`, for instance) - the in-place entry merge
+  used to replace a nested object wholesale one level deeper than the
+  top-level merge did, which was corrected once found.
+- Every other value replaces the existing value outright.
 - Neither input is mutated.
 
 Deduplication inside a merged list depends on the item type. Dicts carrying
-a `ref` (`event_ref_list`, `media_list`) dedupe on `ref`. Dicts without one
-(`attribute_list`, which is `{type, value}`) dedupe on whole content, added
-in 2a42d00 after N identical updates were found to leave N copies. Strings
-dedupe by value. Mixed or unknown item types are concatenated as-is, the
-safe fallback. An empty existing list short-circuits to concatenation, except
-for ref-less dicts, which still route through content dedup because a single
-incoming list can carry the same dict twice (6d69545).
+a `ref` (`event_ref_list`, `media_list`) dedupe on identity, not on the
+whole dict: `(ref, role, rect)`, the fields Gramps uses to express
+multiplicity in a list - same person, different role, is two entries; same
+photo with an updated privacy flag is one entry with new metadata merged
+in. `role` and `rect` are normalised to `None` when falsy, because the live
+server always sends `"rect": []` on a media reference rather than omitting
+the key, and that must resolve to the same identity as the bare
+`{"ref": ...}` shape the codebase's own tools send back - otherwise a
+resent reference is appended as a duplicate instead of recognised as the
+same entry. When `role` or `rect` arrives as an unhashable shape (a dict, or
+a list of lists - reachable because the caller is an LLM composing
+arguments), identity falls back to a JSON-based key so the entry is treated
+as distinct rather than crashing the write - the same protection the
+original `json.dumps`-based implementation carried before the `(ref, role,
+rect)` rewrite. Dicts without a `ref` (`attribute_list`, which is `{type,
+value}`) dedupe on whole content, added in 2a42d00 after N identical
+updates were found to leave N copies. Strings dedupe by value. Mixed or
+unknown item types are concatenated as-is, the safe fallback. An empty
+existing list short-circuits to concatenation, except for ref-less dicts,
+which still route through content dedup because a single incoming list can
+carry the same dict twice (6d69545).
 
 `replace_lists` (ae0e308, 2026-08-13) is the opt-out. Union is wrong when
 the list expresses a single-valued relationship: moving a place to a new

@@ -144,16 +144,16 @@ class TestAttributeDeduplication:
             {"type": "Occupation", "value": "Meunier"},
         ]
 
-    def test_ref_dicts_still_deduplicate_on_ref_alone(self):
-        # Reason: two refs to the same object differ in their other keys but
-        # must still count as one; ref identity must keep winning over
-        # whole-content identity.
+    def test_a_changed_attribute_updates_the_entry_in_place(self):
+        # Reason: identity is ref plus role and rect; every other key is an
+        # attribute, and a changed attribute updates the entry rather than
+        # adding a duplicate or being discarded.
         existing = {"media_list": [{"ref": "AAA", "private": False}]}
         changes = {"media_list": [{"ref": "AAA", "private": True}]}
 
         merged = merge_put_data(existing, changes)
 
-        assert merged["media_list"] == [{"ref": "AAA", "private": False}]
+        assert merged["media_list"] == [{"ref": "AAA", "private": True}]
 
     def test_attribute_with_nested_dict_value_deduplicates(self):
         # Reason: if an attribute's value is itself a dict (e.g., structured
@@ -205,3 +205,147 @@ class TestAttributeDeduplication:
         merged = merge_put_data(existing, changes)
 
         assert merged["attribute_list"] == [attribute]
+
+    def test_an_unmentioned_attribute_survives_an_update(self):
+        # Reason: when updating an entry with matching identity, unmentioned
+        # attributes must survive so a caller can update one attribute without
+        # losing others they never mentioned.
+        existing = {
+            "media_list": [{"ref": "m1", "private": False, "note_list": ["n1"]}]
+        }
+        changes = {"media_list": [{"ref": "m1", "private": True}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [
+            {"ref": "m1", "private": True, "note_list": ["n1"]}
+        ]
+
+    def test_order_is_preserved_when_a_middle_entry_is_updated(self):
+        # Reason: when updating an entry in a list, it must stay at its
+        # existing position; the order of the list must not change.
+        existing = {
+            "media_list": [
+                {"ref": "m1"},
+                {"ref": "m2", "private": False},
+                {"ref": "m3"},
+            ]
+        }
+        changes = {"media_list": [{"ref": "m2", "private": True}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [
+            {"ref": "m1"},
+            {"ref": "m2", "private": True},
+            {"ref": "m3"},
+        ]
+
+    def test_live_media_reference_shape_deduplicates(self):
+        # Reason: every media reference the live server stores carries
+        # "rect": [] - a falsy-but-present list - while the shape this
+        # codebase's own tools recommend sending back is bare {"ref": ...}.
+        # Both must resolve to the same identity or the same photo gets
+        # attached twice on every no-op resend.
+        existing = {
+            "media_list": [
+                {
+                    "attribute_list": [],
+                    "citation_list": [],
+                    "note_list": ["n1"],
+                    "private": False,
+                    "rect": [],
+                    "ref": "m1",
+                }
+            ]
+        }
+        changes = {"media_list": [{"ref": "m1"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert len(merged["media_list"]) == 1
+        assert merged["media_list"][0]["private"] is False
+        assert merged["media_list"][0]["note_list"] == ["n1"]
+
+    def test_unhashable_role_updates_in_place_not_duplicated(self):
+        # Reason: the previous fallback keyed unhashable entries on their
+        # WHOLE content (via json.dumps), so two entries sharing the same
+        # unhashable role but differing "private" got different keys and
+        # produced two entries - reintroducing the exact duplicate-
+        # attachment defect the identity key exists to prevent. Identity
+        # must still be (ref, role, ...) only, so this must merge to one
+        # entry with "private" updated, not two.
+        role = {"_class": "EventRoleType", "string": "Primary"}
+        existing = {"event_ref_list": [{"ref": "e1", "role": role, "private": False}]}
+        changes = {"event_ref_list": [{"ref": "e1", "role": role, "private": True}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["event_ref_list"] == [
+            {"ref": "e1", "role": role, "private": True}
+        ]
+
+    def test_unhashable_rect_does_not_raise(self):
+        # Reason: same failure mode as role, but for rect - a list of lists
+        # ([[0, 0], [1, 1]]) rather than a flat list.
+        existing = {"media_list": [{"ref": "m1", "rect": [[0, 0], [1, 1]]}]}
+        changes = {"media_list": [{"ref": "m1", "rect": [[0, 0], [1, 1]]}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert len(merged["media_list"]) == 1
+
+    def test_citation_list_inside_media_entry_unions(self):
+        # Reason: a reference entry's citation_list/note_list are the same
+        # accumulative lists as at the top level (Gramps' CitationBase/
+        # NoteBase mixins), not a stated description like primary_name. A
+        # nested list here must union, and an unmentioned nested list must
+        # survive untouched - the in-place merge must not fall back to
+        # _merge_dict's descriptive-object rule (nested list replaces).
+        existing = {
+            "media_list": [{"ref": "m1", "citation_list": ["c1"], "note_list": ["n1"]}]
+        }
+        changes = {"media_list": [{"ref": "m1", "citation_list": ["c2"]}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [
+            {
+                "ref": "m1",
+                "citation_list": ["c1", "c2"],
+                "note_list": ["n1"],
+            }
+        ]
+
+    def test_nested_dict_inside_a_reference_entry_is_preserved(self):
+        # Reason: the in-place entry merge used a shallow dict spread, so a
+        # nested object (e.g. "date") inside a placeref_list entry was
+        # replaced wholesale instead of merged sub-key by sub-key - the same
+        # destructive behaviour this branch exists to kill, one level deeper.
+        existing = {
+            "placeref_list": [{"ref": "P1", "date": {"year": 1800, "text": "1800"}}]
+        }
+        changes = {"placeref_list": [{"ref": "P1", "date": {"modifier": 1}}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["placeref_list"] == [
+            {
+                "ref": "P1",
+                "date": {"year": 1800, "text": "1800", "modifier": 1},
+            }
+        ]
+
+    def test_list_not_in_identity_table_falls_back_to_ref_alone(self):
+        # Reason: child_ref_list is deliberately absent from _IDENTITY_FIELDS
+        # - whether a second call number on the same repository is a
+        # correction or a second entry is an undecided product question, and
+        # frel proves the "second entry" default is wrong here: correcting
+        # frel from Birth to Adopted must update the one entry, not append a
+        # second child reference.
+        existing = {"child_ref_list": [{"ref": "c1", "frel": "Birth"}]}
+        changes = {"child_ref_list": [{"ref": "c1", "frel": "Adopted"}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["child_ref_list"] == [{"ref": "c1", "frel": "Adopted"}]

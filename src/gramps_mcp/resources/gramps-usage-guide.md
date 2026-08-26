@@ -49,6 +49,29 @@ Every other record type filters normally; notes are the sole exception.
 - If entity exists but **missing some of the new info**: Use `create_X` with the existing handle to **update** it
 - If entity doesn't exist: Use `create_X` without handle to **create** new entity
 
+**What an update preserves.** A `create_X` call carrying a handle is an
+update, and it merges rather than overwrites: any field you do not mention is
+kept, lists you supply are added to the existing ones, and a nested object
+such as `primary_name` merges sub-key by sub-key. So sending
+`primary_name={"first_name": "Jean"}` changes the first name and leaves the
+surname, suffix and name type alone.
+
+Three consequences worth knowing:
+
+- **Adding an entry to a top-level list never removes one.** To remove one,
+  use `detach_reference`. Supplying an empty top-level list does nothing.
+- **A list nested inside an object states that list.** Sending
+  `primary_name={"surname_list": [...]}` replaces the stored surnames rather
+  than adding to them, so a correction works - but a second surname you omit
+  is lost. Send the whole list. Unlike a top-level list, an empty nested
+  list is not a no-op: sending `primary_name={"surname_list": []}` clears
+  the stored surnames.
+- **A reference is identified by its handle plus its role and region.** The
+  same person on one event as Primary and again as Family is two entries and
+  both are kept. Re-sending the same reference with a changed detail that is
+  not role or region - a privacy flag, for instance - updates the entry that
+  is already there instead of adding a second one.
+
 ### 1. Repository First
 When you have a source document, start with the repository (archive, library, courthouse, etc.):
 
