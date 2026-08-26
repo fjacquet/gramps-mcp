@@ -24,6 +24,8 @@ as a pure, side-effect-free function so it can be unit-tested without a live
 server.
 """
 
+import json
+
 
 def merge_put_data(
     existing: dict, changes: dict, replace_lists: list[str] | None = None
@@ -31,8 +33,8 @@ def merge_put_data(
     """
     Merge requested changes into an existing record for a PUT update.
 
-    Keys whose value is a list and whose existing value is also a list are
-    merged with deduplication; every other key in changes replaces the
+    Lists are merged with deduplication (unless replace_lists says otherwise),
+    dicts merge recursively by sub-key, and everything else replaces the
     existing value. Neither input is mutated.
 
     Args:
@@ -146,13 +148,13 @@ def _merge_list(existing_items: list, new_items: list) -> list:
         and isinstance(sample_new, dict)
         and "ref" in sample_new
     ):
-        existing_refs = {
-            item.get("ref") for item in existing_items if isinstance(item, dict)
-        }
+        # Reason: deduplicating on ref alone discarded a genuine change and
+        # reported success - the same person on the same event in a second
+        # role, or the same photo cropped to a second face. Two entries are
+        # the same entry only when everything about them matches.
+        existing_keys = {_entry_key(item) for item in existing_items}
         additions = [
-            item
-            for item in new_items
-            if isinstance(item, dict) and item.get("ref") not in existing_refs
+            item for item in new_items if _entry_key(item) not in existing_keys
         ]
         return existing_items + additions
 
@@ -168,6 +170,23 @@ def _merge_list(existing_items: list, new_items: list) -> list:
 
     # Reason: mixed/unknown item types - concatenation is the safe fallback
     return existing_items + new_items
+
+
+def _entry_key(item) -> str:
+    """
+    Build a stable identity for a reference-list entry.
+
+    Args:
+        item: One element of a reference list, normally a dict.
+
+    Returns:
+        str: A key equal for two entries exactly when their whole content
+        matches, so a differing role, rel or rect counts as a new entry.
+    """
+    # Reason: sort_keys makes the key independent of dict ordering, and
+    # default=str keeps a non-serialisable value from raising here - an
+    # unmergeable entry should fall through as distinct, not crash a write.
+    return json.dumps(item, sort_keys=True, default=str)
 
 
 def _dedupe_dicts_without_ref(existing_items: list, new_items: list) -> list:

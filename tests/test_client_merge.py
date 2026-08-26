@@ -409,3 +409,36 @@ class TestClientMergeLogic:
         merge_put_data(existing, changes)
         assert existing == {"primary_name": {"first_name": "Jean", "suffix": "Jr"}}
         assert changes == {"primary_name": {"first_name": "Pierre"}}
+
+    def test_a_changed_role_on_the_same_event_is_applied(self):
+        # Reason: deduplicating on ref alone silently discarded the change
+        # and reported success. Recording someone as a witness on an event
+        # where they already appear in another role is routine.
+        existing = {"event_ref_list": [{"ref": "ev1", "role": "Primary"}]}
+        changes = {"event_ref_list": [{"ref": "ev1", "role": "Witness"}]}
+        result = merge_put_data(existing, changes)
+        assert result["event_ref_list"] == [
+            {"ref": "ev1", "role": "Primary"},
+            {"ref": "ev1", "role": "Witness"},
+        ]
+
+    def test_an_identical_ref_entry_is_still_deduplicated(self):
+        existing = {"event_ref_list": [{"ref": "ev1", "role": "Primary"}]}
+        changes = {"event_ref_list": [{"ref": "ev1", "role": "Primary"}]}
+        result = merge_put_data(existing, changes)
+        assert result["event_ref_list"] == [{"ref": "ev1", "role": "Primary"}]
+
+    def test_the_same_photo_in_two_regions_is_kept_twice(self):
+        existing = {"media_list": [{"ref": "m1", "rect": [0, 0, 10, 10]}]}
+        changes = {"media_list": [{"ref": "m1", "rect": [50, 50, 60, 60]}]}
+        result = merge_put_data(existing, changes)
+        assert result["media_list"] == [
+            {"ref": "m1", "rect": [0, 0, 10, 10]},
+            {"ref": "m1", "rect": [50, 50, 60, 60]},
+        ]
+
+    def test_a_bare_ref_addition_still_deduplicates(self):
+        existing = {"citation_list": [{"ref": "c1"}]}
+        changes = {"citation_list": [{"ref": "c1"}, {"ref": "c2"}]}
+        result = merge_put_data(existing, changes)
+        assert result["citation_list"] == [{"ref": "c1"}, {"ref": "c2"}]
