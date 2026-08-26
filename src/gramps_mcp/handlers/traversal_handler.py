@@ -20,9 +20,38 @@ Markdown rendering for breadth-first traversal results.
 No I/O: everything here operates on an in-memory TraversalResult.
 """
 
-from ..traversal import TraversalResult
+from ..traversal import Link, TraversalResult
 
 INDENT = "  "
+
+POLICY_FOOTER = (
+    "**Non-birth links**: a relationship other than birth (Adopted, "
+    "Stepchild, Foster, Sponsored, None, Unknown, or a custom type) is "
+    "reported but its line is not followed."
+)
+
+
+def _markers(link: Link | None) -> str:
+    """
+    Render the bracketed annotations qualifying one link, if any.
+
+    Args:
+        link (Link | None): The link leading to this person, None at the root.
+
+    Returns:
+        str: For example " [Adopted, line not followed]", or "" when the
+        link is an unremarkable birth link inside the main parent family.
+    """
+    if link is None:
+        return ""
+    parts = []
+    if link.relation is not None:
+        # Reason: naming the relationship without saying the walk stopped
+        # would let the silence beyond read as "no ancestors recorded".
+        parts.append(f"{link.relation}, line not followed")
+    if link.secondary_family:
+        parts.append("other parents family")
+    return f" [{'; '.join(parts)}]" if parts else ""
 
 
 def _format_event(event: dict | None, prefix: str) -> str:
@@ -65,7 +94,12 @@ def _format_person(profile: dict) -> str:
 
 
 def _walk_lines(
-    result: TraversalResult, handle: str, depth: int, seen: set[str], lines: list[str]
+    result: TraversalResult,
+    handle: str,
+    depth: int,
+    seen: set[str],
+    lines: list[str],
+    link: Link | None = None,
 ) -> int:
     """
     Append the markdown lines for one subtree, depth-first for readability.
@@ -76,6 +110,7 @@ def _walk_lines(
         depth (int): Current generation, zero for the root.
         seen (set[str]): Handles already rendered somewhere above.
         lines (list[str]): Accumulator, mutated in place.
+        link (Link | None): The link that led here, None at the root.
 
     Returns:
         int: The deepest generation reached under this handle, one-based.
@@ -92,10 +127,12 @@ def _walk_lines(
         lines.append(f"{pad}- {_format_person(profile)} [already listed above]")
         return depth + 1
     seen.add(handle)
-    lines.append(f"{pad}- {_format_person(profile)}")
+    lines.append(f"{pad}- {_format_person(profile)}{_markers(link)}")
     deepest = depth + 1
     for child in result.edges.get(handle, []):
-        deepest = max(deepest, _walk_lines(result, child, depth + 1, seen, lines))
+        deepest = max(
+            deepest, _walk_lines(result, child.handle, depth + 1, seen, lines, child)
+        )
     return deepest
 
 
@@ -120,6 +157,10 @@ def format_traversal(result: TraversalResult, direction: str) -> str:
         f"{generations} generations, {len(result.nodes)} people"
     )
     text = header + "\n\n" + "\n".join(lines) + "\n"
+    if any(
+        link.relation is not None for links in result.edges.values() for link in links
+    ):
+        text += f"\n{POLICY_FOOTER}\n"
     if result.truncated_by_cap:
         text += (
             f"\n**Truncated**: visit cap of {result.visit_cap} reached, "

@@ -441,6 +441,18 @@ matters, look for a death event and source it.
   person reached a second time by a different path is listed again with
   `[already listed above]` instead of being repeated in full. A person the
   walk could not fetch shows as `[unavailable: <reason>]`.
+- **Only birth links continue a lineage.** Gramps records a relationship on
+  each parent separately (`frel` for the father, `mrel` for the mother):
+  Birth, Adopted, Stepchild, Foster, Sponsored, None, Unknown, or a custom
+  type. A non-birth relative is named on its own line and marked
+  `[Adopted, line not followed]` - the relative is real, but their own
+  ancestors are not the subject's, so the walk stops there. When any such
+  line appears, a `**Non-birth links**` footer states the rule. Do not
+  describe a marked relative as a birth parent or birth child, and do not
+  assume a marked line means "no further relatives recorded".
+- A parent from a parent family beyond the first is marked
+  `[other parents family]`. Gramps treats the first parent family as the
+  main one, the one its own reports and charts follow.
 - Still start small: a large `max_generations` on a well-populated tree can
   overflow the context window well before it hits either cap.
 

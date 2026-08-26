@@ -33,6 +33,32 @@ logger = logging.getLogger(__name__)
 VISIT_CAP = 500
 MAX_CONCURRENT_FETCHES = 8
 
+# Reason: the Gramps child reference type that continues a lineage. Every
+# other value - Adopted, Stepchild, Foster, Sponsored, None, Unknown, or a
+# custom string - names a relationship that is real but not biological.
+BIRTH_RELATION = "Birth"
+
+
+@dataclass(frozen=True)
+class Link:
+    """
+    One step from a person to a relative, with how they are related.
+
+    Attributes:
+        handle (str): The relative's handle.
+        relation (str | None): The Gramps child reference type when it is
+            anything other than a birth link, verbatim - "Adopted",
+            "Stepchild", a custom string. None for a birth link.
+        expand (bool): Whether the walk continues through this relative.
+        secondary_family (bool): True when the link comes from a parent
+            family beyond the first, which Gramps treats as the main one.
+    """
+
+    handle: str
+    relation: str | None = None
+    expand: bool = True
+    secondary_family: bool = False
+
 
 @dataclass
 class TraversalResult:
@@ -40,7 +66,7 @@ class TraversalResult:
 
     root: str
     nodes: dict[str, dict] = field(default_factory=dict)
-    edges: dict[str, list[str]] = field(default_factory=dict)
+    edges: dict[str, list[Link]] = field(default_factory=dict)
     truncated_by_cap: bool = False
     unexplored: int = 0
     failed: dict[str, str] = field(default_factory=dict)
@@ -123,42 +149,123 @@ async def _fetch_level(
     return dict(zip(handles, payloads, strict=True))
 
 
-def _parents_of(payload: dict) -> list[str]:
+def _relation(raw: str | None) -> str | None:
     """
-    Read a person's parent handles from an extended parent_family_list.
+    Normalise one Gramps child reference type into a link annotation.
+
+    Args:
+        raw (str | None): The frel or mrel value, or None when the payload
+            carries no child reference entry.
+
+    Returns:
+        str | None: None for a birth link - which Gramps also expresses by
+        omitting the value - and the verbatim string otherwise, custom
+        types included.
+    """
+    # Reason: the raw object fields are not localised, unlike the profile
+    # fields alongside them - verified against the live server, where
+    # locale=fr turns profile.relationship into "Maries" while frel stays
+    # "Birth". Comparing to the English constant is therefore safe.
+    if raw is None or raw == BIRTH_RELATION:
+        return None
+    return raw
+
+
+def _subject_child_ref(family: dict, subject: str | None) -> dict:
+    """
+    Find the subject's own entry in a family's child reference list.
+
+    Args:
+        family (dict): An extended family object.
+        subject (str | None): Handle of the person the walk is centred on.
+
+    Returns:
+        dict: The matching child reference, or an empty dict when the
+        family carries none - which the export does whenever both
+        relationships are Birth.
+    """
+    for child_ref in family.get("child_ref_list", []) or []:
+        if child_ref.get("ref") == subject:
+            return child_ref
+    return {}
+
+
+def _parents_of(payload: dict) -> list[Link]:
+    """
+    Read a person's parent links from an extended parent_family_list.
 
     Args:
         payload (dict): A person payload fetched with extend=parent_family_list.
 
     Returns:
-        list[str]: Father then mother, per family, skipping empty slots.
+        list[Link]: Father then mother, per family, skipping empty slots.
+        Each parent carries its own relationship: Gramps records frel and
+        mrel separately, so a child can be the birth child of one parent
+        and the stepchild of the other.
     """
-    handles: list[str] = []
-    for family in (payload.get("extended") or {}).get("parent_families", []) or []:
-        for key in ("father_handle", "mother_handle"):
+    subject = payload.get("handle")
+    links: list[Link] = []
+    families = (payload.get("extended") or {}).get("parent_families", []) or []
+    for index, family in enumerate(families):
+        child_ref = _subject_child_ref(family, subject)
+        slots = (
+            ("father_handle", child_ref.get("frel")),
+            ("mother_handle", child_ref.get("mrel")),
+        )
+        for key, raw in slots:
             handle = family.get(key)
-            if handle:
-                handles.append(handle)
-    return handles
+            if not handle:
+                continue
+            relation = _relation(raw)
+            links.append(
+                Link(
+                    handle=handle,
+                    relation=relation,
+                    expand=relation is None,
+                    # Reason: Gramps treats the first parent family as the
+                    # main one - the one its own reports and charts follow.
+                    secondary_family=index > 0,
+                )
+            )
+    return links
 
 
-def _children_of(payload: dict) -> list[str]:
+def _children_of(payload: dict) -> list[Link]:
     """
-    Read a person's child handles from an extended family_list.
+    Read a person's child links from an extended family_list.
 
     Args:
         payload (dict): A person payload fetched with extend=family_list.
 
     Returns:
-        list[str]: Child handles across all families, in family order.
+        list[Link]: Child links across all families, in family order, each
+        annotated with the relationship binding the subject to that child.
     """
-    handles: list[str] = []
+    subject = payload.get("handle")
+    links: list[Link] = []
     for family in (payload.get("extended") or {}).get("families", []) or []:
+        is_father = family.get("father_handle") == subject
+        is_mother = family.get("mother_handle") == subject
         for child_ref in family.get("child_ref_list", []) or []:
             handle = child_ref.get("ref")
-            if handle:
-                handles.append(handle)
-    return handles
+            if not handle:
+                continue
+            frel = _relation(child_ref.get("frel"))
+            mrel = _relation(child_ref.get("mrel"))
+            if is_father:
+                relation = frel
+            elif is_mother:
+                relation = mrel
+            else:
+                # Reason: the payload does not say which parent the subject
+                # is, so neither side can be ruled out. Report a non-birth
+                # relationship rather than default to a birth link that
+                # nothing in the data vouches for.
+                relation = frel or mrel
+            links.append(
+                Link(handle=handle, relation=relation, expand=relation is None)
+            )
+    return links
 
 
 async def _walk(
@@ -180,8 +287,8 @@ async def _walk(
         max_generations (int): Generations to fetch, the subject counting as one.
         visit_cap (int): Hard ceiling on people fetched.
         extend (str): "parent_family_list" or "family_list".
-        successors (Callable[[dict], list[str]]): Reads the next generation's
-            handles out of a person payload.
+        successors (Callable[[dict], list[Link]]): Reads the next
+            generation's links out of a person payload.
 
     Returns:
         TraversalResult: Nodes, edges, and what the walk could not reach.
@@ -189,6 +296,9 @@ async def _walk(
     result = TraversalResult(root=start_handle, visit_cap=visit_cap)
     seen: set[str] = {start_handle}
     level = [start_handle]
+    # Reason: handles fetched for their name only, reached solely through a
+    # non-birth link. Empty at the root: the subject is always expanded.
+    terminal: set[str] = set()
     # Reason: a failed fetch is recorded in result.failed and never enters
     # result.nodes, so len(result.nodes) alone understates how many fetches
     # were actually attempted. A level with many failures would then leave
@@ -209,8 +319,10 @@ async def _walk(
             # clearing level here keeps the cap break from double-counting
             # the generation it just refused to fetch.
             refused = set(level)
-            for handle, children in result.edges.items():
-                result.edges[handle] = [c for c in children if c not in refused]
+            for handle, links in result.edges.items():
+                result.edges[handle] = [
+                    link for link in links if link.handle not in refused
+                ]
             result.truncated_by_cap = True
             result.unexplored += len(level)
             level = []
@@ -220,6 +332,7 @@ async def _walk(
         attempted += len(level)
         payloads = await _fetch_level(client, tree_id, level, extend)
         next_level: list[str] = []
+        next_terminal: set[str] = set()
         for handle, payload in payloads.items():
             if isinstance(payload, Exception):
                 logger.warning(f"Traversal could not fetch {handle}: {payload}")
@@ -230,15 +343,27 @@ async def _walk(
                 "gramps_id": payload.get("gramps_id", "?"),
                 "name_display": "?",
             }
-            children = successors(payload)
-            if children and not is_last_iteration:
-                result.edges[handle] = children
-            for child in children:
-                if child in seen:
+            # Reason: a person reached only through a non-birth link is
+            # fetched - the renderer needs a name, not a bare handle - but
+            # the lineage stops there, so their own relatives are never read.
+            links = [] if handle in terminal else successors(payload)
+            if links and not is_last_iteration:
+                result.edges[handle] = links
+            for link in links:
+                # Reason: promotion. The same person can be reached by a
+                # birth link and a non-birth one - an adoptive father who is
+                # also the birth father. The birth link wins, whichever
+                # order the two arrive in, or a real lineage is dropped.
+                if link.expand:
+                    next_terminal.discard(link.handle)
+                if link.handle in seen:
                     continue
-                seen.add(child)
-                next_level.append(child)
+                seen.add(link.handle)
+                next_level.append(link.handle)
+                if not link.expand:
+                    next_terminal.add(link.handle)
         level = next_level
+        terminal = next_terminal
 
     result.unexplored += len(level)
     return result

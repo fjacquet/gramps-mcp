@@ -137,8 +137,8 @@ class TestWalkAncestors:
         ):
             result = await walk_ancestors(GrampsWebAPIClient(), "default", "h1", 3)
         assert set(result.nodes) == {"h1", "h2", "h3", "h4", "h5"}
-        assert result.edges["h1"] == ["h2", "h3"]
-        assert result.edges["h2"] == ["h4", "h5"]
+        assert [link.handle for link in result.edges["h1"]] == ["h2", "h3"]
+        assert [link.handle for link in result.edges["h2"]] == ["h4", "h5"]
         assert result.truncated_by_cap is False
 
     async def test_generation_limit_stops_the_walk(self):
@@ -147,7 +147,7 @@ class TestWalkAncestors:
         ):
             result = await walk_ancestors(GrampsWebAPIClient(), "default", "h1", 2)
         assert set(result.nodes) == {"h1", "h2", "h3"}
-        assert "h4" not in result.edges.get("h2", [])
+        assert "h4" not in [link.handle for link in result.edges.get("h2", [])]
 
     async def test_a_person_reached_twice_is_recorded_once_and_marked(self):
         # h1's father and mother share the same parents - a cousin marriage,
@@ -170,8 +170,8 @@ class TestWalkAncestors:
         assert set(result.nodes) == {"h1", "h2", "h3", "h4", "h5"}
         assert list(result.nodes).count("h4") == 1
         assert list(result.nodes).count("h5") == 1
-        assert set(result.edges["h2"]) == {"h4", "h5"}
-        assert set(result.edges["h3"]) == {"h4", "h5"}
+        assert {link.handle for link in result.edges["h2"]} == {"h4", "h5"}
+        assert {link.handle for link in result.edges["h3"]} == {"h4", "h5"}
 
     async def test_a_cycle_does_not_hang_the_walk(self):
         # A person who is their own grandparent cannot happen in real data,
@@ -338,8 +338,8 @@ class TestWalkDescendants:
         with patch.object(GrampsWebAPIClient, "_make_request", new=_request):
             result = await walk_descendants(GrampsWebAPIClient(), "default", "h1", 3)
         assert set(result.nodes) == {"h1", "h2", "h3", "h4"}
-        assert result.edges["h1"] == ["h2", "h3"]
-        assert result.edges["h2"] == ["h4"]
+        assert [link.handle for link in result.edges["h1"]] == ["h2", "h3"]
+        assert [link.handle for link in result.edges["h2"]] == ["h4"]
 
     async def test_returns_a_traversal_result(self):
         async def _request(self, method=None, url=None, **kwargs):

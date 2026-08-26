@@ -3,7 +3,7 @@ Unit tests for the traversal markdown renderer. Pure formatting, no server.
 """
 
 from src.gramps_mcp.handlers.traversal_handler import format_traversal
-from src.gramps_mcp.traversal import TraversalResult
+from src.gramps_mcp.traversal import Link, TraversalResult
 
 
 def _profile(handle: str, gramps_id: str, name: str, **extra) -> dict:
@@ -50,7 +50,7 @@ def _result(**overrides) -> TraversalResult:
             ),
             "h3": _profile("h3", "I0129", "MARIAUD, Odile"),
         },
-        "edges": {"h1": ["h2", "h3"]},
+        "edges": {"h1": [Link("h2"), Link("h3")]},
         "truncated_by_cap": False,
         "unexplored": 0,
         "failed": {},
@@ -83,7 +83,7 @@ class TestFormatTraversal:
         assert "  - MARIAUD, Odile (I0129)" in text
 
     def test_revisited_node_is_marked_and_not_expanded_twice(self):
-        result = _result(edges={"h1": ["h2", "h3"], "h2": ["h3"]})
+        result = _result(edges={"h1": [Link("h2"), Link("h3")], "h2": [Link("h3")]})
         text = format_traversal(result, "ancestors")
         assert text.count("MARIAUD, Odile (I0129)") == 2
         assert "[already listed above]" in text
@@ -95,7 +95,7 @@ class TestFormatTraversal:
 
     def test_failed_node_renders_with_its_handle_and_reason(self):
         result = _result(
-            edges={"h1": ["h2", "h9"]},
+            edges={"h1": [Link("h2"), Link("h9")]},
             failed={"h9": "HTTP 500"},
         )
         text = format_traversal(result, "ancestors")
@@ -112,6 +112,65 @@ class TestFormatTraversal:
     def test_no_footer_when_the_walk_completed(self):
         text = format_traversal(_result(), "ancestors")
         assert "Truncated" not in text
+
+    def test_a_non_birth_link_is_named_and_declared_unfollowed(self):
+        # Both halves matter: the relationship, so the line is not read as
+        # a birth link, and the fact the lineage stops, so the silence
+        # beyond is not read as "no ancestors known".
+        result = _result(edges={"h1": [Link("h2", relation="Adopted", expand=False)]})
+        text = format_traversal(result, "ancestors")
+        assert (
+            "  - JACQUET, Yvan (I0042), b. 1948 Lyon, d. 2011 "
+            "[Adopted, line not followed]" in text
+        )
+
+    def test_a_custom_relationship_is_printed_verbatim(self):
+        result = _result(
+            edges={"h1": [Link("h2", relation="Mere porteuse", expand=False)]}
+        )
+        text = format_traversal(result, "ancestors")
+        assert "[Mere porteuse, line not followed]" in text
+
+    def test_a_parent_from_a_secondary_family_is_marked_as_such(self):
+        result = _result(edges={"h1": [Link("h3", secondary_family=True)]})
+        text = format_traversal(result, "ancestors")
+        assert "  - MARIAUD, Odile (I0129) [other parents family]" in text
+
+    def test_both_markers_appear_together_on_one_line(self):
+        result = _result(
+            edges={
+                "h1": [
+                    Link("h3", relation="Foster", expand=False, secondary_family=True)
+                ]
+            }
+        )
+        text = format_traversal(result, "ancestors")
+        assert (
+            "  - MARIAUD, Odile (I0129) "
+            "[Foster, line not followed; other parents family]" in text
+        )
+
+    def test_a_footer_explains_the_policy_when_a_line_was_not_followed(self):
+        result = _result(edges={"h1": [Link("h2", relation="Adopted", expand=False)]})
+        text = format_traversal(result, "ancestors")
+        assert (
+            "**Non-birth links**: a relationship other than birth (Adopted, "
+            "Stepchild, Foster, Sponsored, None, Unknown, or a custom type) "
+            "is reported but its line is not followed." in text
+        )
+
+    def test_no_policy_footer_when_every_link_is_a_birth_link(self):
+        text = format_traversal(_result(), "ancestors")
+        assert "Non-birth links" not in text
+
+    def test_an_unfollowed_person_is_still_named_not_reduced_to_a_handle(self):
+        # Reason: the walk fetches an unexpanded relative precisely so this
+        # line can carry a name. Printing "[unavailable: not fetched]" here
+        # would trade one silent lie for another.
+        result = _result(edges={"h1": [Link("h2", relation="Adopted", expand=False)]})
+        text = format_traversal(result, "ancestors")
+        assert "not fetched" not in text
+        assert "JACQUET, Yvan" in text
 
     def test_lone_person_with_no_relatives_reads_as_one_generation(self):
         result = _result(
