@@ -53,7 +53,7 @@ class TestSourcedEventPlaceValidation:
         assert params.event_place is None
 
     def test_handle_with_trailing_newline_is_rejected(self):
-        """Shares HANDLE_PATTERN with EventSaveParams.place; same gap applies:
+        """Shares PLACE_HANDLE_PATTERN with EventSaveParams.place; same gap applies:
 
         re.match plus a "$"-anchored pattern accepts a trailing newline
         because "$" matches just before a final newline.

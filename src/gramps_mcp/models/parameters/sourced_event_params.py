@@ -27,7 +27,7 @@ from pydantic import Field, field_validator, model_validator
 
 from .base_params import StrictModel
 from .date_params import DateValue
-from .event_params import HANDLE_PATTERN
+from .event_params import PLACE_HANDLE_PATTERN
 
 
 class SourcedEventData(StrictModel):
@@ -104,9 +104,9 @@ class SourcedEventData(StrictModel):
 
         Raises:
             ValueError: If value is not None and does not match
-                HANDLE_PATTERN.
+                PLACE_HANDLE_PATTERN.
         """
-        if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
+        if value is not None and not re.fullmatch(PLACE_HANDLE_PATTERN, value):
             raise ValueError(
                 f"event_place must be a place handle, not a name. Got: "
                 f"{value!r}. Use find_type(type='place', ...) to obtain the "

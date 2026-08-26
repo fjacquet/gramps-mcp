@@ -31,19 +31,25 @@ from pydantic import BaseModel, Field, field_validator
 # Handles come in at least three shapes in this tree alone - hex, UUID,
 # gramps_id-like - so no character-class-plus-length pattern can describe
 # "a handle" without either rejecting real records or accepting arbitrary
-# text. Do not try to narrow this again to look more handle-shaped.
+# text. Do not try to narrow this again to look more handle-shaped: that
+# was tried and reverted (see git history and task-2-report.md) because it
+# also broke event_params.validate_place_is_handle, whose job is the
+# opposite one - see PLACE_HANDLE_PATTERN in event_params.py.
 #
 # What this pattern actually constrains is narrower and does not depend on
 # guessing a handle's format: a handle lands in a URL path segment, so it
 # must not contain a character that means something there (/, ., ?, #, %,
 # whitespace, backslash, etc). That is the same property USERNAME_PATTERN
 # in tools/user_tools.py enforces on a value with the same URL-path fate,
-# for the same reason.
+# for the same reason. This name-for-the-job (not "HANDLE_PATTERN") is
+# deliberate: a name that does not say which job it does is how a stricter,
+# narrower rule (place-name-vs-handle discrimination) and this URL-safety
+# rule got merged into one constant and broke each other.
 #
 # Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
 # needed here. re.match plus a "$" anchor accepts a trailing newline because
 # "$" matches just before a final newline; fullmatch has no such gap.
-HANDLE_PATTERN = r"[A-Za-z0-9_-]+"
+URL_SAFE_IDENTIFIER_PATTERN = r"[A-Za-z0-9_-]+"
 
 
 def validate_handle_shape(value: str | None) -> str | None:
@@ -65,7 +71,7 @@ def validate_handle_shape(value: str | None) -> str | None:
     # already stops a crafted value from leaving its segment, but refusing
     # it here fails before any request is issued and names the problem,
     # rather than 404ing against an endpoint the caller never meant to hit.
-    if value is not None and not re.fullmatch(HANDLE_PATTERN, value):
+    if value is not None and not re.fullmatch(URL_SAFE_IDENTIFIER_PATTERN, value):
         raise ValueError(
             f"'{value}' is not a Gramps handle. A handle may contain only "
             "letters, digits, underscore and dash. To identify a record by "

@@ -17,6 +17,7 @@ from src.gramps_mcp.models.parameters.destructive_params import (
     DetachReferenceParams,
     MergeTypeParams,
 )
+from src.gramps_mcp.models.parameters.event_params import EventSaveParams
 
 
 class TestDestructiveHandleValidation:
@@ -45,8 +46,8 @@ class TestDestructiveHandleValidation:
 
     # Reason: these three are shapes actually found in the live tree's
     # 3425-handle check (2026-08-26) - hex, a UUID, and a citation whose
-    # handle equals its gramps_id. Do not narrow HANDLE_PATTERN to reject
-    # any of them again.
+    # handle equals its gramps_id. Do not narrow
+    # URL_SAFE_IDENTIFIER_PATTERN to reject any of them again.
     @pytest.mark.parametrize(
         "real_handle",
         [
@@ -58,6 +59,23 @@ class TestDestructiveHandleValidation:
     def test_delete_type_accepts_every_real_handle_shape(self, real_handle):
         params = DeleteTypeParams(type="person", handle=real_handle)
         assert params.handle == real_handle
+
+    # Reason: this pins the reason the two rules are separate constants.
+    # The destructive tools' handle field only needs to keep URL-breaking
+    # characters out (URL_SAFE_IDENTIFIER_PATTERN, in base_params.py), so
+    # an ordinary word like "Lyon" is a legitimate (if useless) value there
+    # and must be accepted. EventSaveParams.place needs to catch exactly
+    # that same ordinary word, because there the job is telling a place
+    # NAME apart from a place HANDLE (PLACE_HANDLE_PATTERN, in
+    # event_params.py, deliberately narrower - lowercase hex only). If
+    # this test ever fails because both accept or both refuse "Lyon", the
+    # two rules have been merged back into one and need separating again.
+    def test_url_safety_and_place_handle_rules_differ_on_an_ordinary_word(self):
+        accepted = DeleteTypeParams(type="person", handle="Lyon")
+        assert accepted.handle == "Lyon"
+
+        with pytest.raises(ValidationError):
+            EventSaveParams(type="Birth", citation_list=[], place="Lyon")
 
     def test_delete_type_still_accepts_a_gramps_id_instead(self):
         # Reason: handle and gramps_id are alternatives; tightening one
