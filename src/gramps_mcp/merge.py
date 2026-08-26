@@ -107,10 +107,12 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     """
     Merge two lists, deduplicating when the item type supports it.
 
-    Dicts with a "ref" field (event_ref_list, media_list, ...) deduplicate
-    by ref; dicts without "ref" (attribute_list, ...) by whole content; and
-    strings by value. Existing items always come first. Mixed or unknown
-    item types are concatenated as-is.
+    Dicts with a "ref" field (event_ref_list, media_list, ...) are
+    deduplicated by identity (ref, role, rect); matching identity merges
+    new attributes over the existing entry in place. Dicts without "ref"
+    (attribute_list, ...) deduplicate by whole content, and strings by
+    value. Existing order is preserved. Mixed or unknown item types are
+    concatenated as-is.
 
     Args:
         existing_items (List): Items already stored in Gramps.
@@ -182,7 +184,7 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     return existing_items + new_items
 
 
-def _entry_key(item) -> tuple:
+def _entry_key(item: dict | str | list) -> tuple:
     """
     Build an identity key for a reference-list entry.
 
