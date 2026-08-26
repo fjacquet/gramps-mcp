@@ -63,4 +63,5 @@ than merging. That is deliberate - unioning `primary_name.surname_list` would
 make correcting a surname impossible, yielding both the old and the new.
 
 If you need replace-outright behaviour for a specific top-level key, pass it
-in `replace_lists`, which now covers nested objects as well as lists.
+in `replace_lists` on `create_place` - the only tool that declares this
+field - where it now covers nested objects as well as lists.

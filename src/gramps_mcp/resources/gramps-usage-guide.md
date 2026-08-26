@@ -40,12 +40,14 @@ surname, suffix and name type alone.
 
 Three consequences worth knowing:
 
-- **Adding an entry to a list never removes one.** To remove one, use
-  `detach_reference`. Supplying an empty list does nothing.
+- **Adding an entry to a top-level list never removes one.** To remove one,
+  use `detach_reference`. Supplying an empty top-level list does nothing.
 - **A list nested inside an object states that list.** Sending
   `primary_name={"surname_list": [...]}` replaces the stored surnames rather
   than adding to them, so a correction works - but a second surname you omit
-  is lost. Send the whole list.
+  is lost. Send the whole list. Unlike a top-level list, an empty nested
+  list is not a no-op: sending `primary_name={"surname_list": []}` clears
+  the stored surnames.
 - **A reference is identified by its handle plus its role and region.** The
   same person on one event as Primary and again as Family is two entries and
   both are kept. Re-sending the same reference with a changed detail that is
