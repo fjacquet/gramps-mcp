@@ -76,14 +76,22 @@ class ManageUsersParams(BaseModel):
     """Parameters for the manage_users tool."""
 
     action: Literal["list", "get", "create"]
-    # Reason: this value is substituted, unescaped, into the request URL
-    # path before the client's own percent-encoding runs on it (see
-    # GrampsWebAPIClient._build_url_with_substitution). That encoding
-    # already stops a crafted value from leaving its own path segment, but
-    # validating the same USERNAME_PATTERN used for NewUser.name here
-    # instead rejects it at the parameter boundary, before any request is
-    # issued, and names the actual problem rather than 404ing against an
-    # endpoint the caller never meant to hit.
+    # Reason: this value ends up in the request URL path (see
+    # GrampsWebAPIClient._build_url_with_substitution). What confines it to
+    # its own path segment is that method's percent-encoding, alone:
+    # quote(..., safe="") plus the explicit "." -> "%2E" replacement means
+    # even a value made entirely of dots is sent as a literal segment
+    # rather than resolved as a relative path.
+    #
+    # USERNAME_PATTERN does less than that. It is ^[A-Za-z0-9_.-]{2,64}$,
+    # so it narrows the character set - "../users/x" and anything with a
+    # space, "?", "#" or "%" fails it - but it permits dots freely.
+    # Constructing ManageUsersParams(action="get", name=v) accepts "..",
+    # "...", "..-" and ".env"; only a bare "." fails, and only because of
+    # the two-character floor. Reusing the same pattern as NewUser.name
+    # here keeps one definition of what a username may look like and turns
+    # an obviously wrong value into a named parameter error instead of a
+    # 404, but it is not what makes the endpoint safe.
     name: str | None = Field(default=None, pattern=USERNAME_PATTERN)
     users: list[NewUser] | None = Field(default=None, max_length=MAX_BATCH)
 
