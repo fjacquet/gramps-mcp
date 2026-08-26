@@ -78,11 +78,11 @@ def merge_put_data(
 
 def _merge_dict(existing_value: dict, new_value: dict) -> dict:
     """
-    Merge a nested object, preserving sub-keys the caller did not mention.
+    Merge a DESCRIPTIVE nested object (e.g. primary_name, a place's date).
 
-    Applies one rule one level down, recursively: a nested dict merges with
-    the existing dict, and everything else - including a nested list -
-    replaces. Sub-keys the caller does not mention are always preserved.
+    A descriptive object states its content rather than accumulating it, so
+    a nested dict merges but a nested list replaces, one level down,
+    recursively. Sub-keys the caller does not mention are always preserved.
 
     Args:
         existing_value (dict): The nested object currently stored in Gramps.
@@ -99,6 +99,36 @@ def _merge_dict(existing_value: dict, new_value: dict) -> dict:
         # surname_list would make correcting a surname impossible, yielding
         # both the old and the new. Only unmentioned sub-keys are preserved.
         if isinstance(value, dict) and isinstance(current, dict):
+            merged[key] = _merge_dict(current, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _merge_ref_entry(existing_entry: dict, new_entry: dict) -> dict:
+    """
+    Merge a REFERENCE-list entry (e.g. one media_list/event_ref_list item).
+
+    A reference entry mixes in CitationBase/NoteBase/AttributeBase: its
+    citation_list, note_list and attribute_list accumulate just like the
+    top-level lists, unlike a descriptive object's stated content. So this
+    applies the TOP-LEVEL rule one level down, recursively - nested list
+    merges via _merge_list, nested dict merges via _merge_dict, else
+    replaces - instead of _merge_dict's replace-nested-lists rule.
+
+    Args:
+        existing_entry (dict): The reference entry currently stored.
+        new_entry (dict): The sub-keys the caller wants to change.
+
+    Returns:
+        dict: A new dict containing the merged entry.
+    """
+    merged = existing_entry.copy()
+    for key, value in new_entry.items():
+        current = existing_entry.get(key)
+        if isinstance(value, list) and isinstance(current, list):
+            merged[key] = _merge_list(current, value)
+        elif isinstance(value, dict) and isinstance(current, dict):
             merged[key] = _merge_dict(current, value)
         else:
             merged[key] = value
@@ -165,13 +195,13 @@ def _merge_list(existing_items: list, new_items: list) -> list:
                 # Merge new attributes over existing entry at this position
                 idx = identity_to_index[identity]
                 if isinstance(result[idx], dict) and isinstance(new_item, dict):
-                    # Reason: a shallow spread here replaced any nested dict
-                    # (e.g. a placeref_list entry's "date") wholesale instead
-                    # of merging it sub-key by sub-key - the exact destructive
+                    # Reason: a shallow spread here replaced a nested dict or
+                    # list (e.g. a placeref_list "date", a media_list
+                    # citation_list) wholesale - the exact destructive
                     # behaviour this module exists to kill, one level deeper.
-                    # _merge_dict keeps the same nested-dict-merges,
-                    # nested-list-replaces rule used at the top level.
-                    result[idx] = _merge_dict(result[idx], new_item)
+                    # _merge_ref_entry applies the top-level, accumulative
+                    # rule, not _merge_dict's descriptive-object one.
+                    result[idx] = _merge_ref_entry(result[idx], new_item)
             else:
                 # New identity, append as new entry
                 result.append(new_item)

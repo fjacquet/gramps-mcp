@@ -297,6 +297,28 @@ class TestAttributeDeduplication:
 
         assert len(merged["media_list"]) == 1
 
+    def test_citation_list_inside_media_entry_unions(self):
+        # Reason: a reference entry's citation_list/note_list are the same
+        # accumulative lists as at the top level (Gramps' CitationBase/
+        # NoteBase mixins), not a stated description like primary_name. A
+        # nested list here must union, and an unmentioned nested list must
+        # survive untouched - the in-place merge must not fall back to
+        # _merge_dict's descriptive-object rule (nested list replaces).
+        existing = {
+            "media_list": [{"ref": "m1", "citation_list": ["c1"], "note_list": ["n1"]}]
+        }
+        changes = {"media_list": [{"ref": "m1", "citation_list": ["c2"]}]}
+
+        merged = merge_put_data(existing, changes)
+
+        assert merged["media_list"] == [
+            {
+                "ref": "m1",
+                "citation_list": ["c1", "c2"],
+                "note_list": ["n1"],
+            }
+        ]
+
     def test_nested_dict_inside_a_reference_entry_is_preserved(self):
         # Reason: the in-place entry merge used a shallow dict spread, so a
         # nested object (e.g. "date") inside a placeref_list entry was
