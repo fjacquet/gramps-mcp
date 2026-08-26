@@ -267,25 +267,23 @@ class TestAttributeDeduplication:
         assert merged["media_list"][0]["private"] is False
         assert merged["media_list"][0]["note_list"] == ["n1"]
 
-    def test_unhashable_role_does_not_raise(self):
-        # Reason: an LLM caller can compose a role as a nested object (e.g.
-        # {"_class": "EventRoleType", "string": "Primary"}) rather than a
-        # plain string. Identity must fall back to a stable key instead of
-        # crashing the whole write on an unhashable dict.
-        existing = {
-            "event_ref_list": [
-                {"ref": "e1", "role": {"_class": "EventRoleType", "string": "Primary"}}
-            ]
-        }
-        changes = {
-            "event_ref_list": [
-                {"ref": "e1", "role": {"_class": "EventRoleType", "string": "Primary"}}
-            ]
-        }
+    def test_unhashable_role_updates_in_place_not_duplicated(self):
+        # Reason: the previous fallback keyed unhashable entries on their
+        # WHOLE content (via json.dumps), so two entries sharing the same
+        # unhashable role but differing "private" got different keys and
+        # produced two entries - reintroducing the exact duplicate-
+        # attachment defect the identity key exists to prevent. Identity
+        # must still be (ref, role, ...) only, so this must merge to one
+        # entry with "private" updated, not two.
+        role = {"_class": "EventRoleType", "string": "Primary"}
+        existing = {"event_ref_list": [{"ref": "e1", "role": role, "private": False}]}
+        changes = {"event_ref_list": [{"ref": "e1", "role": role, "private": True}]}
 
         merged = merge_put_data(existing, changes)
 
-        assert len(merged["event_ref_list"]) == 1
+        assert merged["event_ref_list"] == [
+            {"ref": "e1", "role": role, "private": True}
+        ]
 
     def test_unhashable_rect_does_not_raise(self):
         # Reason: same failure mode as role, but for rect - a list of lists

@@ -24,8 +24,6 @@ as a pure, side-effect-free function so it can be unit-tested without a live
 server.
 """
 
-import json
-
 
 def merge_put_data(
     existing: dict, changes: dict, replace_lists: list[str] | None = None
@@ -222,6 +220,30 @@ def _merge_list(existing_items: list, new_items: list) -> list:
     return existing_items + new_items
 
 
+def _freeze(value: object) -> object:
+    """
+    Canonicalise a JSON value into a hashable form, recursively.
+
+    Args:
+        value (object): Any JSON-shaped value - dict, list, scalar, or None.
+
+    Returns:
+        object: value itself if already hashable-shaped; a dict becomes a
+        tuple of its (key, frozen value) pairs sorted by key, a list
+        becomes a tuple of frozen elements.
+    """
+    # Reason: identity must be TOTAL over server-shaped JSON, not merely
+    # hashable - a try/hash-except fallback keyed on the whole entry instead
+    # changes the KIND of key on the unhashable path (attributes like
+    # "private" leak into identity), reintroducing the duplicate-attachment
+    # defect this module exists to kill.
+    if isinstance(value, dict):
+        return tuple(sorted((k, _freeze(v)) for k, v in value.items()))
+    if isinstance(value, list):
+        return tuple(_freeze(v) for v in value)
+    return value
+
+
 def _entry_key(item: dict | str | list) -> object:
     """
     Build an identity key for a reference-list entry.
@@ -230,19 +252,12 @@ def _entry_key(item: dict | str | list) -> object:
         item: One element of a reference list, normally a dict.
 
     Returns:
-        object: A hashable key based on ref, role, and rect only. These are
-        the fields that Gramps uses to express multiplicity in a list.
-        Missing keys contribute None, so a dict with only ref is distinct
-        from one with ref and role. The live server sends "role": [] or
-        "rect": [] rather than omitting the key, so both are normalised to
-        None when falsy - otherwise the same entry sent back in the
-        documented {"ref": ...}-only shape would get a different identity
-        and be appended as a duplicate instead of recognised as the same
-        entry. When role or rect is itself an unhashable shape (a dict, or a
-        list of lists), the normal tuple key cannot be built or stored in a
-        dict; falling back to a JSON-based key keeps the entry usable
-        (treated as distinct rather than merged) instead of crashing the
-        whole write.
+        object: A hashable key based on ref, role, and rect only, each
+        passed through _freeze. Missing fields contribute None, and falsy
+        values (the server sends "role": [] rather than omitting the key)
+        are normalised to None first, so that shape and the documented
+        {"ref": ...}-only shape share one identity instead of being treated
+        as different entries.
     """
     # Reason: identity must distinguish structural cases (same person in
     # different roles, or same photo with different crop regions), while
@@ -250,22 +265,10 @@ def _entry_key(item: dict | str | list) -> object:
     # not duplicates to discard or append.
     if isinstance(item, dict):
         ref = item.get("ref")
-        role = item.get("role") or None
-        rect = item.get("rect") or None
-        if isinstance(rect, list):
-            rect = tuple(rect)
-        key = (ref, role, rect)
-        try:
-            hash(key)
-            return key
-        except TypeError:
-            # Reason: role or rect can arrive as an unhashable shape (a dict
-            # for role, a list-of-lists for rect) from an LLM-composed call.
-            # The original json.dumps-based identity carried this same
-            # protection so an unmergeable entry falls through as distinct
-            # rather than crashing the whole write.
-            return json.dumps(item, sort_keys=True, default=str)
-    return (item, None, None)
+        role = _freeze(item.get("role") or None)
+        rect = _freeze(item.get("rect") or None)
+        return (_freeze(ref), role, rect)
+    return (_freeze(item), None, None)
 
 
 def _dedupe_dicts_without_ref(existing_items: list, new_items: list) -> list:
