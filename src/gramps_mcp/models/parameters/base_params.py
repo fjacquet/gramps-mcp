@@ -32,9 +32,10 @@ from pydantic import BaseModel, Field, field_validator
 # gramps_id-like - so no character-class-plus-length pattern can describe
 # "a handle" without either rejecting real records or accepting arbitrary
 # text. Do not try to narrow this again to look more handle-shaped: that
-# was tried and reverted (see git history and task-2-report.md) because it
-# also broke event_params.validate_place_is_handle, whose job is the
-# opposite one - see PLACE_HANDLE_PATTERN in event_params.py.
+# was tried and reverted (see commit e0a07eb, "widen HANDLE_PATTERN to a
+# URL-safe character set, not a handle shape") because it also broke
+# event_params.validate_place_is_handle, whose job is the opposite one -
+# see PLACE_HANDLE_PATTERN in event_params.py.
 #
 # What this pattern actually constrains is narrower and does not depend on
 # guessing a handle's format: a handle lands in a URL path segment, so it
@@ -60,6 +61,11 @@ URL_SAFE_IDENTIFIER_PATTERN = r"[A-Za-z0-9_-]+"
 def validate_handle_shape(value: str | None) -> str | None:
     """
     Reject a value that is not shaped like a Gramps handle.
+
+    Wired into three models only - DeleteTypeParams, DetachReferenceParams
+    and MergeTypeParams, in destructive_params.py - not into parameter
+    models generally. Applying it more broadly is a deliberate follow-up,
+    not a consequence of this function's existence.
 
     Args:
         value (str | None): The candidate handle, or None when the field
