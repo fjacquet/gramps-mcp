@@ -27,6 +27,24 @@ To read one record in full, use `get_type(type=..., handle=...)` or
 only; for the other types use `find_type` with a filter on `gramps_id` or
 `handle`.
 
+**Notes cannot be filtered with GQL.** `find_type(type="note", gql=...)`
+returns HTTP 500 for *every* filter, whatever the left-hand side - including
+`gramps_id = "N0216"`. This is a server-side bug in `gramps-ql` 0.4.0, which
+converts an object to a dict only for `PrimaryObject` subclasses; `Note` is
+the one primary record type in Gramps that is not one, so a raw `Note`
+reaches a matcher expecting a dict and raises. It is fixed upstream in
+`gramps-ql` 0.5.0, but no published `grampsweb` image ships that version yet,
+so the failure stands on this server.
+
+Until then, to find a note:
+- `find_anything(query="...")` - works, but truncates note text at 500
+  characters, so use it to locate the note, not to read it.
+- `get_type` does not accept `note`, so once you have the handle, read the
+  note through `find_type(type="note")` **without** a `gql` argument and page
+  through the results, or ask the user to query the REST API directly.
+
+Every other record type filters normally; notes are the sole exception.
+
 - If entity exists and **already contains all the new info**: Use the existing entity as-is (no update needed)
 - If entity exists but **missing some of the new info**: Use `create_X` with the existing handle to **update** it
 - If entity doesn't exist: Use `create_X` without handle to **create** new entity
@@ -326,7 +344,9 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 
 **Note Process:**
 - **First**: Search for an existing note (if applicable) with
-  `find_type(type="note", gql='class = note and text.string ~ "marriage contract"')`
+  `find_anything(query="marriage contract")`. Do **not** use
+  `find_type(type="note", gql=...)` - see the note-search limitation below;
+  every GQL filter on notes fails.
 - **If found and complete**: Use existing note as-is
 - **If found but missing info**: Use `create_note` with existing handle to update note
 - **If not found**: Use `create_note` without handle to create new note

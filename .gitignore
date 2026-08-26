@@ -6,6 +6,11 @@ __pycache__
 .ruff_cache
 .pytest_cache
 .env
+# Credential-bearing variants (.env-local, .env-remove, .env.production, ...).
+# .env.example is the tracked template and is kept out of the pattern.
+.env-*
+.env.*
+!.env.example
 .claude/
 coverage.xml
 .coverage
