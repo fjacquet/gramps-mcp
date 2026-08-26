@@ -370,16 +370,21 @@ The MCP server has **no authentication of its own**. It uses the Gramps Web cred
 
 **Important**: Do not publish the MCP server port (`8000` by default) to untrusted networks. The compose files bind it to `127.0.0.1` (loopback only), but **this only takes effect when the container is recreated**. If you have a running container from before this change, it is still publishing on `0.0.0.0` (all interfaces) until you recreate it.
 
-To apply the safer binding:
+To apply the safer binding, pass the same compose file your stack already
+runs from - `docker compose` with no `-f` resolves to `docker-compose.yml`,
+which is a **different compose project** from the sqllite and pgsql stacks, so
+running it bare would start that other project and leave your exposed
+container untouched:
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose-sqllite.yml up -d   # or -pgsql.yml, or your own
 ```
 
-This recreates the container with the new port binding. To verify it worked:
+This recreates the container with the new port binding. To verify it worked,
+using that same file:
 
 ```bash
-docker compose ps --format "{{.Names}}\t{{.Ports}}" | grep mcp
+docker compose -f docker-compose-sqllite.yml ps --format "{{.Names}}\t{{.Ports}}" | grep mcp
 ```
 
 Look for bindings like `127.0.0.1:8000->8000/tcp` (safe) or loopback IPv6 equivalents. If you still see `0.0.0.0:8000->8000/tcp`, the container has not been recreated yet.
