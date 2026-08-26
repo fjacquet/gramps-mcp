@@ -1,12 +1,15 @@
 """
 Handle-shaped fields on destructive tools must reject a non-handle.
 
-A Gramps handle does not have one describable format: a 3425-handle check
-across the live tree (2026-08-26) found real handles that are lowercase
-hex, a UUID, and gramps_id-shaped (e.g. "C0055"). What is constant across
-all of them is narrower - a handle lands in a URL path segment, so it must
-not contain a character that means something there. Anything that does is
-a crafted value worth refusing, and these tools delete and merge records.
+A Gramps handle does not have one describable format: a sweep of every
+handle in the live tree - all ten record categories, 6496 handles
+(2026-08-26) - found real handles that are lowercase hex, a UUID,
+gramps_id-shaped (e.g. "C0055"), and one that ends in three literal dots
+("103da162..."). What is constant across all of them is narrower - a
+handle lands in a URL path segment, so it must not contain a character
+that means something there, and must not be a relative-path segment in its
+own right. Anything that is, is a crafted value worth refusing, and these
+tools delete and merge records.
 """
 
 import pytest
@@ -27,6 +30,8 @@ class TestDestructiveHandleValidation:
             "../users/someuser",
             ".",
             "..",
+            "...",
+            "....",
             "abc?keys=x",
             "abc#frag",
             "//evil.example.com/x",
@@ -44,16 +49,26 @@ class TestDestructiveHandleValidation:
         params = DeleteTypeParams(type="person", handle="103bcbfa97824cbb051f1c7a28b")
         assert params.handle == "103bcbfa97824cbb051f1c7a28b"
 
-    # Reason: these three are shapes actually found in the live tree's
-    # 3425-handle check (2026-08-26) - hex, a UUID, and a citation whose
-    # handle equals its gramps_id. Do not narrow
-    # URL_SAFE_IDENTIFIER_PATTERN to reject any of them again.
+    # Reason: these four are shapes actually found in the live tree by a
+    # sweep of every handle in all ten record categories (2026-08-26,
+    # 6496 handles): hex, a UUID, a citation whose handle equals its
+    # gramps_id, and a corrupt citation handle that ends in three literal
+    # dots. The last one was missed by an earlier survey that reached only
+    # 3425 handles because it did not cover every category, and the pattern
+    # was narrowed on that incomplete evidence until this sweep found the
+    # gap. Every one of these is a value the server itself resolves - GET
+    # /api/citations/103da162... returns 200 - so refusing it here only
+    # removes a repair (DetachReferenceParams.ref_handle is required and
+    # has no gramps_id alternative) without removing a risk. Narrow this
+    # again only after re-running the full sweep and showing the shape you
+    # want to refuse is absent from every category.
     @pytest.mark.parametrize(
         "real_handle",
         [
             "103bcbfa97824cbb051f1c7a28b",
             "d747a30b-33a1-418b-a572-35d65b20ed62",
             "C0055",
+            "103da162...",
         ],
     )
     def test_delete_type_accepts_every_real_handle_shape(self, real_handle):
@@ -76,6 +91,20 @@ class TestDestructiveHandleValidation:
 
         with pytest.raises(ValidationError):
             EventSaveParams(type="Birth", citation_list=[], place="Lyon")
+
+    # Reason: this pins the exact boundary the dot rule draws. A dot is
+    # only a path-traversal hazard when it is the whole segment, so the
+    # refusal must be a dot-only membership test - not a character-class
+    # exclusion, which would also have to refuse the live tree's
+    # "103da162...". Both halves are asserted together so a future change
+    # cannot satisfy one by breaking the other.
+    @pytest.mark.parametrize("dots", [".", "..", "...", "..........."])
+    def test_dot_only_values_are_refused_but_mixed_dots_are_not(self, dots):
+        with pytest.raises(ValidationError):
+            DeleteTypeParams(type="person", handle=dots)
+
+        mixed = f"103da162{dots}"
+        assert DeleteTypeParams(type="person", handle=mixed).handle == mixed
 
     def test_delete_type_still_accepts_a_gramps_id_instead(self):
         # Reason: handle and gramps_id are alternatives; tightening one

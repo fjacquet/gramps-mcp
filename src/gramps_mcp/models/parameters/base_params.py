@@ -23,39 +23,71 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-# Reason: this does NOT describe what a Gramps handle looks like - a
-# 3425-handle check across every record type in the live tree (2026-08-26)
-# found 21 real production handles that are not lowercase hex: one person
-# handle is a UUID (with dashes), and twenty citation handles equal their
-# own gramps_id (e.g. "C0055" - uppercase letters and digits, no dashes).
-# Handles come in at least three shapes in this tree alone - hex, UUID,
-# gramps_id-like - so no character-class-plus-length pattern can describe
-# "a handle" without either rejecting real records or accepting arbitrary
-# text. Do not try to narrow this again to look more handle-shaped: that
-# was tried and reverted (see commit e0a07eb, "widen HANDLE_PATTERN to a
-# URL-safe character set, not a handle shape") because it also broke
-# event_params.validate_place_is_handle, whose job is the opposite one -
-# see PLACE_HANDLE_PATTERN in event_params.py.
+# Reason: this does NOT describe what a Gramps handle looks like. A sweep
+# of every handle in the live tree - all ten record categories, 6496
+# handles (2026-08-26) - found real production handles in four different
+# shapes: lowercase hex, a UUID (with dashes), citation handles equal to
+# their own gramps_id ("C0055" - uppercase letters and digits), and one
+# corrupt citation handle that ends in three literal dots
+# ("103da162...", gramps_id C0620). No character-class-plus-length pattern
+# can describe "a handle" across those without either rejecting a real
+# record or accepting arbitrary text.
 #
-# What this pattern actually constrains is narrower and does not depend on
-# guessing a handle's format: a handle lands in a URL path segment, so it
-# must not contain a character that means something there (/, ., ?, #, %,
-# whitespace, backslash, etc). USERNAME_PATTERN in tools/user_tools.py
-# guards a value with the same URL-path fate, for the same purpose - but
-# it is not the same property: USERNAME_PATTERN is
-# r"[A-Za-z0-9_.-]{2,64}" and allows a dot, which this pattern deliberately
-# excludes, because a dot is exactly what makes "." and ".." meaningful as
-# path segments (current directory / parent directory) - a username is
-# never compared against those, but a handle reaching a path segment must
-# not be confusable with them. This name-for-the-job (not "HANDLE_PATTERN")
-# is deliberate: a name that does not say which job it does is how a
-# stricter, narrower rule (place-name-vs-handle discrimination) and this
-# URL-safety rule got merged into one constant and broke each other.
+# The dot was added to this class after that sweep, correcting an earlier
+# version of this rule. That version was written from a survey covering
+# only 3425 handles - it did not reach every category - and its comment
+# claimed dots could be excluded because no handle contained one. The full
+# sweep disproved that: the server resolves GET /api/citations/103da162...
+# with 200, and so does the percent-encoded form the client actually sends
+# (/api/citations/103da162%2E%2E%2E). Refusing that value here removed a
+# repair without removing a risk, because DetachReferenceParams.ref_handle
+# is required and has no gramps_id alternative, so detaching that corrupt
+# citation from its event was unreachable through the tools. Narrowing
+# this again is not forbidden, but it needs the same evidence: re-run the
+# full ten-category sweep and show the shape being refused is absent.
+#
+# What this pattern actually constrains does not depend on guessing a
+# handle's format: a handle lands in a URL path segment, so it must not
+# contain a character that means something there (/, ?, #, %, whitespace,
+# backslash, etc). A dot is only dangerous when it is the *whole* segment
+# ("." and ".." are the current and parent directory), which is why
+# is_dot_only_segment below refuses those separately rather than the
+# character class refusing every dot - a dot mixed with other characters
+# never forms a relative-path segment. USERNAME_PATTERN in
+# tools/user_tools.py, r"[A-Za-z0-9_.-]{2,64}", guards a value with the
+# same URL-path fate and now permits the same character set; it has no
+# dot-only check, and does not need one, because percent-encoding in
+# _build_url_with_substitution is what confines both values to their
+# segment.
+#
+# This name-for-the-job (not "HANDLE_PATTERN") is deliberate: a name that
+# does not say which job it does is how a stricter, narrower rule
+# (place-name-vs-handle discrimination, PLACE_HANDLE_PATTERN in
+# event_params.py) and this URL-safety rule got merged into one constant
+# and broke each other - see commit e0a07eb.
 #
 # Reason: matched with re.fullmatch (not re.match), so no ^/$ anchors are
 # needed here. re.match plus a "$" anchor accepts a trailing newline because
 # "$" matches just before a final newline; fullmatch has no such gap.
-URL_SAFE_IDENTIFIER_PATTERN = r"[A-Za-z0-9_-]+"
+URL_SAFE_IDENTIFIER_PATTERN = r"[A-Za-z0-9_.-]+"
+
+
+def is_dot_only_segment(value: str) -> bool:
+    """
+    Report whether a value consists of nothing but dots.
+
+    Values like ".", ".." and "..." are relative-path segments rather than
+    identifiers. This is a membership test, not a pattern, so it refuses
+    every such value at any length while leaving a dot that appears
+    alongside other characters alone.
+
+    Args:
+        value (str): The candidate identifier.
+
+    Returns:
+        bool: True when the value is non-empty and every character is a dot.
+    """
+    return bool(value) and set(value) == {"."}
 
 
 def validate_handle_shape(value: str | None) -> str | None:
@@ -75,18 +107,24 @@ def validate_handle_shape(value: str | None) -> str | None:
         str | None: The value unchanged when it is None or well-shaped.
 
     Raises:
-        ValueError: When the value is present and contains a character
-            other than a letter, digit, underscore or dash.
+        ValueError: When the value is present and either contains a
+            character other than a letter, digit, underscore, dot or dash,
+            or consists of nothing but dots.
     """
     # Reason: a handle lands in a URL path segment. Encoding in the client
     # already stops a crafted value from leaving its segment, but refusing
     # it here fails before any request is issued and names the problem,
     # rather than 404ing against an endpoint the caller never meant to hit.
-    if value is not None and not re.fullmatch(URL_SAFE_IDENTIFIER_PATTERN, value):
+    if value is None:
+        return value
+    if not re.fullmatch(URL_SAFE_IDENTIFIER_PATTERN, value) or is_dot_only_segment(
+        value
+    ):
         raise ValueError(
             f"'{value}' is not a Gramps handle. A handle may contain only "
-            "letters, digits, underscore and dash. To identify a record by "
-            "its Gramps ID instead, use the gramps_id field."
+            "letters, digits, underscore, dot and dash, and may not consist "
+            "of dots alone. To identify a record by its Gramps ID instead, "
+            "use the gramps_id field."
         )
     return value
 
