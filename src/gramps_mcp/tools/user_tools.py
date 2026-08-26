@@ -76,10 +76,14 @@ class ManageUsersParams(BaseModel):
     """Parameters for the manage_users tool."""
 
     action: Literal["list", "get", "create"]
-    # Reason: this is substituted, unescaped, into the request URL path by the
-    # client. Without the same USERNAME_PATTERN used for NewUser.name, a
-    # value like "../metadata" survives urljoin's path normalization and
-    # redirects a "get" call to an unrelated endpoint.
+    # Reason: this value is substituted, unescaped, into the request URL
+    # path before the client's own percent-encoding runs on it (see
+    # GrampsWebAPIClient._build_url_with_substitution). That encoding
+    # already stops a crafted value from leaving its own path segment, but
+    # validating the same USERNAME_PATTERN used for NewUser.name here
+    # instead rejects it at the parameter boundary, before any request is
+    # issued, and names the actual problem rather than 404ing against an
+    # endpoint the caller never meant to hit.
     name: str | None = Field(default=None, pattern=USERNAME_PATTERN)
     users: list[NewUser] | None = Field(default=None, max_length=MAX_BATCH)
 
