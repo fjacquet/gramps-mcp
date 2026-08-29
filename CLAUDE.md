@@ -133,6 +133,23 @@
 - See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
   research/data-entry workflow (sourcing chain, media attachment, match vs.
   hypothesis handling, homonym hygiene).
+- **Never pass a `gramps_id` string (e.g. `"C0619"`) into a `*_list` field
+  (`citation_list`, `note_list`, etc.).** The API stores it literally as a
+  broken pseudo-handle, invisible until GEDCOM export crashes with
+  `HandleError`. Always copy the real handle from the tool's own return
+  value. To audit the whole tree for this: fetch every entity via the REST
+  API, collect all real handles, then walk every `*_list` field checking
+  each ref against that set - `0 broken references found` is the target.
+- **`create_sourced_event` always creates a brand-new event** - it never
+  matches an existing one for the person/family. To add a corroborating
+  citation or correct a date on an event that already exists, call
+  `create_event` with that event's real `handle` instead, or you end up
+  with an orphan duplicate event alongside the original.
+- **`create_family`'s `child_handles`/`father_handle`/`mother_handle` only
+  link the family side.** The child person record's own
+  `parent_family_list` is not set automatically - call `create_person` with
+  `parent_family_list: [<family handle>]` separately, or ancestor lookups
+  from the child fail silently.
 - **Surname casing: no international standard mandates uppercase.** GEDCOM
   5.5.1 explicitly says the opposite - "capitalize the first letter of each
   part and lowercase the other letters" - and FamilySearch follows that.

@@ -37,6 +37,13 @@ class FamilySaveParams(StrictModel):
     handle: str | None = Field(
         None, description="Family's handle (for updates; omit for new family)"
     )
+    type: str | None = Field(
+        None,
+        description=(
+            "Relationship type (Married, Unmarried, Civil Union, etc.). "
+            "Gramps Web shows 'Unknown' when this is omitted."
+        ),
+    )
     father_handle: str | None = Field(None, description="Father's handle")
     mother_handle: str | None = Field(None, description="Mother's handle")
     child_handles: list[str] | None = Field(None, description="List of child handles")
