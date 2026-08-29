@@ -193,6 +193,9 @@ Now create the life event that was documented in that citation:
 
 #### Family Creation Attributes:
 **Family requires:**
+- **Type** (optional): Relationship type (`Married`, `Unmarried`, `Civil Union`,
+  etc.). Gramps Web displays "Unknown" in the UI when this is left unset -
+  set it explicitly for any family representing an actual marriage.
 - **Father handle** (optional): Handle of the father person
 - **Mother handle** (optional): Handle of the mother person  
 - **Children handles** (optional): List of handles of child persons

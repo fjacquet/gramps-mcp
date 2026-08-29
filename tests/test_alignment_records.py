@@ -161,7 +161,7 @@ class TestParameterAlignment:
             )
 
         # Check no extra fields beyond what guide allows (plus system fields from BaseDataModel and linking fields)
-        guide_fields = {"notes", "media", "urls"}
+        guide_fields = {"notes", "media", "urls", "type"}
         system_fields = {
             "handle",
             "gramps_id",
