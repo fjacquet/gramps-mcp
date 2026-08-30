@@ -20,12 +20,21 @@ Copied from fjacquet/crewai-custom-tools v0.31.1 (19d78f7),
 src/crewai_custom_tools/tools/genealogy/geo/nominatim.py.
 Divergence from that copy is expected and accepted; see
 docs/superpowers/specs/2026-08-30-detection-tools-design.md.
+
+Divergence: the source's `_UA` value named crewai-custom-tools and pointed
+to a bare `https://github.com/`, which reaches nobody. OSM's usage policy
+requires a User-Agent that identifies the application and offers a way to
+contact its operator; that value satisfied neither once this code moved to
+gramps-mcp. Rebuilt from `__version__` and pointed at this project's repo,
+the same call already made for `USER_AGENT` in `geo/sparql.py` - the two
+modules should not disagree about who is sending the requests.
 """
 
 from __future__ import annotations
 
 import httpx
 
+from ... import __version__
 from ..domain import (
     DatedChain,
     DatedName,
@@ -37,7 +46,10 @@ from ..rate_limit import get_rate_limiter
 from .score import best_similarity, is_ambiguous
 
 _URL = "https://nominatim.openstreetmap.org/search"
-_UA = "genecrew/1.0 (genealogy place standardizer; +https://github.com/)"
+_UA = (
+    f"gramps-mcp/{__version__} "
+    "(https://github.com/fjacquet/gramps-mcp; place resolution)"
+)
 _PROVIDER = "Nominatim"
 
 
