@@ -40,7 +40,7 @@ from .models.parameters.destructive_params import (
     MergeTypeParams,
     UndoChangeParams,
 )
-from .models.parameters.detection_params import FindDuplicatesParams
+from .models.parameters.detection_params import AuditQualityParams, FindDuplicatesParams
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.family_params import FamilySaveParams
@@ -83,7 +83,7 @@ from .tools.destructive import (
     merge_type_tool,
     undo_change_tool,
 )
-from .tools.detection import find_duplicates_tool
+from .tools.detection import audit_quality_tool, find_duplicates_tool
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
@@ -268,6 +268,16 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
         "schema": FindDuplicatesParams,
         "handler": find_duplicates_tool,
+    },
+    "audit_quality": {
+        "description": (
+            "Run the deterministic consistency rules over the tree and report "
+            "anomalies by severity. Read-only. Rules needing a date are "
+            "skipped when that date is unknown, so unknown data never "
+            "produces a false positive"
+        ),
+        "schema": AuditQualityParams,
+        "handler": audit_quality_tool,
     },
     "delete_type": {
         "description": (

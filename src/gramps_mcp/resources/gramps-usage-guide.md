@@ -506,6 +506,26 @@ are also reported by count.
 Feed a proved pair's handles to `merge_type` to actually merge; this tool
 never does it for you.
 
+### `audit_quality` - deterministic consistency anomalies
+
+`audit_quality()` with no arguments scans the whole tree and reports every
+anomaly the deterministic rules find. Read-only: it never writes anything.
+
+- `limit` (default: unset): stop after this many people, for a cheap probe on
+  a large tree. Omit to scan everyone.
+- `severity` (default: unset): report only anomalies at this severity - one
+  of `haute`, `moyenne` or `basse`. Omit to report every severity.
+
+Anomalies are grouped by severity, highest (`haute`) first. Each one names
+the rule that fired (for example `R1`, `R3`), the `gramps_id` it is attached
+to, and a human-readable message. A rule needing a date is skipped when that
+date is unknown, so unknown data never produces a false positive.
+
+If the tree scan could not finish, the output says so first, naming the
+error, before any finding. Records the collector could not parse are also
+reported by count. A clean tree renders an explicit "no anomalies found"
+line rather than an empty response.
+
 ### `get_relationship` - how two people are related
 
 `get_relationship(person1=..., person2=...)`. Each accepts a handle or a

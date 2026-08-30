@@ -25,8 +25,13 @@ from ..config import get_settings
 from ..genealogy.collect import collect_tree
 from ..genealogy.duplicates import etager
 from ..genealogy.merge_plan import plan_fusions
+from ..genealogy.rules import check_family, check_person
+from ..handlers.audit_handler import format_anomalies
 from ..handlers.duplicates_handler import format_duplicate_clusters
-from ..models.parameters.detection_params import FindDuplicatesParams
+from ..models.parameters.detection_params import (
+    AuditQualityParams,
+    FindDuplicatesParams,
+)
 from .search_basic import with_client
 
 logger = logging.getLogger(__name__)
@@ -91,3 +96,49 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "duplicate detection")
+
+
+@with_client
+async def audit_quality_tool(client, arguments: dict) -> list[TextContent]:
+    """
+    Run the deterministic consistency rules over the tree.
+
+    Args:
+        client: A GrampsWebAPIClient, injected by with_client.
+        arguments (dict): Tool arguments, validated against
+            AuditQualityParams.
+
+    Returns:
+        list[TextContent]: Anomalies grouped by severity, rendered as
+        markdown.
+    """
+    try:
+        params = AuditQualityParams(**arguments)
+        tree_id = get_settings().gramps_tree_id
+
+        collected = await collect_tree(client, tree_id, limit=params.limit)
+        by_handle = {p.handle: p for p in collected.people}
+
+        anomalies = []
+        for person in collected.people:
+            anomalies.extend(check_person(person))
+        for family in collected.families.values():
+            anomalies.extend(check_family(family, by_handle))
+
+        if params.severity is not None:
+            anomalies = [a for a in anomalies if a.severity == params.severity]
+
+        return [
+            TextContent(
+                type="text",
+                text=format_anomalies(
+                    anomalies,
+                    skipped=collected.skipped,
+                    partial=collected.partial,
+                    error=collected.error,
+                ),
+            )
+        ]
+
+    except Exception as e:
+        return _format_error_response(e, "quality audit")

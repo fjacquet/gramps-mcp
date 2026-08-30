@@ -27,7 +27,10 @@ When this test fails, fix the guide first and this file second - never this
 file alone.
 """
 
-from src.gramps_mcp.models.parameters.detection_params import FindDuplicatesParams
+from src.gramps_mcp.models.parameters.detection_params import (
+    AuditQualityParams,
+    FindDuplicatesParams,
+)
 
 
 class TestParameterAlignment:
@@ -55,4 +58,28 @@ class TestParameterAlignment:
         extra_fields = actual_fields - implementation_fields
         assert not extra_fields, (
             f"FindDuplicatesParams has extra fields not in usage guide: {extra_fields}"
+        )
+
+    def test_audit_quality_parameters_alignment(self):
+        """Test AuditQualityParams parameters match the usage guide."""
+        model = AuditQualityParams
+        fields = model.model_fields
+
+        # No required fields - audit_quality() with no arguments scans the
+        # whole tree.
+        required_fields: set[str] = set()
+        actual_required = {
+            name for name, field in fields.items() if field.is_required()
+        }
+        extra_required = actual_required - required_fields
+        assert not extra_required, (
+            f"AuditQualityParams has extra required fields: {extra_required}"
+        )
+
+        # Documented in gramps-usage-guide.md's `### audit_quality` section.
+        implementation_fields = required_fields | {"limit", "severity"}
+        actual_fields = set(fields.keys())
+        extra_fields = actual_fields - implementation_fields
+        assert not extra_fields, (
+            f"AuditQualityParams has extra fields not in usage guide: {extra_fields}"
         )
