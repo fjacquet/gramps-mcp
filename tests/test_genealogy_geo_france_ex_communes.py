@@ -202,6 +202,27 @@ def test_wikidata_ex_commune_malformed_json_is_none(monkeypatch):
     assert fec.wikidata_ex_commune("55451") is None
 
 
+def test_wikidata_ex_commune_malformed_json_from_real_transport_is_none(monkeypatch):
+    # Contrairement au test ci-dessus, `sparql_rows` n'est PAS mocké : c'est le
+    # vrai `httpx.get(...).json()` de sparql.py qui est exercé, sur une réponse
+    # HTTP 200 dont le corps n'est pas du JSON valide. `httpx.Response.json()`
+    # lève alors le `json.JSONDecodeError` de la bibliothèque standard, qui
+    # N'HÉRITE PAS de `httpx.HTTPError` - contrairement à `requests`, où
+    # `requests.exceptions.JSONDecodeError` hérite bien de `RequestException`.
+    # Ce test échoue si la clause `except` de `wikidata_ex_commune` est un
+    # jour renarrowée à `except httpx.HTTPError:` seul (vérifié : voir
+    # task-16-report.md, "Fix round 1" pour la sortie réelle de l'échec).
+    import httpx
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        return httpx.Response(
+            200, content=b"not json", request=httpx.Request("GET", url)
+        )
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    assert fec.wikidata_ex_commune("55451") is None
+
+
 def test_wikidata_ex_commune_programming_error_propagates(monkeypatch):
     import pytest
 

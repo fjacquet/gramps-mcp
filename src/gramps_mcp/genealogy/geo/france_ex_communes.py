@@ -32,6 +32,17 @@ Ported from `requests` to `httpx`: `sparql_rows` (geo/sparql.py) now raises
 `httpx.HTTPError`, not `requests.RequestException`, on network/JSON failure -
 the except clause below was updated to match.
 
+Correction (code review, round 1): the source's single
+`except requests.RequestException:` covered BOTH network failure and a
+malformed reply, because `requests.exceptions.JSONDecodeError` genuinely
+subclasses `RequestException`. httpx has no equivalent relationship -
+`response.json()` in `sparql.py` raises the stdlib `json.JSONDecodeError`
+directly, which is a `ValueError`, not an `httpx.HTTPError`. The first pass
+of this port caught only `httpx.HTTPError`, which silently narrowed the
+catch: a malformed/non-JSON reply from Wikidata would have propagated and
+crashed `resolve_fr_ex_commune` / `resolve_place` instead of degrading to
+"no datation". Fixed by catching `(httpx.HTTPError, json.JSONDecodeError)`.
+
 Divergence: added a `typing.cast(ExCommuneFacts, facts)` where `concordant`
 guards use of `facts.merged_on` in `resolve_fr_ex_commune`. mypy --strict
 cannot see that `facts` is not None there - `concordant` already required
@@ -41,6 +52,7 @@ changed; the cast is erased at import time.
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, timedelta
 from typing import cast
@@ -167,8 +179,13 @@ def wikidata_ex_commune(insee: str) -> ExCommuneFacts | None:
     """
     try:
         rows = sparql_rows(_SPARQL.format(insee=insee))
-    except httpx.HTTPError:
-        # Réseau ET JSON malformé (DecodingError hérite de HTTPError, vérifié).
+    except (httpx.HTTPError, json.JSONDecodeError):
+        # Réseau (httpx.HTTPError, incl. HTTPStatusError et DecodingError si
+        # httpx elle-même échoue à décoder) ET JSON malformé/non-JSON renvoyé
+        # par Wikidata (json.JSONDecodeError, levée par `response.json()` dans
+        # sparql.py - PAS une sous-classe de httpx.HTTPError, contrairement à
+        # requests.exceptions.JSONDecodeError qui héritait de RequestException
+        # dans la source ; voir la note de portage en tête de fichier).
         # Volontairement étroit : un KeyError ou une ValidationError seraient des
         # bugs de ce module, et doivent remonter plutôt que se déguiser en
         # « pas de datation » — même convention que places_apply.py.

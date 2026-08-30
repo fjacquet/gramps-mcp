@@ -31,6 +31,15 @@ def test_route_falls_back_to_world_when_country_resolver_returns_none(monkeypatc
     monkeypatch.setattr(
         registry, "resolve_fr", lambda p: None
     )  # pas d'INSEE utilisable
+    # Divergence (code review, round 1): la source upstream ne mockait pas
+    # resolve_fr_ex_commune ici. _BY_COUNTRY["France"] est
+    # `resolve_fr(p) or resolve_fr_ex_commune(p)` : avec resolve_fr mocké à
+    # None seul, ce test appelait le VRAI resolve_fr_ex_commune, qui émet un
+    # httpx.get réel vers geo.api.gouv.fr - un test censé être offline
+    # atteignait donc le réseau en silence (bogue hérité de l'amont). Mocké
+    # à None ici aussi pour que resolve_place retombe bien sur resolve_world
+    # sans jamais toucher un transport réel.
+    monkeypatch.setattr(registry, "resolve_fr_ex_commune", lambda p: None)
     monkeypatch.setattr(registry, "resolve_world", lambda p: _rp(0.93))
     out = registry.resolve_place(
         ParsedPlace(raw="…", commune="X", insee=None, country="France", shifted=True)
