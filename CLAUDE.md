@@ -1,12 +1,12 @@
 ### Project Awareness & Context
-- **Always read `README.md`** at the start of a new conversation to understand the project's setup, features, and usage.
-- **Use consistent naming conventions, file structure, and architecture patterns** following Python and MCP best practices.
 - **Use uv** for all Python dependency management and command execution.
-  - **Commands**: Use `uv run python` or `uv run <command>` for executing Python scripts and tests
-  - **Dependencies**: Use `uv add <package>` to add dependencies, `uv sync` to install
-  - **Git commits**: Use `uv run git commit` to ensure pre-commit hooks run correctly
-  - **Run the server**: `uv run python -m src.gramps_mcp.server` (HTTP, port 8000) or
-    `uv run python -m src.gramps_mcp.server stdio` (stdio transport)
+  - **Commands**: `uv run python` / `uv run <command>`. Run them **from the repo
+    root**: a `cd` elsewhere in the same compound command selects another project
+    and breaks the venv (`ModuleNotFoundError: httpx`).
+  - **Dependencies**: `uv add <package>` to add, `uv sync` to install
+  - **Git commits**: `uv run git commit`, so pre-commit hooks run correctly
+  - **Run the server**: `uv run python -m src.gramps_mcp.server` (HTTP, port 8000)
+    or `uv run python -m src.gramps_mcp.server stdio` (stdio transport)
   - **Type check**: `uv run mypy src/gramps_mcp --ignore-missing-imports`
   - **First-time setup**: `uv run pre-commit install` so ruff/ruff-format/copyright/
     file-length/no-emoji hooks run automatically on commit
@@ -22,33 +22,22 @@
     which is misleading. Merge with `--merge`, never `--squash`.
 
 ### Code Structure & Modularity
-- **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
-- **Organize code into clearly separated modules**, grouped by feature or responsibility.
-  For this MCP server project:
-    - `server.py` - Main MCP server setup, tool registry, and routing
-    - `tools/` directory - MCP tool implementations organized by feature
-    - `handlers/` directory - Formats raw API responses into tool output
-    - `client.py` - Gramps Web API client
-    - `merge.py` - Pure merge logic for PUT updates (preserves existing
-      fields/lists not mentioned in a change) - unit-tested without a live server
-    - `destructive.py` - Pure decision logic for deletions/list-element removal
-      (same unit-testable pattern as merge.py)
-    - `auth.py` - JWT authentication handling (singleton `AuthManager`)
-    - `models/` directory - Pydantic models for validation (`parameters/` per domain)
-    - `config.py` - Configuration management
-    - `utils.py` - Shared helpers
-    - `resources/` directory - MCP resources (GQL docs, usage guide)
-    - `tool_registry.py` - Single source of truth mapping tool name -> description/
-      schema/handler; split out of server.py to stay under the 500-line limit
-    - `traversal.py` - Pure breadth-first graph traversal of the family tree
-      (rendering lives in `handlers/traversal_handler.py`)
-- **Use clear, consistent imports** (prefer relative imports within packages).
-- **Use python_dotenv and load_dotenv()** for environment variables.
+- **Never create a file longer than 500 lines.** Enforced in `tests/` as well as
+  `src/`: `.pre-commit-config.yaml`'s `check-file-length` hook covers the whole
+  tree, with no exclusion for tests.
+- Layout is `ls src/gramps_mcp/`; only these carry non-obvious intent:
+  - `merge.py` - pure merge logic for PUT updates, preserving fields and lists a
+    change does not mention; unit-tested without a live server
+  - `destructive.py` - same unit-testable pattern for deletions and list-element
+    removal
+  - `tool_registry.py` - tool name -> description/schema/handler, split out of
+    `server.py` to stay under the 500-line limit
+  - `traversal.py` - pure breadth-first graph traversal; rendering lives apart in
+    `handlers/traversal_handler.py`
 
 ### Testing & Reliability (TDD Approach)
-- **This project follows Test-Driven Development (TDD) practices**.
-- **Write tests FIRST before implementing functionality** - red, green, refactor cycle.
-- **Always create Pytest integration tests for new features** (functions, classes, routes, etc).
+- **Write tests first**, red-green-refactor, and update existing tests when the
+  logic they cover changes. Tests live in `/tests`, mirroring the app structure.
 - **Test against the real Gramps API - do not fake its behaviour.** No test
   clients and no stubbed responses standing in for the server. Setup that
   creates real records against the real server is not faking - that is what
@@ -58,9 +47,6 @@
   `tests/test_client_merge.py` and `tests/test_http_error_detail.py` do.
   Assertions must read the output of the code under test, never the stub's
   call arguments - a test that asserts on its own mock proves nothing.
-- **After updating any logic**, check whether existing tests need to be updated. If so, do it.
-- **Tests should live in a `/tests` folder** mirroring the main app structure.
-- **Run tests frequently during development** using `uv run pytest` or `uv run pytest -xvs` for verbose output.
 - **Most tests need a live Gramps Web server** (`GRAMPS_API_URL` etc. from `.env`)
   and fail with connection errors offline - this is expected, not a regression.
   Server-dependent test modules (or, within a mixed module, the classes that
@@ -68,22 +54,44 @@
   tests that work offline: `uv run pytest -m "not integration"`. That selection
   is green. CI still runs a narrower explicit file list in
   `.github/workflows/ci.yml`, a strict subset of what the marker selects.
-- **Live tests run from the macOS host need `GRAMPS_API_URL=http://localhost:80`**
-  as an env override, not the `.env` value. `.env` points at
-  `host.docker.internal`, which only resolves inside the container. Do not
-  edit `.env` and do not commit the override.
+- **The Gramps Web server is remote** (`GRAMPS_API_URL` in `.env` points at a
+  hosted instance). Live tests run from the macOS host against it with no env
+  override - do not edit `.env`. An empty `docker ps` says nothing about
+  whether the tree is reachable; check the API itself.
+- **`GRAMPS_API_URL` has no `/api` suffix.** The REST base is
+  `${GRAMPS_API_URL%/}/api`; calling it without the suffix returns the app's HTML
+  page with HTTP 200, not an error.
 - **`tree_stats` returns a permission error even for the owner-role account
   in `.env`.** A `tree_stats` failure ("Permission denied for this
   operation") is an environment fact, not a regression.
-- **The running server comes from `docker-compose-sqllite.yml`**, on the
-  upstream `ghcr.io/gramps-project/grampsweb:latest` image - *not* the local
-  build in `docker/grampsweb/` (that one belongs to the pgsql compose, which
-  is not running). Confirm with `docker inspect gramps-mcp-grampsweb-1
-  --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}'`
-  before reasoning about what is installed server-side.
+- **The MCP server runs in Docker**, container `gramps-mcp-gramps-mcp-1` on the
+  published image `ghcr.io/fjacquet/gramps-mcp:latest`, exposed on
+  `http://localhost:8000/mcp` (what `.mcp.json` targets). So it executes the
+  image, not the working tree - verify a fix from source - and any `media_path`
+  must be staged inside it first
+  (`docker cp <file> gramps-mcp-gramps-mcp-1:/tmp/`). The repo's compose files
+  describe the old local-backend setup and do not serve the live tree.
+- **Reading the API directly is fine; a raw `PUT` is not.** For counts, audits and
+  exports, `POST /api/token/` with the `.env` credentials then
+  `Authorization: Bearer <access_token>` - per-category totals come back in the
+  `X-Total-Count` header with `pagesize=1`, no pagination needed. Never write with
+  a raw `PUT`: it bypasses `merge.py` and drops every field the payload omits.
+- **Access tokens expire mid-session**, and a failed `curl -o` leaves its target
+  untouched - so a stale dump passes for a fresh one. Check the token response,
+  and validate a snapshot before `mv`.
+- **For a bulk lot, a one-off script calling
+  `GrampsWebAPIClient.make_api_call(ApiCalls.PUT_*)` is the right tool** - it goes
+  through `merge_put_data()`, so semantics match the MCP tools, which do not scale
+  to hundreds of calls. Make it idempotent (source by exact title, media by md5
+  against `checksum`, citation by source+page) or a rerun after a partial failure
+  duplicates everything.
+- **Parameter models require fields even for a one-field update**:
+  `EventSaveParams` needs `type` and `citation_list` to change only `place`;
+  `PersonData` needs `primary_name` and `gender`; `DateValue` accepts only
+  `dateval`/`modifier`/`quality`/`text` - there is no `year`.
 - **Back up the live tree before any risky change.** The client has no export
   support, so GET `/api/exporters/gramps/file` with a bearer token from
-  `AuthManager`. Gzipped Gramps XML, lossless, ~500 KB. Media files are *not*
+  `AuthManager`. Gzipped Gramps XML, lossless, ~600 KB. Media files are *not*
   included - the XML carries only `<object>` references.
 - **Traversal tests must assert on the rendered output, not only on
   `TraversalResult.edges`.** Two defects shipped in #27 because the tests
@@ -100,34 +108,18 @@
   declare has that field silently dropped - the call still succeeds and the
   test can still pass while exercising nothing. Check a key against the model
   in `src/gramps_mcp/models/parameters/` before trusting a test that uses it.
-- **The 500-line rule is enforced in `tests/` as well as `src/`.**
-  `.pre-commit-config.yaml`'s `check-file-length` hook covers the whole tree;
-  there is no exclusion for tests.
-
 
 ### Style & Conventions
-- Use type hints throughout, format with `ruff format`, lint with `ruff`.
-- **Use `pydantic` for data validation**.
-- Use `httpx` for async HTTP client (no FastAPI needed for MCP servers).
-- Use `MCP Python SDK` for MCP server implementation.
+- Type hints throughout, Google-style docstrings on every function, `ruff format`
+  and `ruff` clean, no emoji in code.
 - **Raw Gramps object fields are not localised; profile fields are.** With
   `locale=fr`, `profile.relationship` becomes `Maries` and
   `profile.events[].type` becomes `Naissance`, while raw `family.type` stays
   `Married` and `child_ref_list[].frel` stays `Birth`. Compare against
   English constants only on raw fields, never on profile fields.
-- Write **docstrings for every function** using the Google style:
-  ```python
-  def example():
-      """
-      Brief summary.
-
-      Args:
-          param1 (type): Description.
-
-      Returns:
-          type: Description.
-      """
-  ```
+- When writing complex logic, add an inline `# Reason:` comment explaining the
+  why, not the what. Update `README.md` when features, dependencies or setup
+  steps change.
 
 ### Genealogy Data Entry Workflow
 - See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
@@ -144,34 +136,38 @@
   matches an existing one for the person/family. To add a corroborating
   citation or correct a date on an event that already exists, call
   `create_event` with that event's real `handle` instead, or you end up
-  with an orphan duplicate event alongside the original.
+  with an orphan duplicate event alongside the original. It also does **not**
+  attach the event to anyone: follow it with
+  `create_person(handle=..., event_ref_list=[{ref, role}])`. A `source_title`
+  that already exists is refused, and the error names the handle to reuse via
+  `source_handle`.
 - **`create_family`'s `child_handles`/`father_handle`/`mother_handle` only
   link the family side.** The child person record's own
   `parent_family_list` is not set automatically - call `create_person` with
   `parent_family_list: [<family handle>]` separately, or ancestor lookups
   from the child fail silently.
-- **Surname casing: no international standard mandates uppercase.** GEDCOM
-  5.5.1 explicitly says the opposite - "capitalize the first letter of each
-  part and lowercase the other letters" - and FamilySearch follows that.
-  ALL-CAPS surname (`JACQUET`) is a French-specific formal/international-
-  correspondence convention, not a universal genealogy rule. Do not write
-  surnames upper-case against Gramps to "fix" casing; store Title Case
-  (`Jacquet`), matching GEDCOM and the sibling `genecrew` repo's tested
-  `GrampsUpdateNameTool` invariant (recases `JACQUET`->`Jacquet`, never the
-  reverse). Verified 2026-08-16 via GEDCOM spec + MyHeritage/tamurajones
-  naming-convention references.
-
-### Documentation & Explainability
-- **Update `README.md`** when new features are added, dependencies change, or setup steps are modified.
-- **Comment non-obvious code** and ensure everything is understandable to a mid-level developer.
-- When writing complex logic, **add an inline `# Reason:` comment** explaining the why, not just the what.
+- **The citation `page` outranks the source `title` for an event's place.** A
+  title names the register or the archive's seat, not where the act happened:
+  "Table des successions, Bourges" covers deaths at Saint-Martin-d'Auxigny.
+  Measured corollaries: match place names on word boundaries ("genevoises"
+  matched Genève by substring, 35 events); take the act type named **first** in
+  the page, since "mariage ... ne le ..." is a marriage act; and "von X" / "de X"
+  in Swiss registers is bourgeois origin, not birthplace.
+- **Verify a gazetteer QID against the nearest identified ancestor**, never
+  against a region or country: "Le Rocher" (Cher) matched Saint-Antoine-du-Rocher
+  (Indre-et-Loire) on the region alone, and "le rocher" is a genuine alias of that
+  commune - the label is no protection.
+- **`Unknown` places created by Check and Repair are usually not orphans**: 8 of 9
+  were the parent of a real commune. Repoint the children onto the right parent
+  and check backlinks record by record before deleting anything.
+- **Surname casing: store Title Case (`Jacquet`), never ALL-CAPS.** GEDCOM 5.5.1
+  mandates the opposite of upper-case ("capitalize the first letter of each part
+  and lowercase the other letters") and FamilySearch follows it; ALL-CAPS is a
+  French correspondence convention, not a genealogy rule. Matches the sibling
+  `genecrew` repo's tested `GrampsUpdateNameTool` invariant, which recases
+  `JACQUET` -> `Jacquet` and never the reverse.
 
 ### AI Behavior Rules
-- **Never assume missing context. Ask questions if uncertain.**
-- **Never hallucinate libraries or functions** – only use known, verified Python packages.
-- **Always confirm file paths and module names** exist before referencing them in code or tests.
-- **Never delete or overwrite existing code** unless explicitly instructed to
-- **Do not use emojis in the code** to maintain a clean and professional coding style.
 - **Never use `git stash` or `git reset --hard`.** Both have destroyed
   uncommitted work in this repo. Compare against `main` with `git show
   main:<path>`; move a misplaced commit with `git branch <name> <sha>` then
