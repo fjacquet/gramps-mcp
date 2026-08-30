@@ -470,6 +470,43 @@ including the owner role. Do not call it. Use `get_facts` instead.
   nothing - you get whole-tree statistics back. When both `gramps_id` and
   `handle` are given, `gramps_id` wins.
 
+### `find_duplicates` - candidate duplicate people, clustered
+
+`find_duplicates()` with no arguments scans the whole tree. Read-only: it
+never writes anything, and never merges - it only reports.
+
+- `limit` (default: unset): stop after this many people, for a cheap probe on
+  a large tree. Omit to scan everyone.
+- `threshold` (default 0.85, range 0.0-1.0): reserved for the underlying
+  similarity scan; the current implementation clusters on the same
+  structural rules `audit_quality` uses (matching normalized name plus an
+  exact shared birth date, shared parents, or a shared spouse and child) and
+  does not vary its behaviour with this value.
+
+The output has two parts, never merged under one heading:
+
+- **Proved duplicates**: clusters the rules could establish with structural
+  evidence (an exact date match, shared parents, or a shared spouse and
+  child). Each cluster names the record that would survive a merge (the most
+  complete one) and the records that would merge into it. When the surviving
+  record's gender is unknown, the cluster also states which gender to patch
+  onto it first - `merge_type` does not carry gender across a merge, so
+  applying the patch before merging is the only way it is not silently lost.
+- **Needs human arbitration**: pairs that share enough to be worth a look
+  (for example, a phonetic name match plus some shared context) but that the
+  rules did not prove. These are never presented as duplicates - review each
+  one yourself before doing anything with it. Pairs matched on name
+  resemblance alone are dropped entirely, not reported here: a name
+  resemblance is never proof.
+
+If the tree scan could not finish, the output says so first, naming the
+error, before any finding - do not read a result with no "partial scan"
+warning as a completed scan otherwise. Records the collector could not parse
+are also reported by count.
+
+Feed a proved pair's handles to `merge_type` to actually merge; this tool
+never does it for you.
+
 ### `get_relationship` - how two people are related
 
 `get_relationship(person1=..., person2=...)`. Each accepts a handle or a

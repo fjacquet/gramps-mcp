@@ -40,6 +40,7 @@ from .models.parameters.destructive_params import (
     MergeTypeParams,
     UndoChangeParams,
 )
+from .models.parameters.detection_params import FindDuplicatesParams
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.family_params import FamilySaveParams
@@ -82,6 +83,7 @@ from .tools.destructive import (
     merge_type_tool,
     undo_change_tool,
 )
+from .tools.detection import find_duplicates_tool
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
@@ -256,6 +258,16 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "Get interesting facts and statistics about the tree",
         "schema": FactsParams,
         "handler": get_facts_tool,
+    },
+    "find_duplicates": {
+        "description": (
+            "Find candidate duplicate people, grouped into clusters with the "
+            "record that would survive a merge already chosen. Read-only: it "
+            "reports pairs the rules proved and, separately, pairs needing "
+            "human arbitration. Feed a proved pair to merge_type"
+        ),
+        "schema": FindDuplicatesParams,
+        "handler": find_duplicates_tool,
     },
     "delete_type": {
         "description": (
