@@ -115,13 +115,15 @@ printf '"""Genealogy analysis logic copied from crewai-custom-tools."""\n' > src
 
 - [ ] **Step 2: Copy domain.py and keep only the models in scope**
 
-The source is 378 lines and 22 classes. Keep these line ranges from `$SRC/models/domain.py`, in this order: `1-75` (module docstring, imports, `EventFact`, `PersonFacts`, `FamilyFacts`, `Anomaly`, `DuplicateCandidate`), `91-140` (`ParsedPlace`, `PlaceLevel`, `DatedName`, `DatedChain`, `ResolvedPlace`), `316-343` (`MergePair`, `MergeCluster`).
+The source is 378 lines and 22 classes. Keep these line ranges from `$SRC/models/domain.py`, in this order: `1-75` (module docstring, imports, `EventFact`, `PersonFacts`, `FamilyFacts`, `Anomaly`, `DuplicateCandidate`), `91-140` (`ParsedPlace`, `PlaceLevel`, `DatedName`, `DatedChain`, `ResolvedPlace`), `307-313` (the `MergeTier` alias `MergePair.tier` is annotated with - it is a type alias, not a model, which is why it appears in neither list below), `316-343` (`MergePair`, `MergeCluster`).
+
+`FacteurConcordance` (line 250), the only other alias in the file, is not copied: it belongs to `PropositionAudit`, which is dropped.
 
 Dropped: `Proposition`, `PlaceProposition`, `PlaceFacts`, `PlaceMergeProposition`, `PropositionAudit`, `PropositionsLot`, `Piste`, `Subdivision`, `CollisionIso`, `EntiteEcartee`.
 
 ```bash
 SRC=/Users/fjacquet/Projects/crewai_custom_tools/src/crewai_custom_tools/tools/genealogy
-{ sed -n '1,75p' $SRC/models/domain.py; sed -n '91,140p' $SRC/models/domain.py; sed -n '316,343p' $SRC/models/domain.py; } > src/gramps_mcp/genealogy/domain.py
+{ sed -n '1,75p' $SRC/models/domain.py; sed -n '91,140p' $SRC/models/domain.py; sed -n '307,313p' $SRC/models/domain.py; sed -n '316,343p' $SRC/models/domain.py; } > src/gramps_mcp/genealogy/domain.py
 ```
 
 - [ ] **Step 3: Add the provenance header**
@@ -131,10 +133,15 @@ Edit the module docstring at the top of `src/gramps_mcp/genealogy/domain.py` to 
 - [ ] **Step 4: Verify the file is self-contained**
 
 ```bash
-uv run python -c "from src.gramps_mcp.genealogy.domain import EventFact, PersonFacts, FamilyFacts, Anomaly, DuplicateCandidate, ParsedPlace, PlaceLevel, DatedName, DatedChain, ResolvedPlace, MergePair, MergeCluster; print('ok')"
+uv run python -c "
+from src.gramps_mcp.genealogy.domain import EventFact, PersonFacts, FamilyFacts, Anomaly, DuplicateCandidate, ParsedPlace, PlaceLevel, DatedName, DatedChain, ResolvedPlace, MergePair, MergeCluster
+MergePair(gramps_id_a='I1', gramps_id_b='I2', handle_a='a', handle_b='b', tier='arbitrage', regle=None, blocs=[])
+MergeCluster(phoenix_handle='a', phoenix_gramps_id='I1', titanic_handles=['b'], titanic_gramps_ids=['I2'], gender_patch=None)
+print('ok')
+"
 ```
 
-Expected: `ok`. If it raises `NameError` or `ImportError`, a kept class references a dropped one - report which, do not re-add the dropped class without saying so.
+Expected: `ok`. The probe **instantiates** rather than only importing: the file carries `from __future__ import annotations`, which makes pydantic defer model building, so a bare import succeeds even on a model whose annotations reference a name that was never copied. If this raises `PydanticUserError`, `NameError` or `ImportError`, a kept class references something the trim dropped - report which, and do not re-add a dropped model without saying so.
 
 - [ ] **Step 5: Port the domain tests**
 
@@ -713,7 +720,22 @@ uv run git commit -m "feat: add tree collection with explicit partial-scan repor
 
 **Interfaces:**
 - Consumes: `collect.collect_tree`, `duplicates.etager`, `merge_plan.plan_fusions`
-- Produces: `FindDuplicatesParams`, `find_duplicates_tool(client, arguments: dict) -> list[TextContent]`, `format_duplicate_clusters(clusters, skipped: int, partial: bool, error: str | None) -> str`
+- Produces: `FindDuplicatesParams`, `find_duplicates_tool(client, arguments: dict) -> list[TextContent]`, `format_duplicate_clusters(clusters, arbitration_pairs, people_by_handle, skipped: int, partial: bool, error: str | None) -> str`
+
+**Read this before writing the tool.** `plan_fusions` builds clusters from
+`tier == "auto"` pairs **only** - it filters with `[p for p in paires if p.tier
+== "auto"]` and the `arbitrage` and `rejet` pairs never reach its output. So a
+tool that calls `etager` and then renders only `plan_fusions`' result silently
+drops every pair needing human arbitration, which is exactly the split the spec
+forbids collapsing. Keep the full pair list from `etager` and pass
+`[p for p in pairs if p.tier == "arbitrage"]` to the handler as its own
+argument. `rejet` pairs are dropped deliberately - they were matched on name
+resemblance alone, which the source's own comment calls "jamais une preuve".
+
+`MergePair` fields, verified: `gramps_id_a`, `gramps_id_b`, `handle_a`,
+`handle_b`, `tier`, `regle`, `blocs`. `MergeCluster` fields, verified:
+`phoenix_handle`, `phoenix_gramps_id`, `titanic_handles`, `titanic_gramps_ids`,
+`gender_patch`.
 
 - [ ] **Step 1: Write the failing handler test**
 
@@ -734,31 +756,55 @@ class TestDuplicateRendering:
                               given="Jean", sex="M")
         titanic = PersonFacts(handle="b", gramps_id="I0002", surname="Jacquet",
                               given="Jean", sex="M")
-        cluster = MergeCluster(phoenix_handle="a", titanic_handles=["b"])
+        cluster = MergeCluster(
+            phoenix_handle="a", phoenix_gramps_id="I0001",
+            titanic_handles=["b"], titanic_gramps_ids=["I0002"],
+        )
 
         text = format_duplicate_clusters(
-            [cluster], {"a": phoenix, "b": titanic}, skipped=0, partial=False, error=None
+            [cluster], [], {"a": phoenix, "b": titanic},
+            skipped=0, partial=False, error=None,
         )
 
         assert "I0001" in text
         assert "I0002" in text
         assert "survives" in text.lower()
 
+    def test_an_arbitration_pair_is_not_presented_as_proved(self):
+        from src.gramps_mcp.genealogy.domain import MergePair
+
+        pair = MergePair(
+            gramps_id_a="I0003", gramps_id_b="I0004",
+            handle_a="c", handle_b="d",
+            tier="arbitrage", regle=None, blocs=["pho:JCQ"],
+        )
+
+        text = format_duplicate_clusters(
+            [], [pair], {}, skipped=0, partial=False, error=None
+        )
+
+        assert "I0003" in text
+        assert "arbitration" in text.lower() or "review" in text.lower()
+
     def test_a_partial_scan_says_so(self):
         text = format_duplicate_clusters(
-            [], {}, skipped=0, partial=True, error="connection reset"
+            [], [], {}, skipped=0, partial=True, error="connection reset"
         )
 
         assert "partial" in text.lower()
         assert "connection reset" in text
 
     def test_skipped_records_are_reported(self):
-        text = format_duplicate_clusters([], {}, skipped=3, partial=False, error=None)
+        text = format_duplicate_clusters(
+            [], [], {}, skipped=3, partial=False, error=None
+        )
 
         assert "3" in text
 ```
 
-Adjust `MergeCluster`'s field names to those Task 1 produced; read `src/gramps_mcp/genealogy/domain.py` rather than guessing.
+Read `src/gramps_mcp/genealogy/domain.py` for any field these constructors still
+miss - `PersonFacts` and `MergePair` may require fields beyond those shown. Do
+not drop a required field; supply a plausible value for it.
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -805,7 +851,7 @@ class FindDuplicatesParams(BaseModel):
 
 - [ ] **Step 4: Write the handler**
 
-Create `src/gramps_mcp/handlers/duplicates_handler.py` with `format_duplicate_clusters(clusters, people_by_handle, skipped, partial, error)`. It must render, in this order: a partial-scan warning when `partial` is true (naming `error`), the count of skipped records when non-zero, then one block per cluster naming the phoenix, why it was chosen (completeness score), and each titanic. Proved pairs and pairs needing arbitration render under separate headings - collapsing them would let the caller treat a guess as a proof.
+Create `src/gramps_mcp/handlers/duplicates_handler.py` with `format_duplicate_clusters(clusters, arbitration_pairs, people_by_handle, skipped, partial, error)`. It must render, in this order: a partial-scan warning when `partial` is true (naming `error`), the count of skipped records when non-zero, then the proved clusters - each naming the phoenix, why it was chosen (completeness score), and each titanic - and finally the arbitration pairs under their own heading. The two groups never render under one heading: collapsing them would let the caller treat a guess as a proof. A cluster whose `gender_patch` is not None renders that too, because the caller must apply it before merging.
 
 - [ ] **Step 5: Run the handler tests**
 
@@ -864,11 +910,18 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
         by_handle = {p.handle: p for p in collected.people}
         clusters = plan_fusions(pairs, by_handle)
 
+        # Reason: plan_fusions keeps only tier == "auto" pairs, so the pairs
+        # needing human arbitration never reach its output. They are carried
+        # separately rather than dropped - the spec forbids collapsing the
+        # proved/unproved split, because a collapsed one reads as proof.
+        arbitration = [p for p in pairs if p.tier == "arbitrage"]
+
         return [
             TextContent(
                 type="text",
                 text=format_duplicate_clusters(
                     clusters,
+                    arbitration,
                     by_handle,
                     skipped=collected.skipped,
                     partial=collected.partial,
@@ -1147,60 +1200,58 @@ uv run git commit -m "feat: add rate limiter trimmed to the four gazetteer provi
 
 ---
 
-### Task 11: Place parsing and scoring
+### Task 11: Similarity scoring
 
 **Files:**
 - Create: `src/gramps_mcp/genealogy/geo/__init__.py`
-- Create: `src/gramps_mcp/genealogy/geo/places_parse.py`
 - Create: `src/gramps_mcp/genealogy/geo/score.py`
-- Test: `tests/test_genealogy_places_parse.py`, `tests/test_genealogy_places_score.py`
+- Test: `tests/test_genealogy_places_score.py`
 
 **Interfaces:**
-- Consumes: `domain.ParsedPlace`
-- Produces: `parse_pname(raw: str) -> ParsedPlace`; `best_similarity`, `is_ambiguous`, `similarity`, `_norm`
+- Consumes: nothing outside stdlib
+- Produces: `best_similarity`, `is_ambiguous`, `similarity`, `_norm` - Tasks 13, 14, 16 and 18 all import from here.
 
-- [ ] **Step 1: Create the geo package and port both test files**
+**Scope note.** An earlier draft of this task also created `places_parse.py`. It
+cannot: `standardize/places.py:14` imports `split_canton_suffix` from
+`geo/suisse.py`, which does not exist until Task 14. `places_parse.py` is
+therefore created in Task 14, right after the module it depends on. The
+dependency is one-way - `suisse.py` does not import `places_parse` - so no
+circular import exists and neither copy needs to diverge from its source.
+
+- [ ] **Step 1: Create the geo package and port the score test**
 
 ```bash
 mkdir -p src/gramps_mcp/genealogy/geo
 printf '"""Place resolvers copied from crewai-custom-tools."""\n' > src/gramps_mcp/genealogy/geo/__init__.py
 CCT=/Users/fjacquet/Projects/crewai_custom_tools
-for t in places_parse places_score; do
-  cp $CCT/tests/test_genealogy_$t.py tests/test_genealogy_$t.py
-done
-sed -i '' -e 's|from crewai_custom_tools.tools.genealogy.standardize.places|from src.gramps_mcp.genealogy.geo.places_parse|g' \
-          -e 's|from crewai_custom_tools.tools.genealogy.geo.score|from src.gramps_mcp.genealogy.geo.score|g' \
+cp $CCT/tests/test_genealogy_places_score.py tests/test_genealogy_places_score.py
+sed -i '' -e 's|from crewai_custom_tools.tools.genealogy.geo.score|from src.gramps_mcp.genealogy.geo.score|g' \
           -e 's|from crewai_custom_tools.tools.genealogy.models.domain|from src.gramps_mcp.genealogy.domain|g' \
-          tests/test_genealogy_places_parse.py tests/test_genealogy_places_score.py
+          tests/test_genealogy_places_score.py
 ```
 
-- [ ] **Step 2: Run to verify they fail**
+- [ ] **Step 2: Run to verify it fails**
 
 ```bash
-uv run pytest tests/test_genealogy_places_parse.py tests/test_genealogy_places_score.py -v
+uv run pytest tests/test_genealogy_places_score.py -v
 ```
 
-Expected: FAIL, `ModuleNotFoundError`.
+Expected: FAIL, `ModuleNotFoundError` on `src.gramps_mcp.genealogy.geo.score`.
 
-- [ ] **Step 3: Copy both modules**
+- [ ] **Step 3: Copy the module**
 
 ```bash
 SRC=/Users/fjacquet/Projects/crewai_custom_tools/src/crewai_custom_tools/tools/genealogy
-cp $SRC/standardize/places.py src/gramps_mcp/genealogy/geo/places_parse.py
 cp $SRC/geo/score.py src/gramps_mcp/genealogy/geo/score.py
-sed -i '' -e 's|from crewai_custom_tools.tools.genealogy.models.domain import|from ..domain import|' \
-          -e 's|from crewai_custom_tools.tools.genealogy.geo.suisse import|from .suisse import|' \
-          src/gramps_mcp/genealogy/geo/places_parse.py src/gramps_mcp/genealogy/geo/score.py
+sed -i '' 's|from crewai_custom_tools.tools.genealogy.models.domain import|from ..domain import|' src/gramps_mcp/genealogy/geo/score.py
 ```
 
-`places_parse.py` imports `split_canton_suffix` from `suisse`, which does not exist yet (Task 14). If that import breaks the module, move `split_canton_suffix` into `places_parse.py` and have `suisse.py` import it from there in Task 14 - and say so in the handoff, because it changes Task 14's interface.
+Add the provenance header with `geo/score.py` as the original path.
 
-Add provenance headers: `standardize/places.py` and `geo/score.py`.
-
-- [ ] **Step 4: Run to verify they pass**
+- [ ] **Step 4: Run to verify it passes**
 
 ```bash
-uv run pytest tests/test_genealogy_places_parse.py tests/test_genealogy_places_score.py -v
+uv run pytest tests/test_genealogy_places_score.py -v
 ```
 
 Expected: all PASS.
@@ -1208,8 +1259,8 @@ Expected: all PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-rtk git add src/gramps_mcp/genealogy/geo/ tests/test_genealogy_places_parse.py tests/test_genealogy_places_score.py
-uv run git commit -m "feat: add place parsing and similarity scoring"
+rtk git add src/gramps_mcp/genealogy/geo/ tests/test_genealogy_places_score.py
+uv run git commit -m "feat: add place similarity scoring"
 ```
 
 ---
@@ -1349,15 +1400,22 @@ uv run git commit -m "feat: add France place resolver"
 
 ---
 
-### Task 14: Switzerland resolver
+### Task 14: Switzerland resolver and place parsing
 
 **Files:**
 - Create: `src/gramps_mcp/genealogy/geo/suisse.py`
-- Test: `tests/test_genealogy_geo_suisse.py`
+- Create: `src/gramps_mcp/genealogy/geo/places_parse.py`
+- Test: `tests/test_genealogy_geo_suisse.py`, `tests/test_genealogy_places_parse.py`
 
 **Interfaces:**
-- Consumes: `rate_limit.get_rate_limiter`, `domain` models
-- Produces: `resolve_ch(parsed: ParsedPlace) -> ResolvedPlace | None`, `split_canton_suffix(...)`
+- Consumes: `rate_limit.get_rate_limiter`, `score` helpers, `domain` models
+- Produces: `resolve_ch(parsed: ParsedPlace) -> ResolvedPlace | None`, `split_canton_suffix(label: str) -> tuple[str, str | None]`, `parse_pname(raw: str) -> ParsedPlace`
+
+**Why the two ship together.** `standardize/places.py:14` imports
+`split_canton_suffix` from `geo/suisse.py` and calls it at line 116. The
+dependency is one-way, so copying `suisse.py` first and `places_parse.py`
+second in this same task keeps both faithful to their source. Do not move the
+function or invert the import.
 
 - [ ] **Step 1: Port the test file**
 
@@ -1388,21 +1446,54 @@ sed -i '' -e 's|from crewai_custom_tools.core.rate_limiter import|from ..rate_li
           src/gramps_mcp/genealogy/geo/suisse.py
 ```
 
-Add the provenance header. If Task 11 moved `split_canton_suffix` into `places_parse.py`, import it from there instead of redefining it.
+Add the provenance header with `geo/suisse.py` as the original path. Keep `split_canton_suffix` defined here - `places_parse.py` imports it from this module in Step 6.
 
-- [ ] **Step 4: Run to verify it passes, then re-run Task 11's tests**
+- [ ] **Step 4: Run to verify the Switzerland tests pass**
+
+```bash
+uv run pytest tests/test_genealogy_geo_suisse.py -v
+```
+
+Expected: all PASS.
+
+- [ ] **Step 5: Port the place-parsing test**
+
+```bash
+CCT=/Users/fjacquet/Projects/crewai_custom_tools
+cp $CCT/tests/test_genealogy_places_parse.py tests/test_genealogy_places_parse.py
+sed -i '' -e 's|from crewai_custom_tools.tools.genealogy.standardize.places|from src.gramps_mcp.genealogy.geo.places_parse|g' \
+          -e 's|from crewai_custom_tools.tools.genealogy.models.domain|from src.gramps_mcp.genealogy.domain|g' \
+          tests/test_genealogy_places_parse.py
+uv run pytest tests/test_genealogy_places_parse.py -v
+```
+
+Expected: FAIL, `ModuleNotFoundError` on `src.gramps_mcp.genealogy.geo.places_parse`.
+
+- [ ] **Step 6: Copy places_parse.py**
+
+```bash
+SRC=/Users/fjacquet/Projects/crewai_custom_tools/src/crewai_custom_tools/tools/genealogy
+cp $SRC/standardize/places.py src/gramps_mcp/genealogy/geo/places_parse.py
+sed -i '' -e 's|from crewai_custom_tools.tools.genealogy.geo.suisse import|from .suisse import|' \
+          -e 's|from crewai_custom_tools.tools.genealogy.models.domain import|from ..domain import|' \
+          src/gramps_mcp/genealogy/geo/places_parse.py
+```
+
+Add the provenance header with `standardize/places.py` as the original path, noting that the module was renamed from `places.py` to `places_parse.py` to avoid colliding with the repo's existing `place_handler` naming.
+
+- [ ] **Step 7: Run both test files**
 
 ```bash
 uv run pytest tests/test_genealogy_geo_suisse.py tests/test_genealogy_places_parse.py -v
 ```
 
-Expected: all PASS. Both are run because `places_parse` and `suisse` reference each other.
+Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-rtk git add src/gramps_mcp/genealogy/geo/suisse.py tests/test_genealogy_geo_suisse.py
-uv run git commit -m "feat: add Switzerland place resolver"
+rtk git add src/gramps_mcp/genealogy/geo/suisse.py src/gramps_mcp/genealogy/geo/places_parse.py tests/test_genealogy_geo_suisse.py tests/test_genealogy_places_parse.py
+uv run git commit -m "feat: add Switzerland resolver and place parsing"
 ```
 
 ---
@@ -1435,8 +1526,18 @@ from __future__ import annotations
 
 import httpx
 
+from .. import __version__ as _pkg_version  # adjust the relative depth if needed
+
 SPARQL_ENDPOINT = "https://query.wikidata.org/sparql"
-USER_AGENT = "gramps-mcp/1.10.1 (https://github.com/fjacquet/gramps-mcp)"
+
+# Reason: Wikimedia's User-Agent policy exists so an operator seeing traffic can
+# reach whoever sent it. The upstream module names crewai-custom-tools; sending
+# that from here would point Wikidata at the wrong maintainer, so this names
+# gramps-mcp and reads the version rather than hardcoding one that drifts.
+USER_AGENT = (
+    f"gramps-mcp/{_pkg_version} "
+    "(https://github.com/fjacquet/gramps-mcp; place resolution)"
+)
 
 
 def sparql_rows(query: str, *, timeout: float = 30.0) -> list[dict[str, str]]:
@@ -1470,7 +1571,9 @@ def sparql_rows(query: str, *, timeout: float = 30.0) -> list[dict[str, str]]:
     ]
 ```
 
-Copy `SPARQL_ENDPOINT` and `USER_AGENT` from the source rather than trusting the values above; read `$CCT/src/crewai_custom_tools/tools/web/wikidata.py` and `core/user_agent.py`.
+Copy `SPARQL_ENDPOINT` verbatim from `$CCT/src/crewai_custom_tools/tools/web/wikidata.py:14`. Do **not** copy that file's `USER_AGENT` (line 15): it identifies crewai-custom-tools, and the request now comes from this project. `__version__` lives at `src/gramps_mcp/__init__.py:19`; verify the relative import depth resolves from `genealogy/geo/sparql.py` and fix it if it does not.
+
+The `core/user_agent.py` helper in the source repo is a different mechanism used by other modules - `wikidata.py` does not call it. Ignore it.
 
 - [ ] **Step 2: Port the test and convert it from requests to httpx**
 
@@ -1624,13 +1727,12 @@ Expected: FAIL, `ModuleNotFoundError`.
 SRC=/Users/fjacquet/Projects/crewai_custom_tools/src/crewai_custom_tools/tools/genealogy
 cp $SRC/geo/nominatim.py src/gramps_mcp/genealogy/geo/nominatim.py
 sed -i '' -e 's|from crewai_custom_tools.core.rate_limiter import|from ..rate_limit import|' \
-          -e 's|from crewai_custom_tools.core.user_agent import|from .sparql import|' \
           -e 's|from crewai_custom_tools.tools.genealogy.geo.score import|from .score import|' \
           -e 's|from crewai_custom_tools.tools.genealogy.models.domain import|from ..domain import|' \
           src/gramps_mcp/genealogy/geo/nominatim.py
 ```
 
-If `user_agent` is a function rather than the constant `USER_AGENT` that Task 15 defined, copy the function into `sparql.py` instead of aliasing it, and adjust. Add the provenance header.
+Its full import list, verified: `httpx`, `core.rate_limiter`, `geo.score`, `models.domain`. It sends no User-Agent of its own, so nothing from Task 15 is needed here. Add the provenance header with `geo/nominatim.py` as the original path.
 
 - [ ] **Step 4: Verify the rate limit is acquired before the call**
 
