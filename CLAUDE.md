@@ -93,6 +93,32 @@
   support, so GET `/api/exporters/gramps/file` with a bearer token from
   `AuthManager`. Gzipped Gramps XML, lossless, ~600 KB. Media files are *not*
   included - the XML carries only `<object>` references.
+- **The API exposes more than this server uses: 96 of 193 operations.**
+  `docs/reference/gramps-web-api.md` lists every operation against the
+  `ApiCalls` member that reaches it, generated from the vendored
+  `docs/reference/openapi.json` (Gramps Web API 3.21.1) by
+  `uv run python scripts/gen_api_reference.py`. Regenerate it after replacing
+  the spec. Every `ApiCalls` entry matches a real spec path, so the client
+  invents no endpoint; `AuthManager`'s `POST /token/` (`auth.py:128`) is the
+  only call that bypasses the enum. Five unused capabilities are worth knowing
+  before writing a workaround:
+  - **`POST /api/transactions`** commits a batch atomically. The bulk-lot advice
+    above predates this knowledge: a one-off script issuing hundreds of `PUT`s
+    is still the tested path, but this endpoint is why "hundreds of calls" need
+    not be the only shape.
+  - **`POST /api/<type>/query`** exists for every record type. The tools go
+    through GQL over `GET` instead, which is what returns 500 on notes. Try the
+    `POST` body before concluding a query cannot be expressed.
+  - **`GET /api/exporters/<id>/file`** is the export the backup note below calls
+    missing from the client. It is missing from `ApiCalls`, not from the API.
+  - **`POST /api/trees/<id>/verify` and `/repair`** run Check and Repair over
+    the API. Worth reaching for before repairing dead handles by hand - though
+    Check and Repair is itself what materialises some of them.
+  - **`POST /api/media/<handle>/ocr`** exists, and is very likely useless here.
+    Reading the scan directly beats it on this corpus: the registers are
+    handwritten, pre-1950, in French and German hands. Treat the endpoint as
+    unproven on anything older than typescript, and do not route a register
+    through it in place of reading it.
 - **Traversal tests must assert on the rendered output, not only on
   `TraversalResult.edges`.** Two defects shipped in #27 because the tests
   checked the graph and never called `format_traversal` on the tree they had
