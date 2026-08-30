@@ -253,19 +253,35 @@ Consequences to handle rather than discover:
 
 TDD, tests before the copied code is wired in.
 
-**Detection tests, ported (1 075 lines / 10 files):**
+**Correction (Task 20):** the figures below (1 934 lines / 17 files) were
+wrong when this spec was written, and drifted further as the port
+progressed - they undercounted from the start and never gained
+`test_genealogy_places_parse.py`, `test_genealogy_places_score.py`,
+`test_genealogy_wikidata_sparql.py` or `test_genealogy_rate_limit.py`, all of
+which test ported modules (`geo/places_parse.py`, `geo/score.py`,
+`geo/sparql.py`, `rate_limit.py`). The real figure, counted directly off the
+branch, is **2 757 lines across 20 ported test files**
+(`test_genealogy_collect.py` is excluded from this count: it tests
+`collect.py`, the one new module, against the live tree, not a ported one -
+see "Beyond the port" below). Per-file line counts below are also stale in
+places; treat the file list, not the individual numbers, as authoritative.
+
+**Detection tests, ported (10 files):**
 `test_genealogy_duplicates.py` (55), `test_genealogy_blocking.py` (94),
 `test_genealogy_merge_tiers.py` (240), `test_genealogy_merge_plan.py` (110),
 `test_genealogy_merge_models.py` (63), `test_genealogy_phonetics.py` (48),
 `test_genealogy_rules_person.py` (136), `test_genealogy_rules_family.py` (66),
 `test_genealogy_facts.py` (145), `test_genealogy_domain.py` (118, trimmed).
 
-**Geo tests, ported (859 lines / 7 files):**
+**Geo tests, ported (10 files):**
 `test_genealogy_geo_france.py` (115), `test_genealogy_geo_suisse.py` (93),
 `test_genealogy_geo_registry.py` (98), `test_genealogy_geo_transitions.py`
 (43), `test_genealogy_geo_nominatim.py` (59),
 `test_genealogy_geo_france_ex_communes.py` (411),
-`test_genealogy_places_models.py` (40).
+`test_genealogy_places_models.py` (40), `test_genealogy_places_parse.py`,
+`test_genealogy_places_score.py`, `test_genealogy_wikidata_sparql.py`.
+
+**Also ported, uncategorized above:** `test_genealogy_rate_limit.py`.
 
 Two adjustments during the port: the registry tests reference the DE and US
 resolvers that leave `_BY_COUNTRY`, and the ex-communes tests exercise

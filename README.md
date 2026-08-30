@@ -60,7 +60,7 @@ No more manual data entry, no context switching between apps, no generic genealo
 
 ## Features
 
-### 27 Genealogy Tools
+### 30 Genealogy Tools
 
 #### Search & Retrieval (3 tools)
 - **find_type** - Universal search for any entity type (person, family, event, place, source, citation, media, repository) using Gramps Query Language
@@ -92,6 +92,11 @@ No more manual data entry, no context switching between apps, no generic genealo
 - **manage_tags** - List, get, or create/update tags
 - **manage_users** - List, get, or create Gramps Web accounts with generated passwords (owner or admin rights required, see [docs/user-management.md](docs/user-management.md))
 - **get_facts** - Get interesting facts and statistics about the tree
+
+#### Detection & Geocoding Tools (3 tools)
+- **find_duplicates** - Find candidate duplicate people, grouped into clusters with the record that would survive a merge already chosen. Read-only
+- **audit_quality** - Run deterministic consistency rules over the tree and report anomalies by severity. Read-only
+- **geocode_place** - Resolve a free-text place name against authoritative gazetteers (France, Switzerland, worldwide fallback). Read-only; reaches external services, see [Network Access](#mcp-server-network-access)
 
 #### Destructive Operations (4 tools)
 - **delete_type** - Delete a single record; refuses while it is still referenced unless `force=true`
@@ -390,6 +395,21 @@ docker compose -f docker-compose-sqllite.yml ps --format "{{.Names}}\t{{.Ports}}
 Look for bindings like `127.0.0.1:8000->8000/tcp` (safe) or loopback IPv6 equivalents. If you still see `0.0.0.0:8000->8000/tcp`, the container has not been recreated yet.
 
 If you need to access the MCP server from other machines, use an authenticating reverse proxy (nginx, Caddy, etc.) in front of the server rather than publishing the port to untrusted networks.
+
+#### Outbound Egress
+
+Besides your Gramps Web API host, the **geocode_place** tool reaches four
+third-party gazetteers - the container needs egress to all of them:
+
+- `geo.api.gouv.fr` (France)
+- `api3.geo.admin.ch` (Switzerland, Swisstopo)
+- `query.wikidata.org` (merged/renamed commune lookups)
+- `nominatim.openstreetmap.org` (worldwide fallback, rate-limited to 1
+  request/second per its ODbL licence)
+
+**find_duplicates** and **audit_quality** make no outbound calls beyond your
+own Gramps Web API - they keep working even when every gazetteer above is
+unreachable.
 
 
 ## Troubleshooting

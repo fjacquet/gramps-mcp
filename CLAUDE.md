@@ -34,6 +34,12 @@
     `server.py` to stay under the 500-line limit
   - `traversal.py` - pure breadth-first graph traversal; rendering lives apart in
     `handlers/traversal_handler.py`
+  - `genealogy/` - pure detection logic (duplicate blocking, consistency rules
+    R1-R9, merge planning, place resolvers) **copied** from
+    fjacquet/crewai-custom-tools v0.31.1 (19d78f7). The duplication is
+    deliberate, decided by the repo owner; divergence from that repo is
+    expected and is not a defect to repair. Each file's docstring names its
+    origin. Do not "fix" this by re-unifying the two copies.
 
 ### Testing & Reliability (TDD Approach)
 - **Write tests first**, red-green-refactor, and update existing tests when the
@@ -71,6 +77,13 @@
   must be staged inside it first
   (`docker cp <file> gramps-mcp-gramps-mcp-1:/tmp/`). The repo's compose files
   describe the old local-backend setup and do not serve the live tree.
+- **The server now calls third-party hosts, separately from the Gramps Web
+  API above.** `geocode_place` reaches `geo.api.gouv.fr`, `api3.geo.admin.ch`,
+  `query.wikidata.org` and `nominatim.openstreetmap.org`; the Docker
+  container needs egress to them. The two detection tools (`find_duplicates`,
+  `audit_quality`) do not - they keep working when a gazetteer is
+  unreachable. Nominatim's 1 request per second with no burst is an ODbL
+  licence obligation encoded in `genealogy/rate_limit.py`, not a courtesy.
 - **Reading the API directly is fine; a raw `PUT` is not.** For counts, audits and
   exports, `POST /api/token/` with the `.env` credentials then
   `Authorization: Bearer <access_token>` - per-category totals come back in the
