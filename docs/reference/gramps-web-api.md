@@ -3,7 +3,7 @@
 Generated from `openapi.json`, **Gramps Web API 3.21.1**, by `scripts/gen_api_reference.py`.
 Do not edit this page by hand - regenerate it.
 
-This server calls **95 of the 193 operations** the API exposes.
+This server calls **96 of the 193 operations** the API exposes.
 A row with an `ApiCalls` member is reachable from an MCP tool; a row
 without one is a capability this server does not use today.
 
@@ -365,11 +365,11 @@ HTTP 200 rather than an error.
 
 ## Token
 
-0 of 4 used.
+1 of 4 used.
 
 | Method | Path | ApiCalls | Summary |
 |---|---|---|---|
-| POST | `/api/token/` | - | Post username and password to fetch a token. |
+| POST | `/api/token/` | `AuthManager auth.py:128 (not via ApiCalls)` | Post username and password to fetch a token. |
 | GET | `/api/token/create_owner/` | - | Get a token. |
 | POST | `/api/token/create_owner/` | - | Get a token. |
 | POST | `/api/token/refresh/` | - | Fetch a new token. |

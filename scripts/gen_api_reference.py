@@ -51,6 +51,16 @@ OUT_PATH = REPO_ROOT / "docs" / "reference" / "gramps-web-api.md"
 
 HTTP_METHODS = ("get", "post", "put", "delete", "patch")
 
+# Reason: one call in this server does not go through ApiCalls. AuthManager
+# posts to "/token/" directly (src/gramps_mcp/auth.py:128) because it runs
+# before the authenticated client exists. Reading the enum alone would report
+# that operation as unused, which is the opposite of true - it is the one call
+# every other call depends on. Verified as the only such bypass: no other
+# module issues a bare client.get/post/put/delete.
+EXTRA_CALLS: dict[tuple[str, str], list[str]] = {
+    ("POST", "token"): ["AuthManager auth.py:128 (not via ApiCalls)"],
+}
+
 
 def normalise(path: str) -> str:
     """
@@ -90,6 +100,8 @@ def load_our_calls() -> dict[tuple[str, str], list[str]]:
     for member in ApiCalls:
         method, path = member.value[0], member.value[1]
         calls[(method.upper(), normalise(path))].append(member.name)
+    for key, names in EXTRA_CALLS.items():
+        calls[key].extend(names)
     return calls
 
 
