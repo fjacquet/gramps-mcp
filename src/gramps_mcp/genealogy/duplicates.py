@@ -20,6 +20,15 @@ Copied from fjacquet/crewai-custom-tools v0.31.1 (19d78f7),
 src/crewai_custom_tools/tools/genealogy/analysis/duplicates.py.
 Divergence from that copy is expected and accepted; see
 docs/superpowers/specs/2026-08-30-detection-tools-design.md.
+
+Three lines diverge from that copy, each an annotation for mypy, not a
+behaviour change: `candidate_pairs` unpacks the sorted handle pair into two
+names before using it as a dict key, instead of an unannotated
+`tuple(sorted(...))`; `_regle_auto`'s `dates_identiques` adds explicit
+`a.birth is not None`/`b.birth is not None` conjuncts ahead of the
+`date_complete` calls that already guarantee it by short-circuit; and
+`etager` declares `tier: MergeTier` before assigning it, instead of letting
+it infer as plain `str`.
 """
 
 from __future__ import annotations
@@ -32,6 +41,7 @@ from .domain import (
     EventFact,
     FamilyFacts,
     MergePair,
+    MergeTier,
     PersonFacts,
 )
 from .phonetics import (
@@ -132,7 +142,8 @@ def candidate_pairs(
             ignores.append(cle)
             continue
         for a, b in combinations(membres, 2):
-            paires.setdefault(tuple(sorted((a.handle, b.handle))), set()).add(cle)
+            handle_a, handle_b = sorted((a.handle, b.handle))
+            paires.setdefault((handle_a, handle_b), set()).add(cle)
     return paires, ignores
 
 
@@ -220,7 +231,9 @@ def _regle_auto(
     if not nom or nom != normalize_name(f"{b.given} {b.surname}"):
         return ""
     dates_identiques = (
-        date_complete(a.birth)
+        a.birth is not None
+        and b.birth is not None
+        and date_complete(a.birth)
         and date_complete(b.birth)
         and a.birth.sortval == b.birth.sortval
     )
@@ -245,6 +258,7 @@ def etager(
     for (handle_a, handle_b), blocs in sorted(paires_candidates.items()):
         a, b = par_handle[handle_a], par_handle[handle_b]
         regle = _regle_auto(a, b, familles)
+        tier: MergeTier
         if regle:
             tier = "auto"
         elif blocs == {cle for cle in blocs if cle.startswith("pho:")}:
