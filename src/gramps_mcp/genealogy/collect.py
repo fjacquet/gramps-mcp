@@ -68,11 +68,16 @@ async def collect_tree(
                 person = person_from_json(raw)
                 # Reason: person_from_json defaults every field via dict.get,
                 # so it never raises on a malformed record - it silently
-                # returns an empty-shell PersonFacts instead. A record with
-                # no gramps_id is not a real person entry; count it as
-                # unreadable rather than let a blank row into the results.
-                if not person.gramps_id:
-                    raise ValueError("record has no gramps_id")
+                # returns an empty-shell PersonFacts instead. A record
+                # missing either identifier is not a real person entry;
+                # count it as unreadable rather than let it through. This
+                # must mirror the family check below: the next task keys a
+                # dict on `.handle` (`by_handle = {p.handle: p for p in
+                # collected.people}`), and two people with handle="" would
+                # collapse into one entry there, naming the wrong person in
+                # a merge proposal.
+                if not person.gramps_id or not person.handle:
+                    raise ValueError("record has no gramps_id/handle")
                 out.people.append(person)
             except Exception:
                 out.skipped += 1

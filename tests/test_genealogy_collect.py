@@ -71,6 +71,41 @@ class TestCollectOffline:
         assert result.skipped == 1
         assert len(result.people) == 1
 
+    async def test_a_person_missing_handle_is_counted_not_carried_forward(self):
+        with patch(
+            "src.gramps_mcp.client.GrampsWebAPIClient.make_api_call",
+            new_callable=AsyncMock,
+        ) as call:
+            call.side_effect = [
+                [
+                    {
+                        "handle": "",
+                        "gramps_id": "I0003",
+                        "gender": 1,
+                        "primary_name": {
+                            "first_name": "Sans",
+                            "surname_list": [{"surname": "Handle"}],
+                        },
+                    },
+                    {
+                        "handle": "p4",
+                        "gramps_id": "I0004",
+                        "gender": 2,
+                        "primary_name": {
+                            "first_name": "Marie",
+                            "surname_list": [{"surname": "Villaudy"}],
+                        },
+                    },
+                ],
+                [],
+            ]
+            from src.gramps_mcp.client import GrampsWebAPIClient
+
+            result = await collect_tree(GrampsWebAPIClient(), "tree")
+
+        assert result.skipped == 1
+        assert len(result.people) == 1
+
     async def test_a_failure_mid_scan_reports_partial(self):
         with patch(
             "src.gramps_mcp.client.GrampsWebAPIClient.make_api_call",
