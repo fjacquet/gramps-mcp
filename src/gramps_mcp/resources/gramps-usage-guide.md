@@ -477,11 +477,10 @@ never writes anything, and never merges - it only reports.
 
 - `limit` (default: unset): stop after this many people, for a cheap probe on
   a large tree. Omit to scan everyone.
-- `threshold` (default 0.85, range 0.0-1.0): reserved for the underlying
-  similarity scan; the current implementation clusters on the same
-  structural rules `audit_quality` uses (matching normalized name plus an
-  exact shared birth date, shared parents, or a shared spouse and child) and
-  does not vary its behaviour with this value.
+
+There is no similarity-threshold parameter: clustering runs on structural
+rules only (matching normalized name plus an exact shared birth date, shared
+parents, or a shared spouse and child), never on a tunable similarity score.
 
 The output has two parts, never merged under one heading:
 

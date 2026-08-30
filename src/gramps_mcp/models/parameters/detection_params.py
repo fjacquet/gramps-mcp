@@ -36,9 +36,3 @@ class FindDuplicatesParams(BaseModel):
             "the whole tree."
         ),
     )
-    threshold: float = Field(
-        0.85,
-        ge=0.0,
-        le=1.0,
-        description="Minimum similarity for a pair to be reported",
-    )
