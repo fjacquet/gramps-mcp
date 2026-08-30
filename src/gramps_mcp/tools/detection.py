@@ -18,19 +18,24 @@
 
 import logging
 
+import httpx
 from mcp.types import TextContent
 
 from ..client import GrampsAPIError
 from ..config import get_settings
 from ..genealogy.collect import collect_tree
 from ..genealogy.duplicates import etager
+from ..genealogy.geo.places_parse import parse_pname
+from ..genealogy.geo.registry import confiance_of, decide_action, resolve_place
 from ..genealogy.merge_plan import plan_fusions
 from ..genealogy.rules import check_family, check_person
 from ..handlers.audit_handler import format_anomalies
 from ..handlers.duplicates_handler import format_duplicate_clusters
+from ..handlers.geocode_handler import format_place_resolution
 from ..models.parameters.detection_params import (
     AuditQualityParams,
     FindDuplicatesParams,
+    GeocodePlaceParams,
 )
 from .search_basic import with_client
 
@@ -142,3 +147,72 @@ async def audit_quality_tool(client, arguments: dict) -> list[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "quality audit")
+
+
+async def geocode_place_tool(client, arguments: dict) -> list[TextContent]:
+    """
+    Resolve a free-text place name against authoritative gazetteers.
+
+    Read-only: this tool never writes to the tree, including when the
+    resolution is solid (`decide_action` returns 'ecrire'). It always names
+    `create_place` as the caller's next step rather than acting itself.
+
+    Not wrapped in `with_client` - resolution never touches the Gramps API,
+    only external gazetteers (geo.api.gouv.fr, swisstopo, Nominatim), so no
+    authenticated client is needed. `client` is accepted only so this
+    function's calling convention matches the tree-reading tools registered
+    alongside it; `tool_registry.py` adapts the registry's single-argument
+    call to pass None here.
+
+    Args:
+        client: Unused. See the note above.
+        arguments (dict): Tool arguments, validated against
+            GeocodePlaceParams.
+
+    Returns:
+        list[TextContent]: The resolution - or the reason none was found -
+        rendered as markdown.
+    """
+    try:
+        params = GeocodePlaceParams(**arguments)
+        parsed = parse_pname(params.query)
+
+        # Reason: an unreachable gazetteer and "no match found" are
+        # different answers (see geocode_handler's module docstring). Only
+        # httpx.HTTPError - a transport/HTTP failure - is treated as the
+        # former; every other exception (bad input, a resolver bug) falls
+        # through to the generic handler below instead of being reported
+        # as a network problem it was not.
+        try:
+            resolved = resolve_place(parsed)
+        except httpx.HTTPError as e:
+            return [
+                TextContent(
+                    type="text",
+                    text=format_place_resolution(
+                        None,
+                        action="indecidable",
+                        confiance="basse",
+                        query=params.query,
+                        error=str(e),
+                    ),
+                )
+            ]
+
+        action = decide_action(resolved, params.min_score)
+        confiance = confiance_of(resolved, params.min_score)
+
+        return [
+            TextContent(
+                type="text",
+                text=format_place_resolution(
+                    resolved,
+                    action=action,
+                    confiance=confiance,
+                    query=params.query,
+                ),
+            )
+        ]
+
+    except Exception as e:
+        return _format_error_response(e, "place resolution")

@@ -25,6 +25,8 @@ block every time a tool is added.
 
 from typing import Any
 
+from mcp.types import TextContent
+
 from .models.parameters.analysis_params import (
     AncestorsParams,
     DescendantsParams,
@@ -40,7 +42,11 @@ from .models.parameters.destructive_params import (
     MergeTypeParams,
     UndoChangeParams,
 )
-from .models.parameters.detection_params import AuditQualityParams, FindDuplicatesParams
+from .models.parameters.detection_params import (
+    AuditQualityParams,
+    FindDuplicatesParams,
+    GeocodePlaceParams,
+)
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.family_params import FamilySaveParams
@@ -83,7 +89,11 @@ from .tools.destructive import (
     merge_type_tool,
     undo_change_tool,
 )
-from .tools.detection import audit_quality_tool, find_duplicates_tool
+from .tools.detection import (
+    audit_quality_tool,
+    find_duplicates_tool,
+    geocode_place_tool,
+)
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
     check_living_tool,
@@ -93,6 +103,29 @@ from .tools.relationship_tools import (
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
 from .tools.user_tools import ManageUsersParams, manage_users_tool
+
+
+async def _geocode_place_handler(arguments: dict) -> list[TextContent]:
+    """
+    Adapt geocode_place_tool to the registry's single-argument calling
+    convention.
+
+    Every other handler here is decorated with `with_client`, which turns a
+    `(client, arguments)` function into a single-argument one by injecting
+    a live GrampsWebAPIClient. `geocode_place_tool` deliberately is not
+    decorated that way - it never touches the Gramps API, only external
+    gazetteers - so its own signature stays `(client, arguments)` for
+    direct testability and this thin adapter supplies `None` for the
+    unused client instead.
+
+    Args:
+        arguments (dict): Tool arguments, as handed in by the MCP server.
+
+    Returns:
+        list[TextContent]: geocode_place_tool's own return value.
+    """
+    return await geocode_place_tool(None, arguments)
+
 
 # Tool registry - single source of truth for all tools
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
@@ -278,6 +311,17 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
         "schema": AuditQualityParams,
         "handler": audit_quality_tool,
+    },
+    "geocode_place": {
+        "description": (
+            "Resolve a free-text place name against authoritative gazetteers "
+            "(France, Switzerland, worldwide fallback). Read-only: it returns "
+            "the administrative chain, coordinates and a score, and flags an "
+            "ambiguous match instead of picking one. Pass the result to "
+            "create_place to record it"
+        ),
+        "schema": GeocodePlaceParams,
+        "handler": _geocode_place_handler,
     },
     "delete_type": {
         "description": (

@@ -526,6 +526,43 @@ error, before any finding. Records the collector could not parse are also
 reported by count. A clean tree renders an explicit "no anomalies found"
 line rather than an empty response.
 
+### `geocode_place` - resolve a free-text place name against gazetteers
+
+`geocode_place(query=...)`. Read-only: it never writes anything, including
+when the match is solid - it always names `create_place` as the next step
+rather than acting itself.
+
+- `query` (required): free-text place name, for example
+  `"Bourges, Cher, France"`.
+- `min_score` (default `0.90`): score at or above which the resolution is
+  considered solid. Below it, the result is rendered as a proposal to
+  review rather than treated as decided.
+
+Resolution is routed by country: France and Switzerland go through their
+authoritative gazetteer first (geo.api.gouv.fr, swisstopo); anything else -
+and anything the country resolver could not place - falls back to
+Nominatim/OpenStreetMap, which is fuzzy. The output reports the resolved
+name, its administrative chain (country down to municipality), coordinates,
+the INSEE or Swiss code when there is one, the score, and the confidence
+derived from it.
+
+An ambiguous match (two or more candidates scoring close together) is
+stated prominently rather than silently resolved to the top candidate -
+this repo's own history has a near miss: "Le Rocher" (Cher) once matched
+Saint-Antoine-du-Rocher (Indre-et-Loire) on the region alone, and "le
+rocher" is a genuine alias of that commune, so the label was no
+protection. Treat an ambiguous result as a question, not an answer.
+
+A gazetteer being unreachable is reported as a provider failure, distinct
+from "no match found" - the two are different claims and are never
+rendered the same way.
+
+**A verified QID (or INSEE/Swiss code) from this tool is still checked
+against the nearest identified ancestor before it is used** - this tool
+supplies candidates, it does not replace that check. Once you have
+confirmed a resolution, pass its details to `create_place` to record it;
+`geocode_place` itself never creates anything.
+
 ### `get_relationship` - how two people are related
 
 `get_relationship(person1=..., person2=...)`. Each accepts a handle or a

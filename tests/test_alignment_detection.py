@@ -30,6 +30,7 @@ file alone.
 from src.gramps_mcp.models.parameters.detection_params import (
     AuditQualityParams,
     FindDuplicatesParams,
+    GeocodePlaceParams,
 )
 
 
@@ -82,4 +83,31 @@ class TestParameterAlignment:
         extra_fields = actual_fields - implementation_fields
         assert not extra_fields, (
             f"AuditQualityParams has extra fields not in usage guide: {extra_fields}"
+        )
+
+    def test_geocode_place_parameters_alignment(self):
+        """Test GeocodePlaceParams parameters match the usage guide."""
+        model = GeocodePlaceParams
+        fields = model.model_fields
+
+        # `query` is the only required field - geocode_place(query=...).
+        required_fields = {"query"}
+        actual_required = {
+            name for name, field in fields.items() if field.is_required()
+        }
+        extra_required = actual_required - required_fields
+        assert not extra_required, (
+            f"GeocodePlaceParams has extra required fields: {extra_required}"
+        )
+        missing_required = required_fields - actual_required
+        assert not missing_required, (
+            f"GeocodePlaceParams is missing required fields: {missing_required}"
+        )
+
+        # Documented in gramps-usage-guide.md's `### geocode_place` section.
+        implementation_fields = required_fields | {"min_score"}
+        actual_fields = set(fields.keys())
+        extra_fields = actual_fields - implementation_fields
+        assert not extra_fields, (
+            f"GeocodePlaceParams has extra fields not in usage guide: {extra_fields}"
         )

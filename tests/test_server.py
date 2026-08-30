@@ -84,7 +84,7 @@ class TestMCPServerSetup:
                 # List tools
                 tools_result = await session.list_tools()
                 tools = tools_result.tools
-                assert len(tools) == 25  # matches TOOL_REGISTRY in server.py
+                assert len(tools) == 26  # matches TOOL_REGISTRY in server.py
 
                 # Verify all expected tools are registered
                 expected_tools = {
@@ -152,7 +152,7 @@ class TestHTTPRoutes:
             assert response.status_code == 200
             data = response.json()
             assert data["service"] == "Gramps MCP Server"
-            assert data["tools_count"] == 25  # matches TOOL_REGISTRY in server.py
+            assert data["tools_count"] == 26  # matches TOOL_REGISTRY in server.py
 
     @pytest.mark.asyncio
     async def test_health_endpoint(self):
@@ -184,7 +184,7 @@ class TestMCPProtocolCompliance:
                 # List tools
                 tools_result = await session.list_tools()
                 assert (
-                    len(tools_result.tools) == 25
+                    len(tools_result.tools) == 26
                 )  # matches TOOL_REGISTRY in server.py
 
     @pytest.mark.asyncio

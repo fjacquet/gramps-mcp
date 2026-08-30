@@ -63,3 +63,20 @@ class AuditQualityParams(BaseModel):
             "basse. Omit to report every severity."
         ),
     )
+
+
+class GeocodePlaceParams(BaseModel):
+    """Parameters for resolving a free-text place name."""
+
+    query: str = Field(
+        description="Free-text place name, for example 'Bourges, Cher, France'"
+    )
+    min_score: float = Field(
+        0.90,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Score at or above which the resolution is considered solid. "
+            "Below it, the result is rendered as a proposal to review."
+        ),
+    )
