@@ -336,15 +336,25 @@ sed -i '' 's|from crewai_custom_tools.tools.genealogy.models.domain import|from 
 
 Add the provenance header with `analysis/merge_plan.py` as the original path.
 
-- [ ] **Step 4: Run to verify they pass**
+- [ ] **Step 4: Delete the dropped-model cases from merge_models**
+
+`test_genealogy_merge_models.py` covers `MergePair` and `MergeCluster` in its
+first four cases, then covers `PlaceFacts` and `PlaceMergeProposition` in
+`test_place_facts_defauts_vides`, `test_place_facts_complet` and
+`test_place_merge_proposition_champs_de_rapport_optionnels` (source lines
+34-60). Those two models were deliberately dropped in Task 1, so those three
+cases are deleted. Keep all four `MergePair` / `MergeCluster` cases - they are
+the only coverage those two models have anywhere in this repo.
+
+- [ ] **Step 5: Run to verify they pass**
 
 ```bash
 uv run pytest tests/test_genealogy_merge_plan.py tests/test_genealogy_merge_models.py -v
 ```
 
-Expected: all PASS.
+Expected: all PASS, with the four merge-model cases present.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 rtk git add src/gramps_mcp/genealogy/merge_plan.py tests/test_genealogy_merge_plan.py tests/test_genealogy_merge_models.py
@@ -506,7 +516,11 @@ This is the only module written from scratch and the only one that talks to the 
 rtk grep -n "GET_PEOPLE\|GET_FAMILIES" src/gramps_mcp/models/api_calls.py
 ```
 
-Use whatever names come back in the implementation below. If the enum members are named differently, use the real names - do not invent them.
+Already verified: `ApiCalls.GET_PEOPLE = ("GET", "people/")` at line 28 and `ApiCalls.GET_FAMILIES = ("GET", "families/")` at line 38. Run the command anyway to confirm nothing moved, but the draft below uses the real names.
+
+**Do not add pagination.** `src/gramps_mcp/tools/analysis.py:249` records that the underlying API "only honours `pagesize` when `page` is also given" - a caller who sets `pagesize` alone gets every record back, silently. A bare GET therefore returns the whole collection, which is what this module wants. Sending `pagesize` without `page` would look like paging while doing nothing, and adding real paging would be work with no effect. The `limit` parameter is applied client-side by slicing, as the draft does.
+
+`make_api_call(api_call, params, tree_id, ...)` accepts a plain `dict` for `params` (`src/gramps_mcp/client.py:359-368`), so `params=dict(_LIST_PARAMS)` is correct - no pydantic model needed.
 
 - [ ] **Step 2: Write the failing test**
 
