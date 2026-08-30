@@ -61,6 +61,8 @@ nav:
       - Relationships, timelines and recent changes: user-guide/exploring.md
       - Managing accounts: user-guide/administration.md
       - Things that will surprise you: user-guide/gotchas.md
+  - Reference:
+      - Gramps Web API coverage: reference/gramps-web-api.md
   - User management: user-management.md
   - Product requirements: prd.md
   - Decisions:
