@@ -23,6 +23,7 @@ already produced by `genealogy.rules.check_person` and
 """
 
 from ..genealogy.domain import Anomaly
+from .scan_status import scan_status_lines
 
 # Reason: the rules engine (genealogy/rules.py) emits only these three
 # French severities. An anomaly carrying any other value (in practice, only
@@ -100,19 +101,7 @@ def format_anomalies(
     Returns:
         str: Markdown ready to hand back as tool output.
     """
-    sections: list[str] = []
-
-    # Reason: a partial scan must be stated before any finding - a caller
-    # who reads "no anomalies" over half a tree has been told a clean bill
-    # of health that was never established.
-    if partial:
-        sections.append(
-            f"**Partial scan**: {error or 'unknown error'}. Results below "
-            "cover only what was read before the scan stopped."
-        )
-
-    if skipped:
-        sections.append(f"{skipped} record(s) were unreadable and skipped.")
+    sections: list[str] = scan_status_lines(partial, error, skipped)
 
     scope_bits: list[str] = []
     if limit is not None:

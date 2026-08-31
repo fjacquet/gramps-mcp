@@ -10,11 +10,12 @@ from src.gramps_mcp.genealogy.domain import (
     EventFact,
     FamilyFacts,
     MergeCluster,
+    MergePair,
     PersonFacts,
 )
 from src.gramps_mcp.handlers.duplicates_handler import format_duplicate_clusters
 from src.gramps_mcp.models.parameters.detection_params import FindDuplicatesParams
-from src.gramps_mcp.tools.detection import find_duplicates_tool
+from src.gramps_mcp.tools.detection import _has_name_evidence, find_duplicates_tool
 
 
 def _naissance(jour: int, mois: int, annee: int) -> EventFact:
@@ -365,3 +366,37 @@ class TestSiblingsAreNotArbitrationCandidates:
         assert "Needs human arbitration" not in text
         assert "I0003" not in text
         assert "I0004" not in text
+
+
+def _pair(*blocs: str) -> MergePair:
+    return MergePair(
+        gramps_id_a="I0001",
+        gramps_id_b="I0002",
+        handle_a="h1",
+        handle_b="h2",
+        tier="arbitrage",
+        blocs=list(blocs),
+    )
+
+
+class TestHasNameEvidence:
+    """Unit tests for the arbitration filter, extracted so the policy has a
+    name and a directly testable seam."""
+
+    def test_a_normalized_name_match_is_evidence(self):
+        assert _has_name_evidence(_pair("nom:jeanjacquet")) is True
+
+    def test_a_phonetic_match_is_evidence(self):
+        assert _has_name_evidence(_pair("pho:JCQ")) is True
+
+    def test_a_shared_family_key_alone_is_not_evidence(self):
+        assert _has_name_evidence(_pair("fam:h1")) is False
+
+    def test_a_surname_plus_birth_year_window_alone_is_not_evidence(self):
+        # an: has no given-name test - two siblings sharing a surname and
+        # born within a few years of each other satisfy it without being
+        # duplicates. See TestSiblingsAreNotArbitrationCandidates above.
+        assert _has_name_evidence(_pair("an:sestre:1850")) is False
+
+    def test_no_blocking_keys_is_not_evidence(self):
+        assert _has_name_evidence(_pair()) is False

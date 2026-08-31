@@ -25,6 +25,7 @@ from mcp.types import TextContent
 from ..client import GrampsAPIError
 from ..config import get_settings
 from ..genealogy.collect import collect_tree
+from ..genealogy.domain import MergePair
 from ..genealogy.duplicates import etager
 from ..genealogy.geo.places_parse import parse_pname
 from ..genealogy.geo.registry import confiance_of, decide_action, resolve_place
@@ -51,6 +52,40 @@ def _format_error_response(error: Exception, operation: str) -> list[TextContent
         error_msg = f"Unexpected error during {operation}: {str(error)}"
     logger.error(f"Tool error in {operation}: {error_msg}")
     return [TextContent(type="text", text=f"Error: {error_msg}")]
+
+
+def _has_name_evidence(pair: MergePair) -> bool:
+    """
+    Decide whether an arbitrage-tier pair carries any name-derived evidence.
+
+    plan_fusions keeps only tier == "auto" pairs, so the pairs needing human
+    arbitration never reach its output. They are carried separately rather
+    than dropped - the spec forbids collapsing the proved/unproved split,
+    because a collapsed one reads as proof.
+
+    blocking_keys() (genealogy/duplicates.py) also emits fam:<handle> and
+    par:<handle> keys, so two people sharing only a family (a married
+    couple, or two siblings) land in "arbitrage" with no name evidence at
+    all - not a duplicate candidate by any reading. Only nom: (normalized
+    full name) and pho: (phonetic surname + given initial) are kept as name
+    evidence - both require the *given* names to agree (exactly, or at
+    least by initial), which two different siblings or spouses do not. an:
+    is deliberately excluded here even though it starts with a name
+    fragment: it is surname plus a birth-year window (+/-2 years each
+    side), with no given-name test at all, so two siblings sharing a
+    surname and born within a few years of each other - the ordinary case
+    in a real tree - satisfy it without being a duplicate. Keeping an: in
+    this filter floods arbitration with sibling noise; see
+    tests/test_detection_duplicates.py::TestSiblingsAreNotArbitrationCandidates.
+
+    Args:
+        pair (MergePair): A candidate pair, of any tier.
+
+    Returns:
+        bool: True when at least one of the pair's blocking keys is a
+        name-derived one (`nom:` or `pho:`).
+    """
+    return any(b.startswith(("nom:", "pho:")) for b in pair.blocs)
 
 
 @with_client
@@ -80,31 +115,8 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
         by_handle = {p.handle: p for p in collected.people}
         clusters = plan_fusions(pairs, by_handle)
 
-        # Reason: plan_fusions keeps only tier == "auto" pairs, so the pairs
-        # needing human arbitration never reach its output. They are carried
-        # separately rather than dropped - the spec forbids collapsing the
-        # proved/unproved split, because a collapsed one reads as proof.
-        #
-        # blocking_keys() (genealogy/duplicates.py) also emits fam:<handle>
-        # and par:<handle> keys, so two people sharing only a family (a
-        # married couple, or two siblings) land in "arbitrage" with no name
-        # evidence at all - not a duplicate candidate by any reading. Only
-        # nom: (normalized full name) and pho: (phonetic surname + given
-        # initial) are kept as name evidence - both require the *given*
-        # names to agree (exactly, or at least by initial), which two
-        # different siblings or spouses do not. an: is deliberately excluded
-        # here even though it starts with a name fragment: it is surname
-        # plus a birth-year window (+/-2 years each side), with no given-name
-        # test at all, so two siblings sharing a surname and born within a
-        # few years of each other - the ordinary case in a real tree -
-        # satisfy it without being a duplicate. Keeping an: in this filter
-        # floods arbitration with sibling noise; see
-        # tests/test_detection_duplicates.py::TestSiblingsAreNotArbitrationCandidates.
         arbitration = [
-            p
-            for p in pairs
-            if p.tier == "arbitrage"
-            and any(b.startswith(("nom:", "pho:")) for b in p.blocs)
+            p for p in pairs if p.tier == "arbitrage" and _has_name_evidence(p)
         ]
 
         return [
