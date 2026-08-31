@@ -16,6 +16,7 @@
 
 """Read-only detection tools: duplicates, quality audit, place resolution."""
 
+import asyncio
 import logging
 
 import httpx
@@ -199,8 +200,18 @@ async def geocode_place_tool(client, arguments: dict) -> list[TextContent]:
         # former; every other exception (bad input, a resolver bug) falls
         # through to the generic handler below instead of being reported
         # as a network problem it was not.
+        #
+        # Reason: resolve_place is synchronous - httpx.get with 15s (30s for
+        # sparql.py) timeouts, plus a blocking time.sleep in rate_limit.py
+        # (up to a 120s budget). Calling it directly from this async handler
+        # would block the whole event loop: on the HTTP transport, /health
+        # and every concurrent tool call would stall alongside it.
+        # asyncio.to_thread runs it on a worker thread instead.
+        # decide_action and confiance_of below are pure post-processing over
+        # the already-resolved ResolvedPlace - neither touches the network -
+        # so they do not need the same treatment.
         try:
-            resolved = resolve_place(parsed)
+            resolved = await asyncio.to_thread(resolve_place, parsed)
         except httpx.HTTPError as e:
             return [
                 TextContent(
