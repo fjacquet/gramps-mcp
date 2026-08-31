@@ -355,8 +355,20 @@ the real output length is not yet known.
 concern. The answer implemented is a per-severity cap
 (`handlers/audit_handler.py:MAX_PER_SEVERITY`, 50), not the summary-first
 render sketched above: each severity group renders its findings up to the
-cap, then states how many more were found and how to narrow the next call
-(`severity` plus a smaller `limit`). `find_duplicates` was not capped the
-same way - its arbitrage-tier fix (name-derived blocking keys only) removed
-the bulk of its output growth (every married couple and sibling pair) at the
-source instead.
+cap, then states how many more were found. `find_duplicates` was not capped
+the same way - its arbitrage-tier fix (name-derived blocking keys only)
+removed the bulk of its output growth (every married couple and sibling
+pair) at the source instead.
+
+**Correction (re-review, same wave):** the first version of this cap told
+the caller to narrow with `severity` and a smaller `limit` to "page through
+the rest". That is false: `limit` (`AuditQualityParams` / `collect.py`) is
+`raw_people[:limit]`, a prefix with no offset, so a smaller `limit` returns
+a subset of the same people, never a different slice; `severity` only drops
+*other* severity groups, it does not narrow within the one already capped.
+No parameter combination in `AuditQualityParams` reaches anomaly 51 of a
+capped group today. The rendered message now says exactly that instead of
+pointing at a route that does not exist - see
+`handlers/audit_handler.py:format_anomalies`. Adding an offset parameter to
+actually enable paging was considered and rejected as new scope for this
+wave.

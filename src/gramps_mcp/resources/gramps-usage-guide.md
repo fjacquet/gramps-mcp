@@ -538,8 +538,13 @@ when that date is unknown, so unknown data never produces a false positive.
 live tree (~1 736 people): a whole-tree scan found 1 403 anomalies, 1 392 of
 them `basse` (mostly `D1` "no vital date" and `R9` "no citation") - too many
 lines for one response. When a severity group is capped, the output states
-how many more were found and suggests narrowing with `severity` and a
-smaller `limit` to page through the rest; it never truncates silently.
+how many more were found; it never truncates silently. **There is
+currently no way to page through the hidden ones**: `limit` truncates the
+same people from the start of every scan (no offset - a smaller `limit` is
+a subset of a larger one, not a different slice), and `severity` only
+removes *other* severity groups, not entries within the one already
+capped. Do not read the capped count as the true total - re-check the
+"N more not shown" line for the real count.
 
 The rules cover more than the R-numbered consistency checks: `R1`-`R9` are
 inconsistency checks (a date that contradicts another date, an implausible
