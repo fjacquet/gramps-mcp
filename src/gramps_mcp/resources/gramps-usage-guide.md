@@ -585,8 +585,9 @@ authoritative gazetteer first (geo.api.gouv.fr, swisstopo); anything else -
 and anything the country resolver could not place - falls back to
 Nominatim/OpenStreetMap, which is fuzzy. The output reports the resolved
 name, its administrative chain (country down to municipality), coordinates,
-the INSEE or Swiss code when there is one, the score, and the confidence
-derived from it.
+the INSEE code when there is one (French resolutions only - a Swiss
+resolution never carries a code, swisstopo's `map_swiss` does not set one),
+the score, and the confidence derived from it.
 
 An ambiguous match (two or more candidates scoring close together) is
 stated prominently rather than silently resolved to the top candidate -
@@ -599,11 +600,15 @@ A gazetteer being unreachable is reported as a provider failure, distinct
 from "no match found" - the two are different claims and are never
 rendered the same way.
 
-**A verified QID (or INSEE/Swiss code) from this tool is still checked
-against the nearest identified ancestor before it is used** - this tool
-supplies candidates, it does not replace that check. Once you have
-confirmed a resolution, pass its details to `create_place` to record it;
-`geocode_place` itself never creates anything.
+**A resolution from this tool is still checked against the nearest
+identified ancestor before it is used** - this tool supplies a candidate
+place, not a verified identifier. It does not itself return or verify a
+Wikidata QID (Wikidata is only ever consulted internally, to date a
+commune's fusion in `france_ex_communes.py` - never exposed as a QID in
+the output); an INSEE code is the only identifier it can report, and only
+for a French resolution. Once you have confirmed a resolution, pass its
+details to `create_place` to record it; `geocode_place` itself never
+creates anything.
 
 ### `get_relationship` - how two people are related
 

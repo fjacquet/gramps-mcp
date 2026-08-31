@@ -190,18 +190,23 @@ Wraps `parse_pname()` then `resolve_place()` then `decide_action()`.
 Parameters: `query` (free text), `min_score` (default 0.90).
 
 Returns the resolved candidate with its administrative chain, coordinates,
-INSEE or Swiss code, the score, and the action the score implies - **but never
-performs it.** `genecrew`'s `lieu_import` writes when the score allows; here
-the tool proposes and the assistant chains to `create_place`. Same reason as
+an INSEE code when there is one (French resolutions only - `suisse.map_swiss`
+never sets `ResolvedPlace.code`, so a Swiss resolution never carries one),
+the score, and the action the score implies - **but never performs it.**
+`genecrew`'s `lieu_import` writes when the score allows; here the tool
+proposes and the assistant chains to `create_place`. Same reason as
 everywhere else in this design: the write path stays under review.
 
 Ambiguity is reported, not resolved. `is_ambiguous` exists precisely so a
 near-tie surfaces as a question instead of a silent pick. `CLAUDE.md` records
 what happens otherwise: "Le Rocher" (Cher) matched Saint-Antoine-du-Rocher
 (Indre-et-Loire) on the region alone, and "le rocher" is a genuine alias of
-that commune. The rule that a QID is verified against the nearest identified
-ancestor still applies - this tool supplies candidates, it does not replace
-that check.
+that commune. Correction (code review): this tool does not itself return or
+verify a Wikidata QID - Wikidata is only ever consulted internally, to date
+a commune's fusion in `france_ex_communes.py`, never exposed as a QID in the
+output. The rule that a resolution is still verified against the nearest
+identified ancestor still applies - this tool supplies candidates, not
+verified identifiers.
 
 ### Rendering
 
