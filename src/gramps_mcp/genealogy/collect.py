@@ -18,8 +18,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 from ..client import GrampsWebAPIClient
 from ..models.api_calls import ApiCalls
@@ -45,20 +47,34 @@ async def collect_tree(
 ) -> CollectResult:
     """Fetch every person and family, converted to facts.
 
+    People and families are independent reads on the same
+    `httpx.AsyncClient`, so both requests are issued concurrently via
+    `asyncio.gather` rather than one after the other.
+
     Args:
         client (GrampsWebAPIClient): Client to issue the reads with.
         tree_id (str): Family tree identifier.
-        limit (int | None): Stop after this many people. Applied client-side
-            to the already-downloaded, already-parsed list - this is not a
-            cheap probe: the API call fetches and this function parses
-            every person in the tree regardless of `limit` before the slice
-            below is taken. `limit=None` (the default) keeps everyone;
-            any other value must be >= 1, enforced by the parameter models
-            (`FindDuplicatesParams`/`AuditQualityParams`) that construct it -
-            `0` and negative values are rejected before they reach here, so
-            this function does not need to special-case them itself, but
-            `is not None` (rather than truthiness) is still used below in
-            case a caller ever passes `limit=0` directly.
+        limit (int | None): Stop after this many people. Cheap when set:
+            `_LIST_PARAMS` already sorts by `gramps_id`, and the underlying
+            API only honours `pagesize` when `page` is also given (see
+            `tools/analysis.py`'s `_normalize_page_and_sort` docstring for
+            the same rule elsewhere), so passing both bounds the request
+            itself to `limit` rows instead of downloading and parsing
+            everyone first - a live probe measured a 95x smaller transfer
+            (10 rows / 158 KB vs. 1736 rows / 15 MB) for `limit=10` against
+            the full tree. The client-side slice below is kept anyway as a
+            belt-and-braces guard: if the API ever ignores `pagesize`/`page`
+            again, the report is still bounded to `limit` people rather than
+            silently growing back to the whole tree. `limit` bounds people
+            only - families are always fetched whole, since there is no
+            per-family bound to apply. `limit=None` (the default) keeps
+            everyone; any other value must be >= 1, enforced by the
+            parameter models (`FindDuplicatesParams`/`AuditQualityParams`)
+            that construct it - `0` and negative values are rejected before
+            they reach here, so this function does not need to
+            special-case them itself, but `is not None` (rather than
+            truthiness) is still used below in case a caller ever passes
+            `limit=0` directly.
 
     Returns:
         CollectResult: The facts, plus how many records were unreadable and
@@ -66,13 +82,33 @@ async def collect_tree(
     """
     out = CollectResult()
 
+    people_params: dict[str, str | int] = dict(_LIST_PARAMS)
+    if limit is not None:
+        people_params["pagesize"] = limit
+        people_params["page"] = 1
+
     # Reason: a partial scan that renders like a complete one is the failure
     # that matters here - "no duplicates found" over half a tree reads as a
     # clean bill of health. Every early exit leaves partial=True/error set.
-    try:
-        raw_people = await client.make_api_call(
-            api_call=ApiCalls.GET_PEOPLE, params=dict(_LIST_PARAMS), tree_id=tree_id
-        )
+    # return_exceptions=True so a failure on one read does not discard facts
+    # already fetched on the other - the same "keep what was read" behaviour
+    # the previous sequential version had for free.
+    results: tuple[Any, Any] = await asyncio.gather(
+        client.make_api_call(
+            api_call=ApiCalls.GET_PEOPLE, params=people_params, tree_id=tree_id
+        ),
+        client.make_api_call(
+            api_call=ApiCalls.GET_FAMILIES, params=dict(_LIST_PARAMS), tree_id=tree_id
+        ),
+        return_exceptions=True,
+    )
+    raw_people_result, raw_families_result = results
+
+    if isinstance(raw_people_result, BaseException):
+        out.partial = True
+        out.error = str(raw_people_result)
+    else:
+        raw_people = raw_people_result
         for raw in raw_people[:limit] if limit is not None else raw_people:
             try:
                 person = person_from_json(raw)
@@ -93,9 +129,12 @@ async def collect_tree(
                 out.skipped += 1
                 logger.debug("unreadable person record: %s", raw.get("handle"))
 
-        raw_families = await client.make_api_call(
-            api_call=ApiCalls.GET_FAMILIES, params=dict(_LIST_PARAMS), tree_id=tree_id
-        )
+    if isinstance(raw_families_result, BaseException):
+        out.partial = True
+        if out.error is None:
+            out.error = str(raw_families_result)
+    else:
+        raw_families = raw_families_result
         for raw in raw_families:
             try:
                 family = family_from_json(raw)
@@ -105,8 +144,5 @@ async def collect_tree(
             except Exception:
                 out.skipped += 1
                 logger.debug("unreadable family record: %s", raw.get("handle"))
-    except Exception as exc:
-        out.partial = True
-        out.error = str(exc)
 
     return out

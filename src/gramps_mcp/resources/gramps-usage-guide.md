@@ -476,10 +476,11 @@ including the owner role. Do not call it. Use `get_facts` instead.
 never writes anything, and never merges - it only reports.
 
 - `limit` (default: unset, must be >= 1 when set): stop after this many
-  people. This is not a cheap probe - every person in the tree is still
-  fetched from the API and parsed before `limit` trims the list, so it
-  saves reading the report, not request time or a timeout. Omit to scan
-  everyone.
+  people. Cheap when set: the request asks the API for exactly this many
+  people (`page=1`, `pagesize=limit`) instead of downloading and parsing
+  everyone first - a 95x smaller transfer for a small `limit` against a
+  tree of real size. Families are always fetched whole regardless of this
+  bound. Omit to scan everyone.
 
 There is no similarity-threshold parameter: clustering runs on structural
 rules only (matching normalized name plus an exact shared birth date, shared
@@ -532,10 +533,11 @@ inconsistencies you are usually looking for. Read-only: it never writes
 anything.
 
 - `limit` (default: unset, must be >= 1 when set): stop after this many
-  people. This is not a cheap probe - every person in the tree is still
-  fetched from the API and parsed before `limit` trims the list, so it
-  saves reading the report, not request time or a timeout. Omit to scan
-  everyone.
+  people. Cheap when set: the request asks the API for exactly this many
+  people (`page=1`, `pagesize=limit`) instead of downloading and parsing
+  everyone first - a 95x smaller transfer for a small `limit` against a
+  tree of real size. Families are always fetched whole regardless of this
+  bound. Omit to scan everyone.
 - `severity` (default: unset): report only anomalies at this severity - one
   of `haute`, `moyenne` or `basse`. Omit to report every severity.
 

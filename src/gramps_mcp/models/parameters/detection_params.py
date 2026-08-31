@@ -28,34 +28,35 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-class FindDuplicatesParams(BaseModel):
+class _CollectLimitParams(BaseModel):
+    """Shared `limit` field for the two collect_tree-backed tools.
+
+    `find_duplicates` and `audit_quality` both bound their scan to the same
+    parameter, with the same wording - factored here so the two stay in
+    sync rather than drifting apart the way the two `limit` blocks already
+    had before this was extracted.
+    """
+
+    limit: int | None = Field(
+        None,
+        ge=1,
+        description=(
+            "Stop after this many people. Cheap when set: the request asks "
+            "the API for exactly this many people (page=1, pagesize=limit) "
+            "instead of downloading everyone and trimming client-side. "
+            "Families are always fetched whole regardless of this bound. "
+            "Omit to scan the whole tree."
+        ),
+    )
+
+
+class FindDuplicatesParams(_CollectLimitParams):
     """Parameters for finding candidate duplicate people."""
 
-    limit: int | None = Field(
-        None,
-        ge=1,
-        description=(
-            "Stop after this many people already downloaded and parsed - "
-            "trims the report, not the request; every person is still "
-            "fetched from the API before the slice is taken. Omit to scan "
-            "the whole tree."
-        ),
-    )
 
-
-class AuditQualityParams(BaseModel):
+class AuditQualityParams(_CollectLimitParams):
     """Parameters for the deterministic quality audit."""
 
-    limit: int | None = Field(
-        None,
-        ge=1,
-        description=(
-            "Stop after this many people already downloaded and parsed - "
-            "trims the report, not the request; every person is still "
-            "fetched from the API before the slice is taken. Omit to scan "
-            "the whole tree."
-        ),
-    )
     # Reason: Anomaly.severity (genealogy/domain.py) is a closed set of
     # three French values, produced only by rules.py's own literals - never
     # user input. A free-form `str` here would let a caller pass "high" or
