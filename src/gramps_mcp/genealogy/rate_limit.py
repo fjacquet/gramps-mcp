@@ -38,6 +38,15 @@ this branch and worth naming explicitly:
   (`crewai-custom-tools`), not this one, and appeared in no document here.
   Renamed to `GRAMPS_MCP_RATE_LIMIT_DISABLED` and
   `GRAMPS_MCP_RATE_LIMIT_MAX_WAIT`.
+
+A third divergence, made during the final review of this branch: the
+source's `float(os.getenv(..., str(_DEFAULT_MAX_WAIT)))` raised
+`ValueError` inside whichever worker thread called `acquire()` if the
+environment held a non-numeric value for `GRAMPS_MCP_RATE_LIMIT_MAX_WAIT` -
+a container misconfiguration would fail every gazetteer call with an
+unrelated-looking traceback. `_max_wait_from_env()` now catches
+`(TypeError, ValueError)` and falls back to `_DEFAULT_MAX_WAIT`, logging a
+warning once per bad value rather than raising.
 """
 
 import logging
@@ -117,6 +126,29 @@ class _TokenBucket:
             waited += wait
 
 
+def _max_wait_from_env() -> float:
+    """Read GRAMPS_MCP_RATE_LIMIT_MAX_WAIT, falling back to the default.
+
+    Reason: this runs inside whichever worker thread calls `acquire()` (see
+    `tools/detection.py`'s `asyncio.to_thread(resolve_place, ...)`) on every
+    gazetteer call. A container holding a non-numeric value for this
+    variable must not fail every place resolution with an unrelated-looking
+    `ValueError` - it should behave as if the variable were unset.
+    """
+    raw = os.getenv("GRAMPS_MCP_RATE_LIMIT_MAX_WAIT")
+    if raw is None:
+        return _DEFAULT_MAX_WAIT
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        logger.warning(
+            "GRAMPS_MCP_RATE_LIMIT_MAX_WAIT=%r is not a number, using default %.1fs",
+            raw,
+            _DEFAULT_MAX_WAIT,
+        )
+        return _DEFAULT_MAX_WAIT
+
+
 class RateLimiterRegistry:
     """Per-provider token buckets. Unknown providers pass through unthrottled."""
 
@@ -137,9 +169,7 @@ class RateLimiterRegistry:
         if bucket is None:
             return
         if max_wait is None:
-            max_wait = float(
-                os.getenv("GRAMPS_MCP_RATE_LIMIT_MAX_WAIT", str(_DEFAULT_MAX_WAIT))
-            )
+            max_wait = _max_wait_from_env()
         bucket.acquire(provider, max_wait)
 
 
