@@ -493,38 +493,65 @@ The output has two parts, never merged under one heading:
   applying the patch before merging is the only way it is not silently lost.
 - **Needs human arbitration**: pairs that share enough to be worth a look
   (for example, a phonetic name match plus some shared context) but that the
-  rules did not prove. These are never presented as duplicates - review each
-  one yourself before doing anything with it. Pairs matched on name
-  resemblance alone are dropped entirely, not reported here: a name
-  resemblance is never proof.
+  rules did not prove. Every pair here shares at least one name-derived
+  signal (exact name, phonetic name, or same surname with a close birth
+  year) - two people who share only a family (a married couple, or
+  siblings) never appear here, because sharing a family is not name
+  evidence and every married couple and sibling pair in the tree would
+  otherwise show up as a "candidate". These are never presented as
+  duplicates - review each one yourself before doing anything with it.
+  Pairs matched on name resemblance alone are dropped entirely, not reported
+  here: a name resemblance is never proof.
 
 If the tree scan could not finish, the output says so first, naming the
 error, before any finding - do not read a result with no "partial scan"
 warning as a completed scan otherwise. Records the collector could not parse
-are also reported by count.
+are also reported by count, alongside the count of blocking keys skipped for
+covering more than 60 people (a common surname, for example) - pairs
+findable only through one of those keys are missing from the result, so a
+narrowed scan is never presented as a full one.
 
 Feed a proved pair's handles to `merge_type` to actually merge; this tool
 never does it for you.
 
 ### `audit_quality` - deterministic consistency anomalies
 
-`audit_quality()` with no arguments scans the whole tree and reports every
-anomaly the deterministic rules find. Read-only: it never writes anything.
+**Start narrow**: `audit_quality(severity="haute")` first, widening to
+`moyenne` and only then `basse` if you want the full completeness picture.
+Called with no arguments at all it scans the whole tree and reports every
+anomaly the deterministic rules find, which on a tree of real size is mostly
+low-priority completeness noise (`D1`/`R9` below) rather than the
+inconsistencies you are usually looking for. Read-only: it never writes
+anything.
 
 - `limit` (default: unset): stop after this many people, for a cheap probe on
   a large tree. Omit to scan everyone.
 - `severity` (default: unset): report only anomalies at this severity - one
   of `haute`, `moyenne` or `basse`. Omit to report every severity.
 
-Anomalies are grouped by severity, highest (`haute`) first. Each one names
-the rule that fired (for example `R1`, `R3`), the `gramps_id` it is attached
-to, and a human-readable message. A rule needing a date is skipped when that
-date is unknown, so unknown data never produces a false positive.
+Anomalies are grouped by severity, highest (`haute`) first, each group
+naming the rule that fired (for example `R1`, `R3`), the `gramps_id` it is
+attached to, and a human-readable message. A rule needing a date is skipped
+when that date is unknown, so unknown data never produces a false positive.
+
+**Rendering is capped at 50 anomalies per severity.** Measured against the
+live tree (~1 736 people): a whole-tree scan found 1 403 anomalies, 1 392 of
+them `basse` (mostly `D1` "no vital date" and `R9` "no citation") - too many
+lines for one response. When a severity group is capped, the output states
+how many more were found and suggests narrowing with `severity` and a
+smaller `limit` to page through the rest; it never truncates silently.
+
+The rules cover more than the R-numbered consistency checks: `R1`-`R9` are
+inconsistency checks (a date that contradicts another date, an implausible
+age), while `D1`-`D3` are completeness checks at severity `basse` - no
+vital date at all (`D1`), a free-text unsortable date (`D2`), unset gender
+(`D3`). Both families are reported the same way.
 
 If the tree scan could not finish, the output says so first, naming the
 error, before any finding. Records the collector could not parse are also
-reported by count. A clean tree renders an explicit "no anomalies found"
-line rather than an empty response.
+reported by count. When `severity` or `limit` narrowed the scan, the output
+states that scope explicitly - a clean result within a narrowed scope is
+never rendered as "the tree is clean" when only part of it was examined.
 
 ### `geocode_place` - resolve a free-text place name against gazetteers
 

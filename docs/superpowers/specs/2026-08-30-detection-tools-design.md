@@ -21,7 +21,8 @@ Three read-only tools close it:
 
 - `find_duplicates` - candidate duplicate people, clustered, with the record
   that would survive a merge already chosen
-- `audit_quality` - deterministic consistency anomalies (rules R1-R9)
+- `audit_quality` - deterministic consistency anomalies (rules R1-R9, plus
+  completeness rules D1-D3)
 - `geocode_place` - a free-text place name resolved against authoritative
   gazetteers, scored, with ambiguity reported rather than hidden
 
@@ -148,8 +149,17 @@ blocking keys and a `MAX_BLOC = 60` guard (without it a surname like `Pagan`,
 151 people, alone yields 11 325 pairs). The copied function keeps its name so
 its tests port unchanged; the tool's docstring states which it calls.
 
-Parameters: `scope`, `limit`, `threshold` (default 0.85). No `confirm` - it
-never writes.
+Parameters: `limit`. No `confirm` - it never writes.
+
+**Correction (post-launch review):** `scope` and `threshold` (default 0.85),
+both named above, were never implemented and never will be under this
+design - the actually-shipped `FindDuplicatesParams` carries only `limit`.
+Clustering runs on structural rules alone (an exact shared birth date,
+shared parents, or a shared spouse and child), never on a tunable
+similarity score, so there is no threshold to expose. `scope` was dropped
+during implementation and the open question below about output length was
+resolved the same way, by narrowing what one call returns rather than by
+letting the caller pick a subtree.
 
 Returns, per cluster: the members, the chosen phoenix and why (completeness
 score), the pairs the rules proved, and separately the pairs needing human
@@ -158,12 +168,17 @@ the assistant treat a guess as a proof.
 
 ### `audit_quality`
 
-Wraps `check_person()` and `check_family()` - rules R1-R9. Each rule is skipped
-when the dates it needs are unknown (`sortval` 0), so unknown data never
-produces a false positive. That property is worth keeping visible in the
-rendered output.
+Wraps `check_person()` and `check_family()` - rules R1-R9 (inconsistency
+checks) plus D1-D3 (completeness checks, all severity `basse`, added during
+implementation - see rules.py). Each rule needing a date is skipped when
+that date is unknown (`sortval` 0), so unknown data never produces a false
+positive. That property is worth keeping visible in the rendered output.
 
-Parameters: `scope`, `limit`, optional `severity` filter.
+Parameters: `limit`, optional `severity` filter.
+
+**Correction (post-launch review):** `scope`, named above, was never
+implemented - the actually-shipped `AuditQualityParams` carries only
+`limit` and `severity`. See the same correction under `find_duplicates`.
 
 Returns anomalies grouped by severity, each naming the rule, the person or
 family, and the detail fields.
@@ -333,3 +348,15 @@ rendered output of a whole-tree scan may be too long to be usable in a chat
 context. If that proves true the answer is a summary-first render with
 per-cluster detail on request - noted here rather than designed now, because
 the real output length is not yet known.
+
+**Resolved (final fix wave, 2026-08-31):** measured against the live tree
+(~1 736 people): `audit_quality()` with no filter produced 1 403 anomalies -
+1 392 of them severity `basse` - rendering as 1 411 lines. That confirmed the
+concern. The answer implemented is a per-severity cap
+(`handlers/audit_handler.py:MAX_PER_SEVERITY`, 50), not the summary-first
+render sketched above: each severity group renders its findings up to the
+cap, then states how many more were found and how to narrow the next call
+(`severity` plus a smaller `limit`). `find_duplicates` was not capped the
+same way - its arbitrage-tier fix (name-derived blocking keys only) removed
+the bulk of its output growth (every married couple and sibling pair) at the
+source instead.

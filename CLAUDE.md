@@ -34,8 +34,9 @@
     `server.py` to stay under the 500-line limit
   - `traversal.py` - pure breadth-first graph traversal; rendering lives apart in
     `handlers/traversal_handler.py`
-  - `genealogy/` - pure detection logic (duplicate blocking, consistency rules
-    R1-R9, merge planning, place resolvers) **copied** from
+  - `genealogy/` - pure detection logic (duplicate blocking, consistency
+    rules R1-R9 plus completeness rules D1-D3, merge planning, place
+    resolvers) **copied** from
     fjacquet/crewai-custom-tools v0.31.1 (19d78f7). The duplication is
     deliberate, decided by the repo owner; divergence from that repo is
     expected and is not a defect to repair. Each file's docstring names its
