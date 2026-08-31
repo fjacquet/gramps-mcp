@@ -174,7 +174,7 @@ async def audit_quality_tool(client, arguments: dict) -> list[TextContent]:
         return _format_error_response(e, "quality audit")
 
 
-async def geocode_place_tool(client, arguments: dict) -> list[TextContent]:
+async def geocode_place_tool(arguments: dict) -> list[TextContent]:
     """
     Resolve a free-text place name against authoritative gazetteers.
 
@@ -184,13 +184,10 @@ async def geocode_place_tool(client, arguments: dict) -> list[TextContent]:
 
     Not wrapped in `with_client` - resolution never touches the Gramps API,
     only external gazetteers (geo.api.gouv.fr, swisstopo, Nominatim), so no
-    authenticated client is needed. `client` is accepted only so this
-    function's calling convention matches the tree-reading tools registered
-    alongside it; `tool_registry.py` adapts the registry's single-argument
-    call to pass None here.
+    authenticated client is needed. Registered directly in the registry,
+    the same way `create_person_tool` is for a tool that needs no client.
 
     Args:
-        client: Unused. See the note above.
         arguments (dict): Tool arguments, validated against
             GeocodePlaceParams.
 

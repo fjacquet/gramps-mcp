@@ -160,7 +160,7 @@ class TestGeocodePlaceTool:
         with patch(
             "src.gramps_mcp.tools.detection.resolve_place", return_value=resolved
         ):
-            result = await geocode_place_tool(None, {"query": "Bourges, Cher, France"})
+            result = await geocode_place_tool({"query": "Bourges, Cher, France"})
 
         text = result[0].text
 
@@ -182,7 +182,7 @@ class TestGeocodePlaceTool:
             "src.gramps_mcp.tools.detection.resolve_place",
             side_effect=httpx.ConnectTimeout("geo.api.gouv.fr timed out"),
         ):
-            result = await geocode_place_tool(None, {"query": "Bourges, Cher"})
+            result = await geocode_place_tool({"query": "Bourges, Cher"})
 
         text = result[0].text
 
@@ -194,19 +194,19 @@ class TestGeocodePlaceTool:
         """Establishes what the OTHER path (the shared `except Exception`
         fallback, used for e.g. a validation failure) looks like, so the
         assertions above are known to discriminate rather than coincide."""
-        result = await geocode_place_tool(None, {})  # missing required `query`
+        result = await geocode_place_tool({})  # missing required `query`
 
         assert result[0].text.startswith("Error:")
 
     async def test_no_match_renders_differently_from_a_provider_failure(self):
         with patch("src.gramps_mcp.tools.detection.resolve_place", return_value=None):
-            no_match_result = await geocode_place_tool(None, {"query": "Nowhere"})
+            no_match_result = await geocode_place_tool({"query": "Nowhere"})
 
         with patch(
             "src.gramps_mcp.tools.detection.resolve_place",
             side_effect=httpx.ConnectTimeout("timed out"),
         ):
-            failed_result = await geocode_place_tool(None, {"query": "Nowhere"})
+            failed_result = await geocode_place_tool({"query": "Nowhere"})
 
         assert no_match_result[0].text != failed_result[0].text
         assert "timed out" not in no_match_result[0].text
@@ -219,7 +219,7 @@ class TestGeocodePlaceTool:
         with patch(
             "src.gramps_mcp.tools.detection.resolve_place", return_value=resolved
         ):
-            result = await geocode_place_tool(None, {"query": "Le Rocher"})
+            result = await geocode_place_tool({"query": "Le Rocher"})
 
         text = result[0].text
 
@@ -230,14 +230,14 @@ class TestGeocodeLive:
     pytestmark = pytest.mark.integration
 
     async def test_it_resolves_a_french_commune(self):
-        result = await geocode_place_tool(None, {"query": "Bourges, Cher, France"})
+        result = await geocode_place_tool({"query": "Bourges, Cher, France"})
         text = result[0].text
 
         assert "Bourges" in text
         assert "18033" in text or "Cher" in text
 
     async def test_it_resolves_a_swiss_commune(self):
-        result = await geocode_place_tool(None, {"query": "Nidau, Berne, Suisse"})
+        result = await geocode_place_tool({"query": "Nidau, Berne, Suisse"})
         text = result[0].text
 
         assert "Nidau" in text

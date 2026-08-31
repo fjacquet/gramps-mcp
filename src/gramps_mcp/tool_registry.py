@@ -25,8 +25,6 @@ block every time a tool is added.
 
 from typing import Any
 
-from mcp.types import TextContent
-
 from .models.parameters.analysis_params import (
     AncestorsParams,
     DescendantsParams,
@@ -103,29 +101,6 @@ from .tools.relationship_tools import (
 from .tools.search_basic import find_type_tool
 from .tools.search_details import get_type_tool
 from .tools.user_tools import ManageUsersParams, manage_users_tool
-
-
-async def _geocode_place_handler(arguments: dict) -> list[TextContent]:
-    """
-    Adapt geocode_place_tool to the registry's single-argument calling
-    convention.
-
-    Every other handler here is decorated with `with_client`, which turns a
-    `(client, arguments)` function into a single-argument one by injecting
-    a live GrampsWebAPIClient. `geocode_place_tool` deliberately is not
-    decorated that way - it never touches the Gramps API, only external
-    gazetteers - so its own signature stays `(client, arguments)` for
-    direct testability and this thin adapter supplies `None` for the
-    unused client instead.
-
-    Args:
-        arguments (dict): Tool arguments, as handed in by the MCP server.
-
-    Returns:
-        list[TextContent]: geocode_place_tool's own return value.
-    """
-    return await geocode_place_tool(None, arguments)
-
 
 # Tool registry - single source of truth for all tools
 TOOL_REGISTRY: dict[str, dict[str, Any]] = {
@@ -321,7 +296,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "create_place to record it"
         ),
         "schema": GeocodePlaceParams,
-        "handler": _geocode_place_handler,
+        "handler": geocode_place_tool,
     },
     "delete_type": {
         "description": (
