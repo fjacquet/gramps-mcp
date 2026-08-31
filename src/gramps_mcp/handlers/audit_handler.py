@@ -23,7 +23,7 @@ already produced by `genealogy.rules.check_person` and
 """
 
 from ..genealogy.domain import Anomaly
-from .scan_status import scan_status_lines
+from .scan_status import people_limit_phrase, scan_status_lines
 
 # Reason: the rules engine (genealogy/rules.py) emits only these three
 # French severities. An anomaly carrying any other value (in practice, only
@@ -105,7 +105,7 @@ def format_anomalies(
 
     scope_bits: list[str] = []
     if limit is not None:
-        scope_bits.append(f"the first {limit} people scanned")
+        scope_bits.append(people_limit_phrase(limit))
     if severity is not None:
         scope_bits.append(f"severity={severity!r} only")
     scope_note = f"Scope: {', '.join(scope_bits)}." if scope_bits else None

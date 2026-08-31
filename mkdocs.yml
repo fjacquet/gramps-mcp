@@ -54,15 +54,25 @@ exclude_docs: |
 
 nav:
   - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Configuration: getting-started/configuration.md
+      - MCP clients: getting-started/mcp-clients.md
   - User guide:
       - Overview: user-guide/index.md
       - Searching and reading records: user-guide/searching.md
       - Recording a sourced fact: user-guide/recording.md
       - Relationships, timelines and recent changes: user-guide/exploring.md
+      - Finding duplicates and auditing quality: user-guide/quality.md
       - Managing accounts: user-guide/administration.md
       - Things that will surprise you: user-guide/gotchas.md
   - Reference:
+      - Tools: reference/tools.md
+      - Architecture: reference/architecture.md
       - Gramps Web API coverage: reference/gramps-web-api.md
+  - Operations:
+      - Security: operations/security.md
+      - Troubleshooting: operations/troubleshooting.md
   - User management: user-management.md
   - Product requirements: prd.md
   - Decisions:
@@ -74,3 +84,5 @@ nav:
       - 0005 manage_users role whitelist: adr/0005-manage-users-role-whitelist.md
       - 0006 500-line limit and hooks: adr/0006-500-line-limit-and-pre-commit-hooks.md
       - 0007 Expose destructive operations: adr/0007-expose-destructive-operations.md
+      - 0008 Duplicate the detection logic: adr/0008-duplicate-the-genealogy-detection-logic.md
+      - 0009 Third-party gazetteers: adr/0009-reach-third-party-gazetteers.md

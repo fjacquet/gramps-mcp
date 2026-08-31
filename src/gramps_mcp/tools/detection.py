@@ -130,6 +130,7 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
                     partial=collected.partial,
                     error=collected.error,
                     ignored=len(ignored),
+                    limit=params.limit,
                 ),
             )
         ]
