@@ -1,10 +1,10 @@
-# Product requirements: gramps-mcp v1.9.0
+# Product requirements: gramps-mcp v1.11.0
 
-This document describes what gramps-mcp is as of v1.9.0 - its scope, its
+This document describes what gramps-mcp is as of v1.11.0 - its scope, its
 boundaries, and the constraints it operates under. It is descriptive, not a
-roadmap: everything here is true of the code today. [README.md](https://github.com/fjacquet/gramps-mcp#readme)
-covers what the product offers and lists the tools; the architecture decisions
-behind the boundaries are recorded in [docs/adr/](adr/README.md).
+roadmap: everything here is true of the code today. [Tools](reference/tools.md)
+lists what the server exposes; the architecture decisions behind the
+boundaries are recorded in [Decisions](adr/README.md).
 
 ## Problem
 
@@ -51,9 +51,22 @@ What it does:
   and the link silently fails to form.
 - **Media upload from a local path**, attachable inline to a source, a
   citation or a sourced event, or as a standalone media record.
-- **Analysis over the tree.** Ancestor and descendant traversal, relationship
-  calculation, living-status estimation, timelines for a person, a family or a
-  group, and tree-wide statistics.
+- **Analysis over the tree.** Breadth-first ancestor and descendant traversal,
+  relationship calculation, living-status estimation, timelines for a person,
+  a family or a group, and tree-wide statistics.
+- **Detection, read-only.** `find_duplicates` clusters candidate duplicate
+  people on structural signals - an exact shared birth date, shared parents,
+  or a shared spouse and child - and names the record that would survive a
+  merge, splitting proved pairs from ones needing human arbitration.
+  `audit_quality` runs deterministic consistency rules (R1-R9) and
+  completeness rules (D1-D3) across the tree and reports anomalies by
+  severity; a rule needing a date is skipped when that date is unknown rather
+  than guessed. `geocode_place` resolves a free-text place name against
+  gazetteers for France and Switzerland, with Nominatim as a worldwide
+  fallback - Germany and the US have no dedicated resolver, matching the
+  French/Swiss tree this targets - and reports an ambiguous match instead of
+  picking one. None of the three writes; they hand handles and fields to
+  `merge_type` and `create_place`.
 - **Housekeeping.** Tag listing and creation, transaction history for auditing
   recent changes, and limited user-account creation.
 - **Destructive operations, deliberately guarded.** Delete one record
@@ -158,37 +171,18 @@ python-dotenv, uvicorn and fastapi.
 **Source files are capped at 500 lines**, enforced by a pre-commit hook
 alongside ruff, formatting, copyright-header and no-emoji hooks (ADR 0006).
 
-## Known limitations as of v1.9.0
+## Known limitations as of v1.11.0
 
 These are specific, current and unfixed.
 
-- `upload_media_file` in the client bypasses `_make_request`, so it has neither
-  the shared 401 refresh-and-retry nor the connection and timeout wrapping every
-  other call gets. A media upload that hits an expired token fails instead of
-  retrying, and a network failure surfaces as a raw httpx exception.
-- `tests/test_workflow_marriage.py`, in the person-creation helper around lines
-  444 and 454, passes `event_handle`, `event_role`, `note_handle`,
-  `media_handle` and `url` to `create_person_tool`. `PersonData` declares
-  `event_ref_list`, `note_list`, `media_list` and `urls`, so Pydantic drops all
-  five silently. The end-to-end marriage test creates two people linked to
-  nothing and still passes.
-- The same calls pass `primary_name` as `{"given_name": ..., "surname": ...}`.
-  `PersonData.primary_name` is typed `dict[str, Any]`, so nothing validates its
-  shape, while every other call site and every handler uses `first_name` plus
-  `surname_list`. The people that test creates are very likely nameless.
-- As a consequence of the shape mismatch above, `find_person_tool` cannot match
-  those people on a later run, so every suite run adds two more people, a
-  family, a note and a media object to the live tree. None of them carry the
-  `Pytest Lot5` prefix that makes test leftovers findable.
-- Three tests assert a MIME type appears in output that structurally cannot
-  contain one; only `format_media` emits a MIME type, and the source, citation,
-  person and family formatters emit `Attached media: {gramps_ids}` instead.
-  Tracked as issue #13.
-- `create_sourced_event` always creates a new source and cannot reuse an
-  existing one, so recording two facts from one document produces duplicate
-  sources. `merge_type` and `delete_type` can now clean these up after the
-  fact, one pair at a time, but the underlying duplication on creation is
-  unfixed. Tracked as issue #12.
+- `create_sourced_event` always creates a brand-new event; it has no way to
+  reuse one that already exists for the person or family. Recording a second
+  corroborating citation for the same event produces a duplicate event
+  alongside the original. `source_handle` closed the equivalent gap on the
+  source side (issue #12) - a duplicate `source_title` is now refused and the
+  error names the handle to reuse - but the event side has no such option. To
+  add a citation or correct a date on an event that already exists, call
+  `create_event` with that event's real handle instead.
 - `tree_stats` returns a permission error even for the owner-role account used
   in the reference deployment. `get_facts` is the working alternative for
   tree-level numbers.
@@ -200,8 +194,21 @@ These are specific, current and unfixed.
 - The list-merge type dispatch is heuristic: it samples the first item of each
   list to decide how to deduplicate. A list whose first element is
   unrepresentative of the rest takes the wrong branch.
-- The sourcing workflow shipped as the `gramps://usage-guide` resource still
-  names per-type tools (`find_person`, `find_source`, `find_repository`) that
-  the current tool registry does not expose; the equivalents are `find_type`
-  and `find_anything`. The workflow it describes is correct, the tool names in
-  it are not.
+- `audit_quality` caps its rendered output at 50 findings per severity group.
+  Measured against the live tree (~1 736 people), a whole-tree audit with no
+  filter produced 1 403 anomalies, 1 392 of them severity `basse`, which would
+  render as 1 411 lines. No combination of `limit` and `severity` reaches
+  finding 51 of an already-capped group: `limit` is a prefix of the people
+  fetched, not an offset, and `severity` only drops other severity groups.
+  There is currently no way to page past the cap.
+- `find_duplicates` and `audit_quality` scan the whole tree; neither exposes a
+  `scope` parameter, and `find_duplicates` has no tunable similarity
+  threshold - clustering runs on structural signals alone (an exact shared
+  birth date, shared parents, or a shared spouse and child).
+- `geocode_place` is the server's first outbound dependency beyond the
+  configured Gramps Web instance: it reaches `geo.api.gouv.fr`,
+  `api3.geo.admin.ch`, `query.wikidata.org` and `nominatim.openstreetmap.org`.
+  A container with no egress to those hosts makes the tool fail outright.
+  `find_duplicates` and `audit_quality` make no outbound calls beyond Gramps
+  Web and are unaffected. See [Security](operations/security.md) for the
+  egress and rate-limit details.

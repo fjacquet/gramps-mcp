@@ -22,6 +22,8 @@ Context section says so rather than inventing a deliberation.
 | [0005](0005-manage-users-role-whitelist.md) | Cap `manage_users` below owner and admin | Accepted | 2026-08-11 |
 | [0006](0006-500-line-limit-and-pre-commit-hooks.md) | Enforce a 500-line file limit and a pre-commit hook chain | Accepted | 2025-09-11 |
 | [0007](0007-expose-destructive-operations.md) | Expose destructive operations: delete, merge, detach, undo | Accepted | 2026-08-14 |
+| [0008](0008-duplicate-the-genealogy-detection-logic.md) | Duplicate the genealogy detection logic rather than share it | Accepted | 2026-08-30 |
+| [0009](0009-reach-third-party-gazetteers.md) | Reach third-party gazetteers for place resolution | Accepted | 2026-08-30 |
 
 ## When to write a new ADR
 
