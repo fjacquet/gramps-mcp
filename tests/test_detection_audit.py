@@ -59,6 +59,48 @@ class TestAuditRendering:
 
         assert text.index("R1") < text.index("R6") < text.index("R9")
 
+    def test_a_severity_group_is_capped_and_says_how_many_more(self):
+        """Pins MAX_PER_SEVERITY (audit_handler.py): more anomalies than the
+        cap in one severity must render only the cap's worth of bullets,
+        plus a count of the rest - and must never claim a route to see them
+        that does not exist (collect.py's `limit` has no offset, so
+        `severity` + a smaller `limit` cannot page through a capped group;
+        see the "Correction" note in the design doc).
+        """
+        from src.gramps_mcp.handlers.audit_handler import MAX_PER_SEVERITY
+
+        many = [
+            Anomaly(
+                rule="R9",
+                severity="basse",
+                gramps_id=f"I{i:04d}",
+                handle=f"h{i}",
+                message="Aucune source ni citation rattachee.",
+            )
+            for i in range(MAX_PER_SEVERITY + 7)
+        ]
+
+        text = format_anomalies(many, skipped=0, partial=False, error=None)
+
+        shown = sum(1 for i in range(len(many)) if f"I{i:04d}" in text)
+        assert shown == MAX_PER_SEVERITY
+        assert "7 more" in text
+        assert "no way to page through them" in text.lower()
+        # The old (wrong) advice must not survive: it told the caller to
+        # narrow with severity + a smaller limit to "page through the rest",
+        # which collect.py's limit (a prefix, no offset) cannot do.
+        assert "page through the rest" not in text.lower()
+
+    def test_scope_reports_the_filter_and_limit_actually_applied(self):
+        """A truncated scan must say so, not read as a whole-tree one."""
+        text = format_anomalies(
+            [], skipped=0, partial=False, error=None, severity="basse", limit=100
+        )
+
+        assert "100" in text
+        assert "basse" in text
+        assert "clean" not in text.lower()
+
 
 def _birth(year: int) -> EventFact:
     """A birth event with a sortable date, at day precision within the year."""

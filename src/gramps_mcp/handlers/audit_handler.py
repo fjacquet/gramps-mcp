@@ -144,12 +144,23 @@ def format_anomalies(
         remaining = len(group) - len(shown)
         section = f"## {group_severity} ({len(group)})\n\n{lines}"
         if remaining:
+            # Reason: `limit` (AuditQualityParams / collect.py) is a prefix
+            # of the people fetched - `raw_people[:limit]`, no offset - and
+            # `severity` only removes *other* severity groups, so neither
+            # narrows which anomalies land within an already-capped group.
+            # There is no combination of today's parameters that reaches
+            # anomaly 51 within one severity group. Advising the caller to
+            # "narrow and page through" here would be false and, for an LLM
+            # caller that follows it literally, would understate a tree with
+            # nearly 1 400 `basse` anomalies as one with 50.
             section += (
                 f"\n\n...{remaining} more {group_severity}-severity anomal"
                 f"{'y' if remaining == 1 else 'ies'} not shown (cap: "
-                f"{MAX_PER_SEVERITY} per severity). Narrow the scan with "
-                f'`severity="{group_severity}"` and a smaller `limit` to '
-                "page through the rest."
+                f"{MAX_PER_SEVERITY} per severity). There is currently no "
+                "way to page through them: `limit` truncates the same "
+                "people from the start of every scan (no offset), and "
+                "`severity` only removes other severity groups, not "
+                f"entries within `{group_severity}` itself."
             )
         sections.append(section)
 
