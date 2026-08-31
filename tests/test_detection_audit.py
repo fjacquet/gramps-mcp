@@ -2,10 +2,29 @@
 
 from unittest.mock import AsyncMock, patch
 
+import pytest
+from pydantic import ValidationError
+
 from src.gramps_mcp.genealogy.collect import CollectResult
 from src.gramps_mcp.genealogy.domain import Anomaly, EventFact, FamilyFacts, PersonFacts
 from src.gramps_mcp.handlers.audit_handler import format_anomalies
+from src.gramps_mcp.models.parameters.detection_params import AuditQualityParams
 from src.gramps_mcp.tools.detection import audit_quality_tool
+
+
+class TestLimitRejectsZeroAndNegative:
+    """See test_detection_duplicates.py::TestLimitRejectsZeroAndNegative -
+    same defect (`limit=0` read as falsy, so "stop after zero" behaved like
+    "no limit"), same fix (`ge=1`), mirrored here for AuditQualityParams.
+    """
+
+    @pytest.mark.parametrize("bad_limit", [0, -1, -5])
+    def test_non_positive_limit_is_rejected(self, bad_limit):
+        with pytest.raises(ValidationError):
+            AuditQualityParams(limit=bad_limit)
+
+    def test_positive_limit_is_accepted(self):
+        assert AuditQualityParams(limit=1).limit == 1
 
 
 class TestAuditRendering:

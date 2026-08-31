@@ -48,7 +48,17 @@ async def collect_tree(
     Args:
         client (GrampsWebAPIClient): Client to issue the reads with.
         tree_id (str): Family tree identifier.
-        limit (int | None): Stop after this many people, for a cheap probe.
+        limit (int | None): Stop after this many people. Applied client-side
+            to the already-downloaded, already-parsed list - this is not a
+            cheap probe: the API call fetches and this function parses
+            every person in the tree regardless of `limit` before the slice
+            below is taken. `limit=None` (the default) keeps everyone;
+            any other value must be >= 1, enforced by the parameter models
+            (`FindDuplicatesParams`/`AuditQualityParams`) that construct it -
+            `0` and negative values are rejected before they reach here, so
+            this function does not need to special-case them itself, but
+            `is not None` (rather than truthiness) is still used below in
+            case a caller ever passes `limit=0` directly.
 
     Returns:
         CollectResult: The facts, plus how many records were unreadable and
@@ -63,7 +73,7 @@ async def collect_tree(
         raw_people = await client.make_api_call(
             api_call=ApiCalls.GET_PEOPLE, params=dict(_LIST_PARAMS), tree_id=tree_id
         )
-        for raw in raw_people[:limit] if limit else raw_people:
+        for raw in raw_people[:limit] if limit is not None else raw_people:
             try:
                 person = person_from_json(raw)
                 # Reason: person_from_json defaults every field via dict.get,

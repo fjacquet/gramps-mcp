@@ -33,8 +33,11 @@ class FindDuplicatesParams(BaseModel):
 
     limit: int | None = Field(
         None,
+        ge=1,
         description=(
-            "Stop after this many people, for a cheap probe. Omit to scan "
+            "Stop after this many people already downloaded and parsed - "
+            "trims the report, not the request; every person is still "
+            "fetched from the API before the slice is taken. Omit to scan "
             "the whole tree."
         ),
     )
@@ -45,8 +48,11 @@ class AuditQualityParams(BaseModel):
 
     limit: int | None = Field(
         None,
+        ge=1,
         description=(
-            "Stop after this many people, for a cheap probe. Omit to scan "
+            "Stop after this many people already downloaded and parsed - "
+            "trims the report, not the request; every person is still "
+            "fetched from the API before the slice is taken. Omit to scan "
             "the whole tree."
         ),
     )

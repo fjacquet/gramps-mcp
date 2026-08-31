@@ -2,6 +2,9 @@
 
 from unittest.mock import AsyncMock, patch
 
+import pytest
+from pydantic import ValidationError
+
 from src.gramps_mcp.genealogy.collect import CollectResult
 from src.gramps_mcp.genealogy.domain import (
     EventFact,
@@ -10,6 +13,7 @@ from src.gramps_mcp.genealogy.domain import (
     PersonFacts,
 )
 from src.gramps_mcp.handlers.duplicates_handler import format_duplicate_clusters
+from src.gramps_mcp.models.parameters.detection_params import FindDuplicatesParams
 from src.gramps_mcp.tools.detection import find_duplicates_tool
 
 
@@ -231,6 +235,24 @@ class TestFindDuplicatesToolRouting:
         # must not appear anywhere in the output.
         assert "I0005" not in text
         assert "I0006" not in text
+
+
+class TestLimitRejectsZeroAndNegative:
+    """`raw_people[:limit] if limit else raw_people` (genealogy/collect.py)
+    tested truthiness, so limit=0 ("stop after zero people") was
+    indistinguishable from limit=None ("no limit") and scanned the whole
+    tree; a negative limit silently drops items from the end via Python
+    slicing. `ge=1` on the parameter model rejects both before they reach
+    collect_tree.
+    """
+
+    @pytest.mark.parametrize("bad_limit", [0, -1, -5])
+    def test_non_positive_limit_is_rejected(self, bad_limit):
+        with pytest.raises(ValidationError):
+            FindDuplicatesParams(limit=bad_limit)
+
+    def test_positive_limit_is_accepted(self):
+        assert FindDuplicatesParams(limit=1).limit == 1
 
 
 class TestRelativesAreNotArbitrationCandidates:

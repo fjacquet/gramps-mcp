@@ -106,6 +106,38 @@ class TestCollectOffline:
         assert result.skipped == 1
         assert len(result.people) == 1
 
+    async def test_limit_zero_stops_immediately_not_treated_as_unset(self):
+        """`raw_people[:limit] if limit else raw_people` tests truthiness,
+        so limit=0 ("stop after zero people") was indistinguishable from
+        limit=None ("no limit") and scanned the whole tree. The parameter
+        models now reject limit=0 with `ge=1`, but collect_tree is also
+        called directly in tests and could be called directly elsewhere, so
+        it must not silently treat 0 as "everyone" either.
+        """
+        with patch(
+            "src.gramps_mcp.client.GrampsWebAPIClient.make_api_call",
+            new_callable=AsyncMock,
+        ) as call:
+            call.side_effect = [
+                [
+                    {
+                        "handle": "p1",
+                        "gramps_id": "I0001",
+                        "gender": 1,
+                        "primary_name": {
+                            "first_name": "Jean",
+                            "surname_list": [{"surname": "Jacquet"}],
+                        },
+                    }
+                ],
+                [],
+            ]
+            from src.gramps_mcp.client import GrampsWebAPIClient
+
+            result = await collect_tree(GrampsWebAPIClient(), "tree", limit=0)
+
+        assert result.people == []
+
     async def test_a_failure_mid_scan_reports_partial(self):
         with patch(
             "src.gramps_mcp.client.GrampsWebAPIClient.make_api_call",
