@@ -470,6 +470,148 @@ including the owner role. Do not call it. Use `get_facts` instead.
   nothing - you get whole-tree statistics back. When both `gramps_id` and
   `handle` are given, `gramps_id` wins.
 
+### `find_duplicates` - candidate duplicate people, clustered
+
+`find_duplicates()` with no arguments scans the whole tree. Read-only: it
+never writes anything, and never merges - it only reports.
+
+- `limit` (default: unset, must be >= 1 when set): stop after this many
+  people. Cheap when set: the request asks the API for exactly this many
+  people (`page=1`, `pagesize=limit`) instead of downloading and parsing
+  everyone first - a 95x smaller transfer for a small `limit` against a
+  tree of real size. Families are always fetched whole regardless of this
+  bound. Omit to scan everyone.
+
+There is no similarity-threshold parameter: clustering runs on structural
+rules only (matching normalized name plus an exact shared birth date, shared
+parents, or a shared spouse and child), never on a tunable similarity score.
+
+The output has two parts, never merged under one heading:
+
+- **Proved duplicates**: clusters the rules could establish with structural
+  evidence (an exact date match, shared parents, or a shared spouse and
+  child). Each cluster names the record that would survive a merge (the most
+  complete one) and the records that would merge into it. When the surviving
+  record's gender is unknown, the cluster also states which gender to patch
+  onto it first - `merge_type` does not carry gender across a merge, so
+  applying the patch before merging is the only way it is not silently lost.
+- **Needs human arbitration**: pairs that share enough to be worth a look
+  (for example, a phonetic name match plus some shared context) but that the
+  rules did not prove. Every pair here shares at least one name-derived
+  signal - an exact normalized name, or a phonetic surname plus matching
+  given-name initial. Same surname with a close birth year alone
+  (no given-name agreement at all) is deliberately not enough to surface a
+  pair here: two siblings born a couple of years apart satisfy exactly
+  that, and siblings that close in age are the norm, not the exception, in
+  a real tree - two people who share only a family (a married couple, or
+  siblings) never appear here, because sharing a family is not name
+  evidence and every married couple and sibling pair in the tree would
+  otherwise show up as a "candidate". These are never presented as
+  duplicates - review each one yourself before doing anything with it.
+  Pairs matched on name resemblance alone are dropped entirely, not reported
+  here: a name resemblance is never proof.
+
+If the tree scan could not finish, the output says so first, naming the
+error, before any finding - do not read a result with no "partial scan"
+warning as a completed scan otherwise. Records the collector could not parse
+are also reported by count, alongside the count of blocking keys skipped for
+covering more than 60 people (a common surname, for example) - pairs
+findable only through one of those keys are missing from the result, so a
+narrowed scan is never presented as a full one.
+
+Feed a proved pair's handles to `merge_type` to actually merge; this tool
+never does it for you.
+
+### `audit_quality` - deterministic consistency anomalies
+
+**Start narrow**: `audit_quality(severity="haute")` first, widening to
+`moyenne` and only then `basse` if you want the full completeness picture.
+Called with no arguments at all it scans the whole tree and reports every
+anomaly the deterministic rules find, which on a tree of real size is mostly
+low-priority completeness noise (`D1`/`R9` below) rather than the
+inconsistencies you are usually looking for. Read-only: it never writes
+anything.
+
+- `limit` (default: unset, must be >= 1 when set): stop after this many
+  people. Cheap when set: the request asks the API for exactly this many
+  people (`page=1`, `pagesize=limit`) instead of downloading and parsing
+  everyone first - a 95x smaller transfer for a small `limit` against a
+  tree of real size. Families are always fetched whole regardless of this
+  bound. Omit to scan everyone.
+- `severity` (default: unset): report only anomalies at this severity - one
+  of `haute`, `moyenne` or `basse`. Omit to report every severity.
+
+Anomalies are grouped by severity, highest (`haute`) first, each group
+naming the rule that fired (for example `R1`, `R3`), the `gramps_id` it is
+attached to, and a human-readable message. A rule needing a date is skipped
+when that date is unknown, so unknown data never produces a false positive.
+
+**Rendering is capped at 50 anomalies per severity.** Measured against the
+live tree (~1 736 people): a whole-tree scan found 1 403 anomalies, 1 392 of
+them `basse` (mostly `D1` "no vital date" and `R9` "no citation") - too many
+lines for one response. When a severity group is capped, the output states
+how many more were found; it never truncates silently. **There is
+currently no way to page through the hidden ones**: `limit` truncates the
+same people from the start of every scan (no offset - a smaller `limit` is
+a subset of a larger one, not a different slice), and `severity` only
+removes *other* severity groups, not entries within the one already
+capped. Do not read the capped count as the true total - re-check the
+"N more not shown" line for the real count.
+
+The rules cover more than the R-numbered consistency checks: `R1`-`R9` are
+inconsistency checks (a date that contradicts another date, an implausible
+age), while `D1`-`D3` are completeness checks at severity `basse` - no
+vital date at all (`D1`), a free-text unsortable date (`D2`), unset gender
+(`D3`). Both families are reported the same way.
+
+If the tree scan could not finish, the output says so first, naming the
+error, before any finding. Records the collector could not parse are also
+reported by count. When `severity` or `limit` narrowed the scan, the output
+states that scope explicitly - a clean result within a narrowed scope is
+never rendered as "the tree is clean" when only part of it was examined.
+
+### `geocode_place` - resolve a free-text place name against gazetteers
+
+`geocode_place(query=...)`. Read-only: it never writes anything, including
+when the match is solid - it always names `create_place` as the next step
+rather than acting itself.
+
+- `query` (required): free-text place name, for example
+  `"Bourges, Cher, France"`.
+- `min_score` (default `0.90`): score at or above which the resolution is
+  considered solid. Below it, the result is rendered as a proposal to
+  review rather than treated as decided.
+
+Resolution is routed by country: France and Switzerland go through their
+authoritative gazetteer first (geo.api.gouv.fr, swisstopo); anything else -
+and anything the country resolver could not place - falls back to
+Nominatim/OpenStreetMap, which is fuzzy. The output reports the resolved
+name, its administrative chain (country down to municipality), coordinates,
+the INSEE code when there is one (French resolutions only - a Swiss
+resolution never carries a code, swisstopo's `map_swiss` does not set one),
+the score, and the confidence derived from it.
+
+An ambiguous match (two or more candidates scoring close together) is
+stated prominently rather than silently resolved to the top candidate -
+this repo's own history has a near miss: "Le Rocher" (Cher) once matched
+Saint-Antoine-du-Rocher (Indre-et-Loire) on the region alone, and "le
+rocher" is a genuine alias of that commune, so the label was no
+protection. Treat an ambiguous result as a question, not an answer.
+
+A gazetteer being unreachable is reported as a provider failure, distinct
+from "no match found" - the two are different claims and are never
+rendered the same way.
+
+**A resolution from this tool is still checked against the nearest
+identified ancestor before it is used** - this tool supplies a candidate
+place, not a verified identifier. It does not itself return or verify a
+Wikidata QID (Wikidata is only ever consulted internally, to date a
+commune's fusion in `france_ex_communes.py` - never exposed as a QID in
+the output); an INSEE code is the only identifier it can report, and only
+for a French resolution. Once you have confirmed a resolution, pass its
+details to `create_place` to record it; `geocode_place` itself never
+creates anything.
+
 ### `get_relationship` - how two people are related
 
 `get_relationship(person1=..., person2=...)`. Each accepts a handle or a

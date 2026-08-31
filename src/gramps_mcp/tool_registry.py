@@ -40,6 +40,11 @@ from .models.parameters.destructive_params import (
     MergeTypeParams,
     UndoChangeParams,
 )
+from .models.parameters.detection_params import (
+    AuditQualityParams,
+    FindDuplicatesParams,
+    GeocodePlaceParams,
+)
 from .models.parameters.event_params import EventSaveParams
 from .models.parameters.facts_params import FactsParams
 from .models.parameters.family_params import FamilySaveParams
@@ -81,6 +86,11 @@ from .tools.destructive import (
     detach_reference_tool,
     merge_type_tool,
     undo_change_tool,
+)
+from .tools.detection import (
+    audit_quality_tool,
+    find_duplicates_tool,
+    geocode_place_tool,
 )
 from .tools.records_tools import get_facts_tool, manage_tags_tool
 from .tools.relationship_tools import (
@@ -256,6 +266,37 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "Get interesting facts and statistics about the tree",
         "schema": FactsParams,
         "handler": get_facts_tool,
+    },
+    "find_duplicates": {
+        "description": (
+            "Find candidate duplicate people, grouped into clusters with the "
+            "record that would survive a merge already chosen. Read-only: it "
+            "reports pairs the rules proved and, separately, pairs needing "
+            "human arbitration. Feed a proved pair to merge_type"
+        ),
+        "schema": FindDuplicatesParams,
+        "handler": find_duplicates_tool,
+    },
+    "audit_quality": {
+        "description": (
+            "Run the deterministic consistency rules over the tree and report "
+            "anomalies by severity. Read-only. Rules needing a date are "
+            "skipped when that date is unknown, so unknown data never "
+            "produces a false positive"
+        ),
+        "schema": AuditQualityParams,
+        "handler": audit_quality_tool,
+    },
+    "geocode_place": {
+        "description": (
+            "Resolve a free-text place name against authoritative gazetteers "
+            "(France, Switzerland, worldwide fallback). Read-only: it returns "
+            "the administrative chain, coordinates and a score, and flags an "
+            "ambiguous match instead of picking one. Pass the result to "
+            "create_place to record it"
+        ),
+        "schema": GeocodePlaceParams,
+        "handler": geocode_place_tool,
     },
     "delete_type": {
         "description": (
