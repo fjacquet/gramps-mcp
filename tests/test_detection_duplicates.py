@@ -3,7 +3,12 @@
 from unittest.mock import AsyncMock, patch
 
 from src.gramps_mcp.genealogy.collect import CollectResult
-from src.gramps_mcp.genealogy.domain import EventFact, MergeCluster, PersonFacts
+from src.gramps_mcp.genealogy.domain import (
+    EventFact,
+    FamilyFacts,
+    MergeCluster,
+    PersonFacts,
+)
 from src.gramps_mcp.handlers.duplicates_handler import format_duplicate_clusters
 from src.gramps_mcp.tools.detection import find_duplicates_tool
 
@@ -213,3 +218,58 @@ class TestFindDuplicatesToolRouting:
         # must not appear anywhere in the output.
         assert "I0005" not in text
         assert "I0006" not in text
+
+
+class TestRelativesAreNotArbitrationCandidates:
+    """A married couple and their children only ever share a family, never a
+    name-derived blocking key (`nom:`, `pho:`, `an:` - see
+    `genealogy.duplicates.blocking_keys`). Sharing a family alone
+    (`fam:`/`par:`) is not evidence of a duplicate - every spouse and every
+    sibling in the tree would otherwise be reported as a "candidate".
+
+    Verified by execution before the fix: with the arbitrage filter absent,
+    this family of five (one couple, three children) produced exactly four
+    arbitration pairs - the couple, plus all three sibling pairs - none of
+    them a duplicate.
+    """
+
+    async def test_no_spouse_or_sibling_pair_is_reported(self):
+        father = _person("I0001", "Jean", "Sestre")
+        mother = _person("I0002", "Marie", "Villaudy")
+        child_a = _person("I0003", "Paul", "Sestre")
+        child_b = _person("I0004", "Louise", "Sestre")
+        child_c = _person("I0005", "Marc", "Sestre")
+
+        father.family_handles = ["hF1"]
+        mother.family_handles = ["hF1"]
+        for child in (child_a, child_b, child_c):
+            child.parent_family_handles = ["hF1"]
+
+        family = FamilyFacts(
+            gramps_id="F0001",
+            handle="hF1",
+            father_handle="hI0001",
+            mother_handle="hI0002",
+            child_handles=["hI0003", "hI0004", "hI0005"],
+        )
+
+        collected = CollectResult(
+            people=[father, mother, child_a, child_b, child_c],
+            families={"hF1": family},
+            skipped=0,
+            partial=False,
+            error=None,
+        )
+
+        with patch(
+            "src.gramps_mcp.tools.detection.collect_tree",
+            new_callable=AsyncMock,
+            return_value=collected,
+        ):
+            result = await find_duplicates_tool({})
+
+        text = result[0].text
+
+        assert "Needs human arbitration" not in text
+        for gramps_id in ("I0001", "I0002", "I0003", "I0004", "I0005"):
+            assert gramps_id not in text

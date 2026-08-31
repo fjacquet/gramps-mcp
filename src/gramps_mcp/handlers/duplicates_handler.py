@@ -23,6 +23,7 @@ MergePair objects, already produced by `genealogy.duplicates.etager` and
 """
 
 from ..genealogy.domain import MergeCluster, MergePair, PersonFacts
+from ..genealogy.duplicates import MAX_BLOC
 
 
 def _name(person: PersonFacts | None, gramps_id: str) -> str:
@@ -96,16 +97,17 @@ def format_duplicate_clusters(
     skipped: int,
     partial: bool,
     error: str | None,
+    ignored: int = 0,
 ) -> str:
     """
     Render the full find_duplicates result as markdown.
 
     Order: a partial-scan warning first when the scan did not complete, then
-    the count of skipped records when non-zero, then the proved clusters
-    (each naming its phoenix and titanics), and finally the pairs still
-    needing human arbitration under their own heading. The two groups are
-    never merged under one heading - a pair the rules could not prove must
-    never read like a pair the rules proved.
+    the count of skipped records and ignored blocking keys when non-zero,
+    then the proved clusters (each naming its phoenix and titanics), and
+    finally the pairs still needing human arbitration under their own
+    heading. The two groups are never merged under one heading - a pair the
+    rules could not prove must never read like a pair the rules proved.
 
     Args:
         clusters (list[MergeCluster]): Proved clusters (`tier == "auto"`
@@ -116,6 +118,12 @@ def format_duplicate_clusters(
         skipped (int): Records the collector could not parse.
         partial (bool): Whether the tree scan stopped early.
         error (str | None): The error that stopped the scan, when `partial`.
+        ignored (int): Blocking keys dropped by `etager` for covering more
+            than `MAX_BLOC` people (`duplicates.candidate_pairs`'s second
+            return value). Every pair that would only have been found
+            through one of those keys is silently absent from both sections
+            below - render the count so a narrowed scan does not read as a
+            full one.
 
     Returns:
         str: Markdown ready to hand back as tool output.
@@ -133,6 +141,13 @@ def format_duplicate_clusters(
 
     if skipped:
         sections.append(f"{skipped} record(s) were unreadable and skipped.")
+
+    if ignored:
+        sections.append(
+            f"{ignored} blocking key(s) covered more than {MAX_BLOC} people "
+            "and were skipped - pairs findable only through one of those "
+            "keys are missing from both sections below."
+        )
 
     if clusters:
         cluster_lines = "\n".join(

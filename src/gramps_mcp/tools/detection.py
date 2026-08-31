@@ -75,7 +75,7 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
         tree_id = get_settings().gramps_tree_id
 
         collected = await collect_tree(client, tree_id, limit=params.limit)
-        pairs, _ignored = etager(collected.people, collected.families)
+        pairs, ignored = etager(collected.people, collected.families)
         by_handle = {p.handle: p for p in collected.people}
         clusters = plan_fusions(pairs, by_handle)
 
@@ -83,7 +83,20 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
         # needing human arbitration never reach its output. They are carried
         # separately rather than dropped - the spec forbids collapsing the
         # proved/unproved split, because a collapsed one reads as proof.
-        arbitration = [p for p in pairs if p.tier == "arbitrage"]
+        #
+        # blocking_keys() (genealogy/duplicates.py) also emits fam:<handle>
+        # and par:<handle> keys, so two people sharing only a family (a
+        # married couple, or two siblings) land in "arbitrage" with no name
+        # evidence at all - not a duplicate candidate by any reading. A real
+        # duplicate always shares a name-derived key (nom:, pho: or an:), so
+        # filtering on that drops every relative pair without losing any
+        # genuine candidate.
+        arbitration = [
+            p
+            for p in pairs
+            if p.tier == "arbitrage"
+            and any(b.startswith(("nom:", "pho:", "an:")) for b in p.blocs)
+        ]
 
         return [
             TextContent(
@@ -95,6 +108,7 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
                     skipped=collected.skipped,
                     partial=collected.partial,
                     error=collected.error,
+                    ignored=len(ignored),
                 ),
             )
         ]
