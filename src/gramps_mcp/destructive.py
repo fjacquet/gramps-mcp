@@ -120,6 +120,66 @@ TYPE_ENDPOINTS: dict[str, TypeEndpoints] = {
 MAX_LISTED_BACKLINKS = 20
 
 
+class ParentConflict(NamedTuple):
+    """Two families disagree on one parent, and no survivor was named."""
+
+    role: str
+    """Either "father" or "mother"."""
+    phoenix_handle: str
+    """The parent on the surviving family."""
+    titanic_handle: str
+    """The parent on the family being absorbed."""
+
+
+def parent_merge_conflicts(
+    phoenix: dict,
+    titanic: dict,
+    phoenix_father_handle: str | None,
+    phoenix_mother_handle: str | None,
+) -> list[ParentConflict]:
+    """
+    Find parent disagreements that a family merge would resolve destructively.
+
+    Merging two families whose fathers differ does not detach one man from
+    the family: it merges the two people into one, and the absorbed man
+    ceases to exist. Measured on a live tree on 2026-08-31 - the titanic's
+    father returned 404 afterwards and the survivor had gained the other's
+    name as an alternate. Neither this server's parameter descriptions nor
+    the Gramps Web API's own schema said so; all of them describe
+    `phoenix_father_handle` as naming "the person to keep", which reads as a
+    choice between two people who both survive.
+
+    Only both-present-and-different counts. With one side empty there is no
+    second person to absorb. That narrower case was not measured, and the
+    guard stays out of it rather than refusing on a suspicion.
+
+    Args:
+        phoenix (dict): The surviving family record.
+        titanic (dict): The family being absorbed.
+        phoenix_father_handle (str | None): The caller's named surviving
+            father, if any. Naming one acknowledges the consequence.
+        phoenix_mother_handle (str | None): The same for the mother.
+
+    Returns:
+        list[ParentConflict]: One entry per unacknowledged disagreement,
+        fathers before mothers. Empty when the merge destroys no one.
+    """
+    acknowledged = {
+        "father": phoenix_father_handle,
+        "mother": phoenix_mother_handle,
+    }
+    conflicts: list[ParentConflict] = []
+    for role in ("father", "mother"):
+        ours = phoenix.get(f"{role}_handle")
+        theirs = titanic.get(f"{role}_handle")
+        if not ours or not theirs or ours == theirs:
+            continue
+        if acknowledged[role] is not None:
+            continue
+        conflicts.append(ParentConflict(role, ours, theirs))
+    return conflicts
+
+
 def should_refuse_delete(backlinks: dict[str, list[str]]) -> str | None:
     """
     Decide whether a deletion must be refused because references remain.

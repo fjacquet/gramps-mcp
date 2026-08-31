@@ -129,10 +129,22 @@ class MergeTypeParams(StrictModel):
         ),
     )
     phoenix_father_handle: str | None = Field(
-        None, description="Family merges only: which father the result keeps"
+        None,
+        description=(
+            "Family merges only: which of the two fathers absorbs the other. "
+            "This is not a choice between two survivors - the other man is "
+            "merged into this one and ceases to exist. Required when the two "
+            "families have different fathers; the merge is refused without it"
+        ),
     )
     phoenix_mother_handle: str | None = Field(
-        None, description="Family merges only: which mother the result keeps"
+        None,
+        description=(
+            "Family merges only: which of the two mothers absorbs the other. "
+            "This is not a choice between two survivors - the other woman is "
+            "merged into this one and ceases to exist. Required when the two "
+            "families have different mothers; the merge is refused without it"
+        ),
     )
 
     @field_validator("phoenix_handle", "titanic_handle")
@@ -153,15 +165,19 @@ class FamilyMergeBody(StrictModel):
     phoenix_father_handle: str | None = Field(
         None,
         description=(
-            "Handle of the person to keep as father of the merged family. "
-            "If omitted, the phoenix family's existing father is kept."
+            "Handle of the person who survives as father of the merged "
+            "family, absorbing the other. If omitted, the phoenix family's "
+            "existing father is kept and the titanic's father is merged "
+            "into him."
         ),
     )
     phoenix_mother_handle: str | None = Field(
         None,
         description=(
-            "Handle of the person to keep as mother of the merged family. "
-            "If omitted, the phoenix family's existing mother is kept."
+            "Handle of the person who survives as mother of the merged "
+            "family, absorbing the other. If omitted, the phoenix family's "
+            "existing mother is kept and the titanic's mother is merged "
+            "into her."
         ),
     )
 

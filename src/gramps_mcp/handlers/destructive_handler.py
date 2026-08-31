@@ -16,6 +16,8 @@
 
 """Formatting for destructive-operation results and previews."""
 
+from ..destructive import ParentConflict
+
 
 def _person_name(obj: dict) -> str | None:
     """
@@ -67,6 +69,48 @@ def _label(obj: dict) -> str:
         if isinstance(value, str) and value.strip():
             return value.strip()[:80]
     return "(no label)"
+
+
+def format_parent_merge_refusal(
+    conflicts: list[ParentConflict], labels: dict[str, str]
+) -> str:
+    """
+    Explain why a family merge was refused, naming who would be destroyed.
+
+    The wording avoids "keep" and "choose" on purpose. Both this server's
+    parameter descriptions and the Gramps Web API's own schema use them, and
+    both readings are wrong: the parameter does not pick one of two
+    survivors, it picks which of two people absorbs the other.
+
+    Args:
+        conflicts (list[ParentConflict]): Unacknowledged parent
+            disagreements, from `destructive.parent_merge_conflicts`.
+        labels (dict[str, str]): Person handle to a readable label, for
+            every handle named in `conflicts`.
+
+    Returns:
+        str: The refusal, naming both people per conflict and the parameter
+        that acknowledges it.
+    """
+
+    def label(handle: str) -> str:
+        return labels.get(handle, f"({handle})")
+
+    lines = ["Refused: this merge would destroy a person you did not name."]
+    for conflict in conflicts:
+        lines.append(
+            f"  The two families have different {conflict.role}s: "
+            f"{label(conflict.phoenix_handle)} on the surviving family, "
+            f"{label(conflict.titanic_handle)} on the one being absorbed. "
+            f"Merging does not choose between them - it merges the two "
+            f"people into one, and the other ceases to exist."
+        )
+        lines.append(
+            f"  Pass phoenix_{conflict.role}_handle to name which of them "
+            f"absorbs the other, or merge the two people yourself first "
+            f"with merge_type(type='person')."
+        )
+    return "\n".join(lines)
 
 
 def format_merge_preview(phoenix: dict, titanic: dict, obj_type: str) -> str:

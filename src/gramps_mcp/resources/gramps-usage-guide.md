@@ -751,9 +751,15 @@ titanic_handle=... or titanic_gramps_id=..., confirm=False)`.
 - With `confirm` unset (the default), the call changes nothing and returns a
   preview of both records so you can check the phoenix/titanic choice before
   committing. Call again with `confirm=true` to execute.
-- Family merges only: `phoenix_father_handle` / `phoenix_mother_handle`
-  choose which parent the merged family keeps, when the two families being
-  merged disagree. Omit either to keep the phoenix family's existing parent.
+- Family merges only: when the two families have different fathers (or
+  mothers), merging them **merges those two people as well**, and the
+  absorbed one ceases to exist as a person. This is not a choice between two
+  survivors, and neither this server's older wording nor the Gramps Web API's
+  own schema said so - it was measured against a live tree on 2026-08-31.
+  The merge is therefore refused unless you name the survivor with
+  `phoenix_father_handle` / `phoenix_mother_handle`. The refusal names both
+  people. If you did not intend to merge two people, merge nothing: fix the
+  parent first with `create_family(father_handle=...)`.
 - There is no backlink guard here - both records are legitimately referenced
   right up to the merge, so `confirm` is the only checkpoint. Recoverable
   with `undo_change`, subject to the `force` requirement described there.

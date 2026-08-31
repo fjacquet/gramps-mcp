@@ -28,8 +28,16 @@ from mcp.types import TextContent
 
 from ..client import GrampsAPIError
 from ..config import get_settings
-from ..destructive import TYPE_ENDPOINTS, remove_from_list, should_refuse_delete
-from ..handlers.destructive_handler import format_merge_preview
+from ..destructive import (
+    TYPE_ENDPOINTS,
+    parent_merge_conflicts,
+    remove_from_list,
+    should_refuse_delete,
+)
+from ..handlers.destructive_handler import (
+    format_merge_preview,
+    format_parent_merge_refusal,
+)
 from ..models.api_calls import ApiCalls
 from ..models.api_mapping import get_param_model
 from ..models.parameters.destructive_params import (
@@ -279,6 +287,33 @@ async def merge_type_tool(client, arguments: dict) -> list[TextContent]:
             api_call=endpoints.get, tree_id=tree_id, handle=titanic_handle
         )
 
+        # Reason: a family merge whose parents differ merges those parent
+        # PEOPLE too, destroying the absorbed one - measured on a live tree,
+        # and stated nowhere in the API's own schema. Refuse rather than
+        # warn: confirm=true is accepted on the first call, so a preview
+        # nobody is obliged to request cannot be the checkpoint.
+        conflicts = (
+            parent_merge_conflicts(
+                phoenix,
+                titanic,
+                params.phoenix_father_handle,
+                params.phoenix_mother_handle,
+            )
+            if params.type == "family"
+            else []
+        )
+        if conflicts:
+            labels = await _parent_labels(client, tree_id, conflicts)
+            # Returned rather than raised, matching delete_type's refusal: a
+            # deliberate refusal is an answer, not an unexpected error, and
+            # _format_error_response would label it as one.
+            return [
+                TextContent(
+                    type="text",
+                    text=format_parent_merge_refusal(conflicts, labels),
+                )
+            ]
+
         if not params.confirm:
             return [
                 TextContent(
@@ -314,6 +349,38 @@ async def merge_type_tool(client, arguments: dict) -> list[TextContent]:
 
     except Exception as e:
         return _format_error_response(e, "merge")
+
+
+async def _parent_labels(client, tree_id: str, conflicts: list) -> dict[str, str]:
+    """
+    Read a readable label for every person named in a parent conflict.
+
+    Args:
+        client (GrampsWebAPIClient): Client to read the people with.
+        tree_id (str): Family tree identifier.
+        conflicts (list[ParentConflict]): The conflicts to name.
+
+    Returns:
+        dict[str, str]: Person handle to "Name (I0001)". A person that
+        cannot be read is simply absent, and the renderer falls back to the
+        handle - a refusal that cannot name someone is still a refusal.
+    """
+    labels: dict[str, str] = {}
+    for handle in {h for c in conflicts for h in (c.phoenix_handle, c.titanic_handle)}:
+        try:
+            person = await client.make_api_call(
+                api_call=ApiCalls.GET_PERSON, tree_id=tree_id, handle=handle
+            )
+        except Exception:
+            continue
+        name = person.get("primary_name", {})
+        given = name.get("first_name", "")
+        surnames = name.get("surname_list") or [{}]
+        surname = surnames[0].get("surname", "")
+        labels[handle] = (
+            f"{given} {surname}".strip() + f" ({person.get('gramps_id', '?')})"
+        )
+    return labels
 
 
 async def _await_undo_result(client, task_id: str, timeout: float = 5.0) -> dict:
