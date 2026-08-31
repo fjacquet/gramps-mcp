@@ -155,6 +155,8 @@ async def audit_quality_tool(client, arguments: dict) -> list[TextContent]:
                     skipped=collected.skipped,
                     partial=collected.partial,
                     error=collected.error,
+                    severity=params.severity,
+                    limit=params.limit,
                 ),
             )
         ]

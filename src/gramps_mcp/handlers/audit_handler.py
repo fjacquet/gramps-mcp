@@ -31,6 +31,17 @@ from ..genealogy.domain import Anomaly
 # renderer a severity the engine does not itself produce.
 _SEVERITY_ORDER = {"haute": 0, "moyenne": 1, "basse": 2}
 
+MAX_PER_SEVERITY = 50
+"""Cap on bullets rendered per severity group.
+
+Measured against the live tree (~1 736 people, 2026-08-31): a whole-tree
+audit produced 1 403 anomalies - 1 392 of them `basse` (mostly D1 "no vital
+date" and R9 "no citation") - rendering as 1 411 lines. That is too much to
+hand an LLM caller under one heading. The cap is per severity, not global,
+so a handful of `haute`/`moyenne` findings are never pushed out by a long
+tail of `basse` ones.
+"""
+
 
 def _severity_rank(severity: str) -> int:
     """Rank a severity for sorting, highest first. Unknown values sort last."""
@@ -55,22 +66,36 @@ def format_anomalies(
     skipped: int,
     partial: bool,
     error: str | None,
+    severity: str | None = None,
+    limit: int | None = None,
 ) -> str:
     """
     Render the full audit_quality result as markdown.
 
     Order: a partial-scan warning first when the scan did not complete, then
-    the count of skipped records when non-zero, then the anomalies
-    themselves grouped by severity with the highest severity first. A clean
-    result (no anomalies) renders an explicit "no anomalies" line rather
-    than an empty string - an empty answer reads exactly like a broken one.
+    the count of skipped records when non-zero, then the scope actually
+    examined when the caller narrowed it (`severity` and/or `limit`), then
+    the anomalies themselves grouped by severity with the highest severity
+    first, each group capped at `MAX_PER_SEVERITY`. A clean result (no
+    anomalies) renders an explicit "no anomalies" line rather than an empty
+    string - an empty answer reads exactly like a broken one - and states
+    the scope it was clean *within*, so a caller who filtered or limited the
+    scan is never told the whole tree is clean when only a slice was read.
 
     Args:
         anomalies (list[Anomaly]): Findings from check_person and
-            check_family, already collected across the tree.
+            check_family, already collected across the tree (or the
+            narrowed scope named by `severity`/`limit`).
         skipped (int): Records the collector could not parse.
         partial (bool): Whether the tree scan stopped early.
         error (str | None): The error that stopped the scan, when `partial`.
+        severity (str | None): The severity filter the caller applied to
+            `AuditQualityParams`, if any - echoed so "no anomalies" cannot
+            be misread as "no anomalies at any severity".
+        limit (int | None): The `AuditQualityParams.limit` the caller
+            applied, if any - echoed so "no anomalies" cannot be misread as
+            "the whole tree is clean" when only the first N people were
+            examined.
 
     Returns:
         str: Markdown ready to hand back as tool output.
@@ -89,8 +114,22 @@ def format_anomalies(
     if skipped:
         sections.append(f"{skipped} record(s) were unreadable and skipped.")
 
+    scope_bits: list[str] = []
+    if limit is not None:
+        scope_bits.append(f"the first {limit} people scanned")
+    if severity is not None:
+        scope_bits.append(f"severity={severity!r} only")
+    scope_note = f"Scope: {', '.join(scope_bits)}." if scope_bits else None
+    if scope_note:
+        sections.append(scope_note)
+
     if not anomalies:
-        sections.append("## Anomalies\n\nNone found - the tree is clean.")
+        clean_line = (
+            f"## Anomalies\n\nNone found within this scope ({', '.join(scope_bits)})."
+            if scope_bits
+            else "## Anomalies\n\nNone found - the tree is clean."
+        )
+        sections.append(clean_line)
         return "\n\n".join(sections) + "\n"
 
     ordered = sorted(anomalies, key=lambda a: _severity_rank(a.severity))
@@ -99,8 +138,19 @@ def format_anomalies(
     for anomaly in ordered:
         grouped.setdefault(anomaly.severity, []).append(anomaly)
 
-    for severity, group in grouped.items():
-        lines = "\n".join(_format_anomaly(a) for a in group)
-        sections.append(f"## {severity} ({len(group)})\n\n{lines}")
+    for group_severity, group in grouped.items():
+        shown = group[:MAX_PER_SEVERITY]
+        lines = "\n".join(_format_anomaly(a) for a in shown)
+        remaining = len(group) - len(shown)
+        section = f"## {group_severity} ({len(group)})\n\n{lines}"
+        if remaining:
+            section += (
+                f"\n\n...{remaining} more {group_severity}-severity anomal"
+                f"{'y' if remaining == 1 else 'ies'} not shown (cap: "
+                f"{MAX_PER_SEVERITY} per severity). Narrow the scan with "
+                f'`severity="{group_severity}"` and a smaller `limit` to '
+                "page through the rest."
+            )
+        sections.append(section)
 
     return "\n\n".join(sections) + "\n"

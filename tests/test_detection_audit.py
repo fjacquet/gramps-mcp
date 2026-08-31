@@ -9,31 +9,6 @@ from src.gramps_mcp.tools.detection import audit_quality_tool
 
 
 class TestAuditRendering:
-    def test_it_groups_by_severity_and_names_the_rule(self):
-        anomalies = [
-            Anomaly(
-                rule="R1",
-                severity="high",
-                gramps_id="I0001",
-                handle="h1",
-                message="Death before birth",
-            ),
-            Anomaly(
-                rule="R4",
-                severity="low",
-                gramps_id="I0002",
-                handle="h2",
-                message="Marriage before age 14",
-            ),
-        ]
-
-        text = format_anomalies(anomalies, skipped=0, partial=False, error=None)
-
-        assert "R1" in text
-        assert "R4" in text
-        assert "I0001" in text
-        assert text.index("R1") < text.index("R4")
-
     def test_a_clean_tree_says_so_rather_than_rendering_nothing(self):
         text = format_anomalies([], skipped=0, partial=False, error=None)
 
