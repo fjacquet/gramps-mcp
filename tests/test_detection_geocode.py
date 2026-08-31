@@ -117,6 +117,24 @@ class TestGeocodeRendering:
         assert "18033" in text
         assert "47.081" in text and "2.398" in text
 
+    def test_no_administrative_chain_renders_no_chain_line(self):
+        """map_nominatim (genealogy/geo/nominatim.py) always returns
+        `chains=[DatedChain(levels=[])]` on a worldwide fallback with no
+        hierarchy - never an empty `chains` list. `_format_chain` must
+        detect this by checking `chains[0].levels`, not `chains` itself
+        (that guard was dead - `chains` is never empty in practice) or by
+        checking whether `names` ended up empty (it never does: the place's
+        own name is always appended, so a bare "Bourges" one-element
+        "hierarchy" would have rendered instead of being suppressed).
+        """
+        resolved = _resolved(chains=[DatedChain(levels=[])])
+
+        text = format_place_resolution(
+            resolved, action="proposition", confiance="basse", query="Bourges"
+        )
+
+        assert "Administrative chain" not in text
+
     def test_a_provider_failure_names_the_error(self):
         text = format_place_resolution(
             None,

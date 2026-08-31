@@ -48,15 +48,22 @@ def _format_chain(resolved: ResolvedPlace) -> str | None:
 
     Returns:
         str | None: For example "France > Cher > Bourges", or None when the
-        resolver returned no chain at all (a bare worldwide fallback with no
-        country segment).
+        resolver returned no administrative chain at all (a bare worldwide
+        fallback with no country segment).
     """
-    if not resolved.chains:
+    # Reason: map_nominatim (genealogy/geo/nominatim.py) always returns
+    # `chains=[DatedChain(levels=[])]` on a fallback with no administrative
+    # hierarchy - never an empty `chains` list. Checking `not resolved.chains`
+    # alone is therefore never true in practice, and `names` (which always
+    # gets `resolved.name` appended below) is never empty either - `if not
+    # names: return None` was dead code that let an empty-levels chain
+    # through and rendered a one-element "hierarchy" naming nothing but the
+    # place itself. Checking `resolved.chains[0].levels` directly is what
+    # actually detects "no chain".
+    if not resolved.chains or not resolved.chains[0].levels:
         return None
     names = [level.name for level in resolved.chains[0].levels]
     names.append(resolved.name)
-    if not names:
-        return None
     return " > ".join(names)
 
 
