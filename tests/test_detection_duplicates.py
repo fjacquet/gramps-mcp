@@ -286,3 +286,60 @@ class TestRelativesAreNotArbitrationCandidates:
         assert "Needs human arbitration" not in text
         for gramps_id in ("I0001", "I0002", "I0003", "I0004", "I0005"):
             assert gramps_id not in text
+
+
+class TestSiblingsAreNotArbitrationCandidates:
+    """Siblings sharing a surname and born close together also share an
+    `an:` blocking key (surname + birth-year +/-2 window -
+    `genealogy.duplicates.blocking_keys`) even with no shared `nom:`/`pho:`
+    key at all - `an:` carries no given-name test whatsoever. The previous
+    class (`TestRelativesAreNotArbitrationCandidates`) could not catch this:
+    its children have no birth dates, so no `an:` key is ever emitted -
+    `EventFact.year` defaults to `None` and blocking_keys only builds an an:
+    key when `p.birth.year` is truthy.
+
+    These two siblings are given real birth dates one and two years apart
+    (with `year` set), sharing different given-name initials (Paul/Louise,
+    so no `pho:` collision) and no full-name match (so no `nom:` collision
+    either) - the only key they share is `an:sestre:1850`. Proof this test
+    is load-bearing: against the pre-fix filter
+    (`any(b.startswith(("nom:", "pho:", "an:")) ...)`)  it fails, asserting
+    "Needs human arbitration" is present and I0003/I0004 are named; against
+    the fixed filter (`nom:`/`pho:` only) it passes.
+    """
+
+    async def test_siblings_born_close_together_are_not_reported(self):
+        child_a = _person("I0003", "Paul", "Sestre", _naissance(3, 4, 1850))
+        child_b = _person("I0004", "Louise", "Sestre", _naissance(6, 9, 1852))
+
+        child_a.parent_family_handles = ["hF1"]
+        child_b.parent_family_handles = ["hF1"]
+
+        family = FamilyFacts(
+            gramps_id="F0001",
+            handle="hF1",
+            father_handle="hI0001",
+            mother_handle="hI0002",
+            child_handles=["hI0003", "hI0004"],
+        )
+
+        collected = CollectResult(
+            people=[child_a, child_b],
+            families={"hF1": family},
+            skipped=0,
+            partial=False,
+            error=None,
+        )
+
+        with patch(
+            "src.gramps_mcp.tools.detection.collect_tree",
+            new_callable=AsyncMock,
+            return_value=collected,
+        ):
+            result = await find_duplicates_tool({})
+
+        text = result[0].text
+
+        assert "Needs human arbitration" not in text
+        assert "I0003" not in text
+        assert "I0004" not in text

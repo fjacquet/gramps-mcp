@@ -88,15 +88,23 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
         # blocking_keys() (genealogy/duplicates.py) also emits fam:<handle>
         # and par:<handle> keys, so two people sharing only a family (a
         # married couple, or two siblings) land in "arbitrage" with no name
-        # evidence at all - not a duplicate candidate by any reading. A real
-        # duplicate always shares a name-derived key (nom:, pho: or an:), so
-        # filtering on that drops every relative pair without losing any
-        # genuine candidate.
+        # evidence at all - not a duplicate candidate by any reading. Only
+        # nom: (normalized full name) and pho: (phonetic surname + given
+        # initial) are kept as name evidence - both require the *given*
+        # names to agree (exactly, or at least by initial), which two
+        # different siblings or spouses do not. an: is deliberately excluded
+        # here even though it starts with a name fragment: it is surname
+        # plus a birth-year window (+/-2 years each side), with no given-name
+        # test at all, so two siblings sharing a surname and born within a
+        # few years of each other - the ordinary case in a real tree -
+        # satisfy it without being a duplicate. Keeping an: in this filter
+        # floods arbitration with sibling noise; see
+        # tests/test_detection_duplicates.py::TestSiblingsAreNotArbitrationCandidates.
         arbitration = [
             p
             for p in pairs
             if p.tier == "arbitrage"
-            and any(b.startswith(("nom:", "pho:", "an:")) for b in p.blocs)
+            and any(b.startswith(("nom:", "pho:")) for b in p.blocs)
         ]
 
         return [

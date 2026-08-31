@@ -494,8 +494,12 @@ The output has two parts, never merged under one heading:
 - **Needs human arbitration**: pairs that share enough to be worth a look
   (for example, a phonetic name match plus some shared context) but that the
   rules did not prove. Every pair here shares at least one name-derived
-  signal (exact name, phonetic name, or same surname with a close birth
-  year) - two people who share only a family (a married couple, or
+  signal - an exact normalized name, or a phonetic surname plus matching
+  given-name initial. Same surname with a close birth year alone
+  (no given-name agreement at all) is deliberately not enough to surface a
+  pair here: two siblings born a couple of years apart satisfy exactly
+  that, and siblings that close in age are the norm, not the exception, in
+  a real tree - two people who share only a family (a married couple, or
   siblings) never appear here, because sharing a family is not name
   evidence and every married couple and sibling pair in the tree would
   otherwise show up as a "candidate". These are never presented as
