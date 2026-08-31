@@ -24,6 +24,53 @@ TIMEOUT = 5.0
 # Base URL for the live server
 BASE_URL = "http://localhost:8000"
 
+# The full set of tool names TOOL_REGISTRY (tool_registry.py) carries today.
+# Hardcoded deliberately, not derived from TOOL_REGISTRY itself: a name
+# missing from the *live server's* advertised tool list must fail this test
+# even if TOOL_REGISTRY and this list agree with each other but have both
+# quietly lost an entry - comparing the registry to itself proves nothing.
+# Verified by importing TOOL_REGISTRY directly: 30 tools, 2026-08-31. This
+# was 26 (asserted) / 27 (actual) before that fix, and 23 (asserted) before
+# that - each bump preserved a stale count instead of reading TOOL_REGISTRY.
+EXPECTED_TOOL_NAMES = {
+    # Search & Retrieval Tools (3)
+    "find_type",
+    "find_anything",
+    "get_type",
+    # Data Management Tools (10)
+    "create_person",
+    "create_family",
+    "create_event",
+    "create_place",
+    "create_source",
+    "create_citation",
+    "create_note",
+    "create_media",
+    "create_repository",
+    "create_sourced_event",
+    # Analysis & Management Tools (10)
+    "tree_stats",
+    "get_descendants",
+    "get_ancestors",
+    "recent_changes",
+    "get_relationship",
+    "check_living",
+    "get_timeline",
+    "manage_tags",
+    "get_facts",
+    "manage_users",
+    # Detection Tools (3)
+    "find_duplicates",
+    "audit_quality",
+    "geocode_place",
+    # Destructive Tools (4)
+    "delete_type",
+    "detach_reference",
+    "merge_type",
+    "undo_change",
+}
+EXPECTED_TOOL_COUNT = len(EXPECTED_TOOL_NAMES)
+
 # Pytest timeout configuration - applies to every test in this module.
 # The integration mark moves to the classes that genuinely need the live
 # server; TestServerBuild, TestParameterModels, and test_manage_users_registered
@@ -84,40 +131,14 @@ class TestMCPServerSetup:
                 # List tools
                 tools_result = await session.list_tools()
                 tools = tools_result.tools
-                assert len(tools) == 26  # matches TOOL_REGISTRY in server.py
+                assert len(tools) == EXPECTED_TOOL_COUNT
 
-                # Verify all expected tools are registered
-                expected_tools = {
-                    # Search & Retrieval Tools (3)
-                    "find_type",
-                    "find_anything",
-                    "get_type",
-                    # Data Management Tools (10)
-                    "create_person",
-                    "create_family",
-                    "create_event",
-                    "create_place",
-                    "create_source",
-                    "create_citation",
-                    "create_note",
-                    "create_media",
-                    "create_repository",
-                    "create_sourced_event",
-                    # Analysis & Management Tools (10)
-                    "tree_stats",
-                    "get_descendants",
-                    "get_ancestors",
-                    "recent_changes",
-                    "get_relationship",
-                    "check_living",
-                    "get_timeline",
-                    "manage_tags",
-                    "get_facts",
-                    "manage_users",
-                }
-
+                # Verify all expected tools are registered - EXPECTED_TOOL_NAMES
+                # is hardcoded at module level, not derived from TOOL_REGISTRY,
+                # so this fails if the live server's registry drifts from it in
+                # either direction.
                 registered_tool_names = {tool.name for tool in tools}
-                assert registered_tool_names == expected_tools
+                assert registered_tool_names == EXPECTED_TOOL_NAMES
 
     @pytest.mark.asyncio
     async def test_tool_descriptions(self):
@@ -152,7 +173,7 @@ class TestHTTPRoutes:
             assert response.status_code == 200
             data = response.json()
             assert data["service"] == "Gramps MCP Server"
-            assert data["tools_count"] == 26  # matches TOOL_REGISTRY in server.py
+            assert data["tools_count"] == EXPECTED_TOOL_COUNT
 
     @pytest.mark.asyncio
     async def test_health_endpoint(self):
@@ -183,9 +204,7 @@ class TestMCPProtocolCompliance:
 
                 # List tools
                 tools_result = await session.list_tools()
-                assert (
-                    len(tools_result.tools) == 26
-                )  # matches TOOL_REGISTRY in server.py
+                assert len(tools_result.tools) == EXPECTED_TOOL_COUNT
 
     @pytest.mark.asyncio
     async def test_mcp_tool_call_find_type_real_api(self):
