@@ -58,6 +58,8 @@ class AuthManager:
         self._token_expires_at: datetime | None = None
         self._client = None
         self._loop = None
+        self._auth_lock: asyncio.Lock | None = None
+        self._auth_lock_loop: asyncio.AbstractEventLoop | None = None
 
         self._initialized = True
         logger.info("Singleton AuthManager instance created")
@@ -161,22 +163,62 @@ class AuthManager:
         except Exception as e:
             raise ValueError(f"Authentication error: {e}")
 
+    def _lock_for_current_loop(self) -> asyncio.Lock:
+        """
+        Get the authentication lock, rebuilding it if the event loop changed.
+
+        Args:
+            None
+
+        Returns:
+            asyncio.Lock: A lock bound to the running event loop.
+        """
+        # Reason: an asyncio.Lock binds to the loop that first awaits it, and
+        # this singleton outlives individual loops (tests, and the client
+        # property already handles the same rotation). A lock left over from a
+        # dead loop would raise instead of serialising.
+        current_loop = asyncio.get_running_loop()
+        if self._auth_lock is None or self._auth_lock_loop is not current_loop:
+            self._auth_lock = asyncio.Lock()
+            self._auth_lock_loop = current_loop
+        return self._auth_lock
+
+    def _token_is_usable(self) -> bool:
+        """
+        Report whether a cached token exists and has not expired.
+
+        Args:
+            None
+
+        Returns:
+            bool: True when the cached token can be returned as is.
+        """
+        if not self._access_token or not self._token_expires_at:
+            return False
+        return datetime.now(UTC) < self._token_expires_at
+
     async def get_token(self) -> str:
         """
         Get a valid access token, authenticating if needed.
 
+        Concurrent callers share one authentication. Reason: collect_tree and
+        traversal both issue their first API calls through asyncio.gather, so
+        on a cold manager every one of them would otherwise post to /token/ at
+        the same instant and the auth endpoint rate-limits all but one.
+
         Returns:
             Valid access token
         """
-        # Check if we need to authenticate
-        if not self._access_token or not self._token_expires_at:
-            return await self.authenticate()
+        if self._token_is_usable():
+            # `_token_is_usable` guarantees a non-None token here.
+            return self._access_token  # type: ignore[return-value]
 
-        # Check if token is expired
-        if datetime.now(UTC) >= self._token_expires_at:
+        async with self._lock_for_current_loop():
+            # Re-check: a caller that waited on the lock is served by the
+            # authentication the caller ahead of it already completed.
+            if self._token_is_usable():
+                return self._access_token  # type: ignore[return-value]
             return await self.authenticate()
-
-        return self._access_token
 
     def get_headers(self) -> dict:
         """
