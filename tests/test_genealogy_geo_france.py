@@ -1,4 +1,6 @@
 # tests/test_genealogy_geo_france.py
+import httpx
+
 from src.gramps_mcp.genealogy.domain import ParsedPlace
 from src.gramps_mcp.genealogy.geo.france import map_commune, resolve_fr
 
@@ -167,6 +169,32 @@ def test_resolve_fr_by_name_region_only_context_does_not_collapse_homonyms(monke
         ParsedPlace(raw="", commune="Sainte-Marie", region="Bretagne", country="France")
     )
     assert rp is not None and rp.ambiguous is True
+
+
+def test_http_get_returns_none_on_404_instead_of_raising(monkeypatch):
+    """A 404 on /communes/{insee} is a normal "not found", not a transport
+    failure: it must degrade to None so the France chain in registry.py
+    (`resolve_fr(p) or resolve_fr_ex_commune(p)`) can fall through to the
+    ex-commune resolver instead of an httpx.HTTPStatusError aborting it.
+    """
+    from src.gramps_mcp.genealogy.geo import france
+
+    class _FakeResponse:
+        status_code = 404
+
+        def raise_for_status(self):
+            raise httpx.HTTPStatusError("not found", request=None, response=self)
+
+        def json(self):
+            raise AssertionError("json() must not be called on a 404 response")
+
+    monkeypatch.setattr(
+        france.httpx, "get", lambda url, params=None, timeout=None: _FakeResponse()
+    )
+    parsed = ParsedPlace(
+        raw="…", commune="X", insee="99999", country="France", shifted=True
+    )
+    assert resolve_fr(parsed) is None  # ne lève pas
 
 
 def test_resolve_fr_insee_path_still_used(monkeypatch):

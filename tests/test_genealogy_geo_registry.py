@@ -1,3 +1,4 @@
+import httpx
 import pytest
 
 from src.gramps_mcp.genealogy.domain import ParsedPlace, ResolvedPlace
@@ -102,6 +103,51 @@ def test_registry_falls_through_to_ex_commune_when_resolve_fr_none(monkeypatch):
         "avant 1973-01-01",
         "après 1973-01-01",
     ]
+
+
+def test_registry_404_from_fr_falls_through_to_ex_commune(monkeypatch):
+    """Uses the REAL resolve_fr (not a stub) against a mocked httpx 404, so
+    this exercises the actual defect: before the fix, `_http_get` called
+    `resp.raise_for_status()` unconditionally and the HTTPStatusError from
+    a 404 on /communes/{insee} escaped `_BY_COUNTRY["France"]`'s
+    `resolve_fr(p) or resolve_fr_ex_commune(p)` entirely, so
+    resolve_fr_ex_commune never ran. With the fix, a 404 degrades to None
+    inside resolve_fr and the chain continues.
+    """
+    from src.gramps_mcp.genealogy.domain import ParsedPlace, ResolvedPlace
+    from src.gramps_mcp.genealogy.geo import france, registry
+
+    class _FakeResponse:
+        status_code = 404
+
+        def raise_for_status(self):
+            raise httpx.HTTPStatusError("not found", request=None, response=self)
+
+    monkeypatch.setattr(
+        france.httpx, "get", lambda url, params=None, timeout=None: _FakeResponse()
+    )
+    sentinel = ResolvedPlace(
+        name="Saint-Agnant-sous-les-Côtes",
+        place_type="Municipality",
+        code="55451",
+        score=1.0,
+        source="ex-commune",
+        query="",
+    )
+    monkeypatch.setattr(registry, "resolve_fr_ex_commune", lambda p: sentinel)
+    monkeypatch.setattr(
+        registry, "resolve_world", lambda p: pytest.fail("Nominatim atteint")
+    )
+
+    got = registry.resolve_place(
+        ParsedPlace(
+            raw="",
+            commune="Saint-Agnant-sous-les-Côtes",
+            insee="55451",
+            country="France",
+        )
+    )
+    assert got is not None and got.code == "55451"
 
 
 def test_registry_live_commune_never_reaches_ex_commune_path(monkeypatch):

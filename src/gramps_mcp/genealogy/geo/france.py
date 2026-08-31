@@ -20,6 +20,18 @@ Copied from fjacquet/crewai-custom-tools v0.31.1 (19d78f7),
 src/crewai_custom_tools/tools/genealogy/geo/france.py.
 Divergence from that copy is expected and accepted; see
 docs/superpowers/specs/2026-08-30-detection-tools-design.md.
+
+Divergence (code review, round 2): the source's `_http_get` called
+`resp.raise_for_status()` unconditionally, so a 404 from
+`GET /communes/{insee}` - an unknown or no-longer-living INSEE code -
+raised `httpx.HTTPStatusError` instead of returning `None`. Because
+`_BY_COUNTRY["France"]` in `registry.py` is
+`lambda p: resolve_fr(p) or resolve_fr_ex_commune(p)`, that exception
+escaped the whole chain: `resolve_fr_ex_commune` (france_ex_communes.py)
+never ran, even though a 404 here - a commune fusionnee absent from
+`/communes` - is exactly the case it exists to handle. Fixed by treating
+404 as "not found" in `_http_get` and returning `None`, letting the `or`
+fall through as designed. Every other status still raises.
 """
 
 from __future__ import annotations
@@ -41,10 +53,19 @@ _FIELDS = "nom,code,centre,departement,region"
 _PROVIDER = "GeoApiGouvFr"
 
 
-def _http_get(path: str, params: dict) -> dict:
-    """Thin HTTP GET (monkeypatched in tests). WGS84 GeoJSON out."""
+def _http_get(path: str, params: dict) -> dict | None:
+    """Thin HTTP GET (monkeypatched in tests). WGS84 GeoJSON out.
+
+    Returns None on a 404 - "not found" is a normal outcome for a commune
+    lookup (an unknown INSEE code, or a commune fusionnee absent from the
+    living-communes endpoint), not a transport failure - so the caller can
+    treat it the same as an empty result instead of propagating an
+    exception. Every other status still raises via raise_for_status().
+    """
     get_rate_limiter().acquire(_PROVIDER)
     resp = httpx.get(f"{_BASE}{path}", params=params, timeout=15.0)
+    if resp.status_code == 404:
+        return None
     resp.raise_for_status()
     return resp.json()
 
