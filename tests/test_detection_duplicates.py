@@ -111,6 +111,19 @@ class TestDuplicateRendering:
 
         assert "3" in text
 
+    def test_ignored_blocking_keys_are_reported(self):
+        """Pins the ignored-key count added alongside the arbitrage fix:
+        etager()'s second return value (blocking keys dropped for covering
+        more than MAX_BLOC people) must be visible, or a narrowed scan
+        reads as a full one.
+        """
+        text = format_duplicate_clusters(
+            [], [], {}, skipped=0, partial=False, error=None, ignored=2
+        )
+
+        assert "2" in text
+        assert "blocking key" in text.lower()
+
     def test_a_gender_patch_is_rendered_before_merging(self):
         """Pins the gender-patch line _format_cluster renders (duplicates_handler.py:69-74).
 
