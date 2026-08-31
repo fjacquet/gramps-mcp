@@ -25,6 +25,19 @@ Trimmed to the four gazetteer providers this project calls (Nominatim,
 Swisstopo, GeoApiGouvFr, Wikidata). The source module's finance/OSINT
 provider table and its premium-tier env-var override mechanism are out of
 scope here and were dropped, not ported.
+
+Two further divergences from that copy, made during the final review of
+this branch and worth naming explicitly:
+
+- The source module's `reset_rate_limiter()` (a test-only singleton reset)
+  had no caller anywhere in this repo, not even its own test module
+  (`tests/test_genealogy_rate_limit.py`) - dropped as dead code rather than
+  carried forward unused.
+- The two environment variable names, `CREWAI_TOOLS_RATE_LIMIT_DISABLED`
+  and `CREWAI_TOOLS_RATE_LIMIT_MAX_WAIT`, named the *source* project
+  (`crewai-custom-tools`), not this one, and appeared in no document here.
+  Renamed to `GRAMPS_MCP_RATE_LIMIT_DISABLED` and
+  `GRAMPS_MCP_RATE_LIMIT_MAX_WAIT`.
 """
 
 import logging
@@ -118,14 +131,14 @@ class RateLimiterRegistry:
         return self._limits.get(provider)
 
     def acquire(self, provider: str, max_wait: float | None = None) -> None:
-        if os.getenv("CREWAI_TOOLS_RATE_LIMIT_DISABLED", "").lower() in ("1", "true"):
+        if os.getenv("GRAMPS_MCP_RATE_LIMIT_DISABLED", "").lower() in ("1", "true"):
             return
         bucket = self._buckets.get(provider)
         if bucket is None:
             return
         if max_wait is None:
             max_wait = float(
-                os.getenv("CREWAI_TOOLS_RATE_LIMIT_MAX_WAIT", str(_DEFAULT_MAX_WAIT))
+                os.getenv("GRAMPS_MCP_RATE_LIMIT_MAX_WAIT", str(_DEFAULT_MAX_WAIT))
             )
         bucket.acquire(provider, max_wait)
 
@@ -142,9 +155,3 @@ def get_rate_limiter() -> RateLimiterRegistry:
             if _registry is None:
                 _registry = RateLimiterRegistry()
     return _registry
-
-
-def reset_rate_limiter() -> None:
-    """Discard the singleton (tests only)."""
-    global _registry
-    _registry = None
