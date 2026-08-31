@@ -120,9 +120,18 @@
     above predates this knowledge: a one-off script issuing hundreds of `PUT`s
     is still the tested path, but this endpoint is why "hundreds of calls" need
     not be the only shape.
-  - **`POST /api/<type>/query`** exists for every record type. The tools go
-    through GQL over `GET` instead, which is what returns 500 on notes. Try the
-    `POST` body before concluding a query cannot be expressed.
+  - **`POST /api/<type>/query`** exists for every record type, but it does
+    **not** take a `gql` or `query` field - both are rejected with HTTP 422,
+    `"Unknown field"`. Read its schema in `docs/reference/openapi.json` before
+    reaching for it. An earlier version of this note suggested it as a
+    workaround for the notes bug below; that was written without trying it.
+  - **The notes GQL bug is fixed upstream** (issue #28). On
+    gramps-webapi 3.21.1 with gramps 6.0.8, all four reproductions from that
+    issue return HTTP 200: `gramps_id="N0216"`, `class = note and private`,
+    `text.string ~ "Nidau"` and the people control. `find_type` on notes works.
+    Verify against the running server before assuming otherwise - the failure
+    was a server-side defect, so it comes and goes with the deployment, not
+    with this repo.
   - **`GET /api/exporters/<id>/file`** is the export the backup note below calls
     missing from the client. It is missing from `ApiCalls`, not from the API.
   - **`POST /api/trees/<id>/verify` and `/repair`** run Check and Repair over
