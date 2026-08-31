@@ -24,7 +24,7 @@ MergePair objects, already produced by `genealogy.duplicates.etager` and
 
 from ..genealogy.domain import MergeCluster, MergePair, PersonFacts
 from ..genealogy.duplicates import MAX_BLOC
-from .scan_status import scan_status_lines
+from .scan_status import people_limit_phrase, scan_status_lines
 
 
 def _name(person: PersonFacts | None, gramps_id: str) -> str:
@@ -99,6 +99,7 @@ def format_duplicate_clusters(
     partial: bool,
     error: str | None,
     ignored: int = 0,
+    limit: int | None = None,
 ) -> str:
     """
     Render the full find_duplicates result as markdown.
@@ -125,11 +126,21 @@ def format_duplicate_clusters(
             through one of those keys is silently absent from both sections
             below - render the count so a narrowed scan does not read as a
             full one.
+        limit (int | None): The `FindDuplicatesParams.limit` the caller
+            passed, if any. Rendered for the same reason as `ignored`: a
+            `limit` truncates the people fetched, so every pair involving
+            someone past the cut is absent from both sections below, and
+            "no duplicate candidates" over the first 50 people of a
+            1736-person tree would otherwise read as a clean bill of
+            health for the tree.
 
     Returns:
         str: Markdown ready to hand back as tool output.
     """
     sections: list[str] = scan_status_lines(partial, error, skipped)
+
+    if limit is not None:
+        sections.append(f"Scope: {people_limit_phrase(limit)}.")
 
     if ignored:
         sections.append(

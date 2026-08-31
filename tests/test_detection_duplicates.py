@@ -400,3 +400,29 @@ class TestHasNameEvidence:
 
     def test_no_blocking_keys_is_not_evidence(self):
         assert _has_name_evidence(_pair()) is False
+
+
+class TestALimitedScanSaysSo:
+    """A `limit`-bounded scan must not render like a scan of the whole tree.
+
+    Reason: `find_duplicates` accepts a `limit` that truncates the people
+    fetched. Without a scope line, "no duplicate candidates" over the first
+    50 people of a 1736-person tree reads as a clean bill of health for the
+    tree - the same failure the partial-scan warning and the ignored-key
+    count already guard against.
+    """
+
+    def test_a_limited_scan_names_its_scope(self):
+        text = format_duplicate_clusters(
+            [], [], {}, skipped=0, partial=False, error=None, limit=50
+        )
+
+        assert "50" in text
+        assert "scope" in text.lower()
+
+    def test_an_unlimited_scan_claims_no_scope(self):
+        text = format_duplicate_clusters(
+            [], [], {}, skipped=0, partial=False, error=None
+        )
+
+        assert "scope" not in text.lower()

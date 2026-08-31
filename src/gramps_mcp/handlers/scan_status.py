@@ -23,6 +23,19 @@ already corrected once - from drifting apart between the two.
 """
 
 
+def people_limit_phrase(limit: int) -> str:
+    """
+    Render how a `limit` narrowed a scan, in the wording both tools share.
+
+    Args:
+        limit (int): The caller's `limit`, already known to be set.
+
+    Returns:
+        str: For example "the first 50 people scanned".
+    """
+    return f"the first {limit} people scanned"
+
+
 def scan_status_lines(partial: bool, error: str | None, skipped: int) -> list[str]:
     """
     Render the partial-scan warning and skipped-record count, if any apply.
