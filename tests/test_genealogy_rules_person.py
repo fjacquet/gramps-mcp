@@ -90,6 +90,22 @@ def test_r7_baptism_before_birth():
     assert "R7" in _rules(check_person(p))
 
 
+def test_r6_does_not_double_count_a_baptism_before_birth():
+    """R6's before-birth branch used to fire for every event type,
+    including Baptism - the exact fact R7 already reports more precisely
+    (baptism vs. birth). Same anomaly, reported twice, inflated the
+    per-severity cap and the guide's totals.
+    """
+    p = _p(
+        birth=EventFact(type="Birth", sortval=2400000, year=1850),
+        events=[EventFact(type="Baptism", sortval=2399990, year=1849)],
+    )
+    anomalies = check_person(p)
+    rules_fired = [a.rule for a in anomalies]
+    assert rules_fired.count("R6") == 0
+    assert rules_fired.count("R7") == 1
+
+
 def test_r7_burial_before_death():
     p = _p(
         death=EventFact(type="Death", sortval=2420000, year=1905),

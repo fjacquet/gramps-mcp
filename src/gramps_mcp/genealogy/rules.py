@@ -32,6 +32,15 @@ instead of an unannotated `(ev) -> bool`, so callers get real narrowing on
 `person.birth`/`person.death` instead of an untyped bool; `years_between` is
 typed `(a: EventFact, b: EventFact) -> float` instead of unannotated
 parameters.
+
+A third divergence, made during the final review of this branch: R6's
+before-birth branch (a life event dated before the person's birth) used to
+fire for any event type, including `Baptism` and `Burial` - the same two
+types R7 already checks against a more specific reference date (baptism vs.
+birth, burial vs. death). A baptism dated before birth was reported twice,
+once by each rule. See `R7_BEFORE_TYPES` below, excluded from R6's
+before-birth branch the same way `POSTMORTEM_TYPES` is already excluded
+from its after-death branch.
 """
 
 from __future__ import annotations
@@ -47,6 +56,16 @@ from .domain import (
 
 DAYS_PER_YEAR = 365.25
 POSTMORTEM_TYPES = {"Burial", "Cremation", "Probate", "Will"}
+R7_BEFORE_TYPES = {"Baptism", "Burial"}
+"""Event types R7 already checks against a specific reference date (baptism
+vs. birth, burial vs. death). Excluded from R6's generic before-birth check
+below - divergence from upstream (code review, round 2): the source let R6's
+"any event before birth" branch fire for these too, so a baptism dated
+before birth was reported twice, once by each rule, inflating the per-
+severity cap and the totals the guide quotes. Mirrors the exclusion R6
+already applies to POSTMORTEM_TYPES on its own after-death branch, for the
+same reason.
+"""
 
 
 def is_valid(ev: EventFact | None) -> TypeGuard[EventFact]:
@@ -108,7 +127,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
     for ev in person.events:
         if ev.type in {"Birth", "Death"} or not is_valid(ev):
             continue
-        if is_valid(b) and ev.sortval < b.sortval:
+        if ev.type not in R7_BEFORE_TYPES and is_valid(b) and ev.sortval < b.sortval:
             out.append(
                 _anom(
                     "R6",
