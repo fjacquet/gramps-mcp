@@ -120,6 +120,62 @@ that isn't your own same-session mistake — per the project's general
 curl -s -X DELETE "$BASE/people/<handle>" -H "Authorization: Bearer $TOKEN"
 ```
 
+## Grayscale JPEGs break the server-side thumbnail
+
+If a media page shows a broken-image icon but `GET
+/api/media/<handle>/file` downloads a perfectly valid file, the upload was
+almost certainly a grayscale JPEG (mode `L`, sometimes with an embedded
+gray ICC profile) — the server's AVIF thumbnail generator produces a
+corrupt thumbnail from grayscale source, even though the full-size file is
+fine. This happens whenever a scan gets staged via `sips -s format jpeg`
+without forcing RGB (see the `genealogiste` skill's disk-filing section).
+
+Find every recent grayscale upload in one pass:
+
+```bash
+curl -s "$BASE/media/?pagesize=3000" -H "Authorization: Bearer $TOKEN" > "$SCRATCH/all-media.json"
+python3 -c "
+import json
+data = json.load(open('$SCRATCH/all-media.json'))
+recent = [m for m in data if m.get('mime') == 'image/jpeg' and m.get('change', 0) > <since-epoch>]
+json.dump({m['gramps_id']: m['handle'] for m in recent}, open('$SCRATCH/gid-to-handle.json', 'w'))
+print(len(recent), 'jpeg uploads to check')
+"
+mkdir -p "$SCRATCH/mediacheck"
+python3 -c "
+import json
+for gid, h in json.load(open('$SCRATCH/gid-to-handle.json')).items():
+    print(gid, h)
+" | while read -r gid h; do
+  curl -s "$BASE/media/$h/file" -H "Authorization: Bearer $TOKEN" -o "$SCRATCH/mediacheck/$gid.jpg"
+done
+python3 -c "
+from PIL import Image
+import os
+for f in sorted(os.listdir('$SCRATCH/mediacheck')):
+    im = Image.open(f'$SCRATCH/mediacheck/{f}')
+    if im.mode == 'L':
+        print('GRAYSCALE', f)
+"
+```
+
+Fix each one found the same way as any other file replacement — convert to
+RGB, `PUT /api/media/<handle>/file`, handle/links untouched:
+
+```bash
+python3 -c "
+from PIL import Image
+Image.open('$SCRATCH/mediacheck/<gid>.jpg').convert('RGB').save('$SCRATCH/mediacheck/<gid>-fixed.jpg', 'JPEG', quality=90)
+"
+curl -s -X PUT "$BASE/media/<handle>/file" -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: image/jpeg" --data-binary @"$SCRATCH/mediacheck/<gid>-fixed.jpg"
+```
+
+Verify by pulling the thumbnail back and decoding it (`GET
+/api/media/<handle>/thumbnail/250`, then `Image.open(...).load()` should not
+raise) — a 200 status alone doesn't prove the bytes are valid, that's
+exactly the failure mode being fixed.
+
 ## Missing-field backfills
 
 The same fetch-modify-PUT pattern handles bulk backfills the MCP tools

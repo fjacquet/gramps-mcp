@@ -202,6 +202,33 @@ the file rather than propagating the wrong label into a citation.
 macOS `sips -s format jpeg -Z 1400 <in> --out <out>` gives a readable
 thumbnail cheaply — batch-convert before reading, don't read 5 MB scans.
 
+**That same `sips` output breaks Gramps Web's thumbnail if uploaded as-is.**
+`sips` preserves the source's colorspace, and old scans (Ancestry/
+FamilySearch exports especially) are often already grayscale — `sips`
+keeps them grayscale (JPEG mode `L`), sometimes with an embedded gray ICC
+profile. The full file uploads and downloads fine, but the server's AVIF
+thumbnail generator produces a corrupt/undecodable thumbnail from a
+grayscale source: the media page shows a broken-image icon even though the
+underlying file is intact. 44 of 55 uploads in one session broke this way
+before it was caught.
+
+Before `create_media`, force RGB on the file that will actually be
+uploaded (the `sips` thumbnail is fine to read from, but don't upload that
+same file if it came out grayscale):
+
+```python
+from PIL import Image
+Image.open(path).convert("RGB").save(path, "JPEG", quality=90)
+```
+
+If a broken thumbnail turns up later (page shows a broken-image icon, full
+file downloads fine via `.../media/<handle>/file`), fix it in place rather
+than re-uploading as a new record: convert to RGB, then `PUT
+/api/media/<handle>/file` with the fixed bytes - handle, `gramps_id`, and
+every citation's `media_list` link stay intact, only the stored file and
+its checksum change. See the `gramps-rest-recovery` skill for the batch
+version of this fix.
+
 ## Style
 
 Keep per-record confirmations short — one or two lines naming who was
