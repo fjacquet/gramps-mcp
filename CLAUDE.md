@@ -20,6 +20,10 @@
   - **Pull requests**: this is a fork, so `gh pr create` needs
     `--repo fjacquet/gramps-mcp`; without it the error names a token problem,
     which is misleading. Merge with `--merge`, never `--squash`.
+  - **`.mcp.json`** (project-scoped) wires up `context7` and `github` MCP
+    servers for every contributor; `.claude/skills,agents,hooks/` are
+    tracked too (only `settings.local.json`, `RESUME.md`, `tdd-guard/` stay
+    local).
 
 ### Code Structure & Modularity
 - **Never create a file longer than 500 lines.** Enforced in `tests/` as well as
@@ -103,10 +107,22 @@
   `EventSaveParams` needs `type` and `citation_list` to change only `place`;
   `PersonData` needs `primary_name` and `gender`; `DateValue` accepts only
   `dateval`/`modifier`/`quality`/`text` - there is no `year`.
+- **`create_event`'s `place` is required, and must be a Place handle, not a
+  name** - passing a commune name string is rejected outright
+  (`place must be a place handle, not a name`). `find_type(type='place',
+  ...)` first; if it doesn't exist, `geocode_place` then `create_place`
+  **with `placeref_list` set to the parent** (canton/state, then country)
+  in the same call. `code` on `create_place` is a free-text field (postal
+  code) - it does not link a parent and is not a substitute for
+  `placeref_list`. A place created without one renders as a bare name with
+  no hierarchy, and nothing catches this automatically.
 - **Back up the live tree before any risky change.** The client has no export
   support, so GET `/api/exporters/gramps/file` with a bearer token from
   `AuthManager`. Gzipped Gramps XML, lossless, ~600 KB. Media files are *not*
   included - the XML carries only `<object>` references.
+- **GEDCOM export is extension `ged`, not `gedcom`.** `GET
+  /api/exporters/ged/file` (not `.../exporters/gedcom/...`, which 404s).
+  `GET /api/exporters/` lists every valid extension if in doubt.
 - **The API exposes more than this server uses: 96 of 193 operations.**
   `docs/reference/gramps-web-api.md` lists every operation against the
   `ApiCalls` member that reaches it, generated from the vendored
@@ -142,6 +158,12 @@
     handwritten, pre-1950, in French and German hands. Treat the endpoint as
     unproven on anything older than typescript, and do not route a register
     through it in place of reading it.
+  - **`DELETE /api/<type>/<handle>`** exists for every entity type
+    (people, events, notes, citations, ...) though nothing in `ApiCalls`
+    wraps it and no MCP tool exposes it. It is the only way to remove a
+    record created by mistake - e.g. a `create_person` fired before checking
+    whether the person already existed. A raw PUT is still forbidden
+    (bypasses `merge.py`); DELETE is not a PUT and carries no such caveat.
 - **Traversal tests must assert on the rendered output, not only on
   `TraversalResult.edges`.** Two defects shipped in #27 because the tests
   checked the graph and never called `format_traversal` on the tree they had
@@ -178,9 +200,15 @@
   (`citation_list`, `note_list`, etc.).** The API stores it literally as a
   broken pseudo-handle, invisible until GEDCOM export crashes with
   `HandleError`. Always copy the real handle from the tool's own return
-  value. To audit the whole tree for this: fetch every entity via the REST
-  API, collect all real handles, then walk every `*_list` field checking
-  each ref against that set - `0 broken references found` is the target.
+  value. The same failure shows up in other shapes too: a citation's
+  `source_handle` set to its own handle (copy-paste between two params in
+  one call), or another record's handle landing in the wrong field
+  entirely - the fix and the audit are identical either way. To audit the
+  whole tree: fetch every entity via the REST API, collect all real
+  handles, then walk every `*_list` field *and* every single-handle field
+  (`source_handle`, `father_handle`, `mother_handle`, `place`) checking
+  each ref against the right handle set - `0 broken references found` is
+  the target. Packaged as the `gramps-rest-recovery` skill.
 - **`create_sourced_event` always creates a brand-new event** - it never
   matches an existing one for the person/family. To add a corroborating
   citation or correct a date on an event that already exists, call
