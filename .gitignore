@@ -11,7 +11,9 @@ __pycache__
 .env-*
 .env.*
 !.env.example
-.claude/
+.claude/settings.local.json
+.claude/RESUME.md
+.claude/tdd-guard/
 coverage.xml
 .coverage
 
