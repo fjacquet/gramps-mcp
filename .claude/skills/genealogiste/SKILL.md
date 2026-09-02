@@ -247,10 +247,11 @@ check by checksum before retrying, or duplicate media records pile up.
 `date.format` / `date.newyear` / `date.sortval` "Extra inputs are not
 permitted" - was a defect in `create_media_tool`, fixed in the source on
 2026-09-02. It echoed the server's own record back into the PUT, where
-the raw `date` object failed revalidation. The MCP tool runs the
-published image, not the working tree, so the crash persists until that
-image is rebuilt and the container restarted - keep using the checksum
-check above until it is.)
+the raw `date` object failed revalidation. The image was rebuilt and the
+container recreated the same day, so the tool no longer crashes. The
+duplicates that year of crashes left behind - 60 media records holding a
+file another record already referenced - were merged on 2026-09-02 by
+`scripts/dedupe_media.py`, leaving 1171 objects and no broken reference.)
 
 ## Style
 
