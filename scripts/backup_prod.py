@@ -54,6 +54,7 @@ TIMEOUT = httpx.Timeout(600.0, connect=30.0)
 
 # Reason: the archive is built server-side and can take minutes on a large
 # tree; poll rather than assume the first response carries the filename.
+CHUNK_BYTES = 1024 * 1024
 ARCHIVE_POLL_SECONDS = 5
 ARCHIVE_POLL_ATTEMPTS = 60
 
@@ -118,20 +119,25 @@ async def download_xml(client: httpx.AsyncClient, headers: dict, target: Path) -
     Raises:
         SystemExit: When the download fails or the body is not gzip.
     """
-    response = await client.get(
-        f"{api_base()}/exporters/gramps/file", headers=headers, timeout=TIMEOUT
-    )
-    if response.status_code != 200:
-        sys.exit(
-            f"XML export failed: HTTP {response.status_code} {response.text[:200]}"
-        )
+    # Reason: stream to disk rather than buffering the body. The media
+    # archive alongside this one isnearly a gigabyte, and holding a whole
+    # backup in memory - then a second copy to write it - is the shape
+    # CodeRabbit already flagged on media_upload.py in PR #4.
+    staging = target.with_suffix(target.suffix + ".part")
+    async with client.stream(
+        "GET", f"{api_base()}/exporters/gramps/file", headers=headers, timeout=TIMEOUT
+    ) as response:
+        if response.status_code != 200:
+            body = (await response.aread())[:200]
+            sys.exit(f"XML export failed: HTTP {response.status_code} {body!r}")
+        with staging.open("wb") as handle:
+            async for chunk in response.aiter_bytes(CHUNK_BYTES):
+                handle.write(chunk)
 
     # Reason: a token that expired mid-run returns a JSON error with HTTP
     # 200 in some deployments. Decompressing one member proves the body is
     # really the export and not an error page, before it replaces any
     # earlier backup.
-    staging = target.with_suffix(target.suffix + ".part")
-    staging.write_bytes(response.content)
     try:
         with gzip.open(staging, "rb") as handle:
             head = handle.read(200)
@@ -224,17 +230,21 @@ async def download_media(
 
     filename = await wait_for_archive(client, headers, task_id)
 
-    archive = await client.get(
-        f"{api_base()}/media/archive/{filename}", headers=headers, timeout=TIMEOUT
-    )
-    if archive.status_code != 200:
-        sys.exit(
-            f"Media archive download failed: HTTP {archive.status_code} "
-            f"{archive.text[:200]}"
-        )
-
     staging = target.with_suffix(target.suffix + ".part")
-    staging.write_bytes(archive.content)
+    async with client.stream(
+        "GET",
+        f"{api_base()}/media/archive/{filename}",
+        headers=headers,
+        timeout=TIMEOUT,
+    ) as archive:
+        if archive.status_code != 200:
+            body = (await archive.aread())[:200]
+            sys.exit(
+                f"Media archive download failed: HTTP {archive.status_code} {body!r}"
+            )
+        with staging.open("wb") as handle:
+            async for chunk in archive.aiter_bytes(CHUNK_BYTES):
+                handle.write(chunk)
     if not zipfile.is_zipfile(staging):
         staging.unlink(missing_ok=True)
         sys.exit("Media archive is not a zip - refusing to keep it.")

@@ -32,7 +32,8 @@ from .config import get_api_base_url, get_settings
 logger = logging.getLogger(__name__)
 
 # Reason: the server's limit is one token request per second, so a wait
-# just over that clears it. Five attempts covers a burst of clients
+# just over that clears it. Five retries after the first attempt - six
+# requests over about six seconds - covers a burst of clients
 # authenticating together without letting a permanently limited server
 # hold the call open indefinitely.
 RATE_LIMIT_RETRY_SECONDS = 1.2

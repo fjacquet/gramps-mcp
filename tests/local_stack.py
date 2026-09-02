@@ -108,8 +108,8 @@ def apply_test_environment() -> None:
     # Reason: the media_path tests upload tests/sample/33SQ-GP8N-NLK.jpg,
     # a fixture inside the repository. The default import root is /tmp, so
     # without this every one of them is refused by resolve_media_path -
-    # which is the containment check doing its job, not a bug. Widening
-    # the root to the repository is safe here and nowhere else: it is the
-    # test process reading its own fixtures, not the MCP container
-    # exposing a host filesystem.
-    os.environ["GRAMPS_MEDIA_IMPORT_ROOT"] = str(REPO_ROOT)
+    # which is the containment check doing its job, not a bug. The root is
+    # tests/ rather than the repository, deliberately: the repository root
+    # holds .env, the file commit 9f6b11a added that containment check to
+    # keep unreachable. Nothing under tests/ is a secret.
+    os.environ["GRAMPS_MEDIA_IMPORT_ROOT"] = str(REPO_ROOT / "tests")
