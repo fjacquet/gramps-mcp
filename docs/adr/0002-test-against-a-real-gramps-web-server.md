@@ -4,7 +4,13 @@ Date: 2025-09-11
 
 ## Status
 
-Accepted
+Accepted, and narrowed by
+[ADR 0010](0010-run-the-tests-against-a-local-stack.md): the no-mocks rule
+below stands unchanged, but the live server the suite talks to is now a
+local stack seeded from a backup, not the production tree. The costs
+recorded under Consequences - writes to a real genealogy database,
+leftover `Pytest`-prefixed objects, credentials for a full run - no longer
+apply.
 
 ## Context
 

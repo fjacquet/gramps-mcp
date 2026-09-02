@@ -30,11 +30,24 @@ uv run pre-commit install
 
 This project follows **Test-Driven Development (TDD)** practices:
 
+Start the local Gramps Web stack once, and seed it:
+
+```bash
+# Take a backup of your Gramps Web instance (reads .env, writes ./backup)
+uv run python scripts/backup_prod.py
+
+# Start the test stack and restore the backup into it
+docker compose -f docker-compose.test.yml up -d
+uv run python scripts/seed_test_tree.py
+```
+
+Then:
+
 ```bash
 # Run all tests
 uv run pytest
 
-# Run only the tests that work without a server
+# Run only the tests that work without the stack running
 uv run pytest -m "not integration"
 
 # Run specific test file
@@ -47,12 +60,20 @@ uv run pytest -xvs
 uv run pytest tests/test_search_basic.py::TestFindPersonTool::test_find_person -xvs
 ```
 
-**Important**: Tests use real Gramps Web API connections (no mocks). Ensure you have a test Gramps Web instance configured in your `.env` file.
+**Important**: tests use real Gramps Web API connections (no mocks), but never
+your live tree. `tests/conftest.py` points them at the local stack and refuses
+any host outside `localhost`, `127.0.0.1`, `::1` and `host.docker.internal` -
+pytest does not read `.env` at all. See
+[ADR 0010](docs/adr/0010-run-the-tests-against-a-local-stack.md).
 
-Without a live instance, use `uv run pytest -m "not integration"`. Server-dependent
-modules (or, in a mixed module, the classes that need a server) carry
-`pytestmark = pytest.mark.integration`. That offline selection is green; a
-failure there is a regression, not an environment problem.
+`backup/` and `tests/.local-tree-id` are gitignored: the backup holds real
+genealogy data and this repository is public.
+
+Without the stack running, use `uv run pytest -m "not integration"`.
+Server-dependent modules (or, in a mixed module, the classes that need a
+server) carry `pytestmark = pytest.mark.integration`. That offline selection
+is green and is what CI runs; a failure there is a regression, not an
+environment problem.
 
 The search tests were split across `tests/test_search_basic.py`,
 `test_search_details.py`, `test_search_find_anything.py`, `test_search_find_type.py`
