@@ -1,9 +1,10 @@
 """
-Shared fixtures creating real records in the Gramps Web tree.
+Shared fixtures creating real records in the local Gramps Web stack.
 
-Nothing here fakes the API. Each fixture performs a real create against the
-configured server, yields the handle, and deletes the record afterwards. They
-exist so that no test depends on another test having run first.
+Nothing here fakes the API. Each fixture performs a real create against
+the local test stack - never the live tree - yields the handle, and
+deletes the record afterwards. They exist so that no test depends on
+another test having run first.
 
 Scope is "module": one set of records per test module, reused by its tests.
 """
@@ -13,20 +14,36 @@ from collections.abc import AsyncIterator
 import pytest
 import pytest_asyncio
 
-from src.gramps_mcp.client import GrampsWebAPIClient
-from src.gramps_mcp.config import get_settings
-from src.gramps_mcp.models.api_calls import ApiCalls
-from src.gramps_mcp.models.parameters.citation_params import CitationData
-from src.gramps_mcp.models.parameters.event_params import EventSaveParams
-from src.gramps_mcp.models.parameters.family_params import FamilySaveParams
-from src.gramps_mcp.models.parameters.media_params import MediaSaveParams
-from src.gramps_mcp.models.parameters.note_params import NoteSaveParams
-from src.gramps_mcp.models.parameters.people_params import PersonData
-from src.gramps_mcp.models.parameters.place_params import PlaceSaveParams
-from src.gramps_mcp.models.parameters.repository_params import RepositoryData
-from src.gramps_mcp.models.parameters.source_params import SourceSaveParams
-from src.gramps_mcp.tools.data_management import _extract_entity_data
-from tests.constants import PREFIX
+from tests.local_stack import apply_test_environment
+
+# Reason: get_settings() reads os.environ on every call and caches
+# nothing, and config.py's module-level load_dotenv() does not override
+# variables already set - so setting them here, before any test module is
+# imported, is what keeps .env (the live server) out of the test run.
+# pytest imports conftest.py first, which is what makes that ordering
+# hold. The imports below therefore come after the call, not before.
+apply_test_environment()
+
+from src.gramps_mcp.client import GrampsWebAPIClient  # noqa: E402
+from src.gramps_mcp.config import get_settings  # noqa: E402
+from src.gramps_mcp.models.api_calls import ApiCalls  # noqa: E402
+from src.gramps_mcp.models.parameters.citation_params import CitationData  # noqa: E402
+from src.gramps_mcp.models.parameters.event_params import EventSaveParams  # noqa: E402
+from src.gramps_mcp.models.parameters.family_params import (  # noqa: E402
+    FamilySaveParams,
+)
+from src.gramps_mcp.models.parameters.media_params import MediaSaveParams  # noqa: E402
+from src.gramps_mcp.models.parameters.note_params import NoteSaveParams  # noqa: E402
+from src.gramps_mcp.models.parameters.people_params import PersonData  # noqa: E402
+from src.gramps_mcp.models.parameters.place_params import PlaceSaveParams  # noqa: E402
+from src.gramps_mcp.models.parameters.repository_params import (  # noqa: E402
+    RepositoryData,
+)
+from src.gramps_mcp.models.parameters.source_params import (  # noqa: E402
+    SourceSaveParams,
+)
+from src.gramps_mcp.tools.data_management import _extract_entity_data  # noqa: E402
+from tests.constants import PREFIX  # noqa: E402
 
 
 async def create_entity(client, tree_id, api_call, params_model, entity_type) -> str:

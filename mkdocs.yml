@@ -86,3 +86,4 @@ nav:
       - 0007 Expose destructive operations: adr/0007-expose-destructive-operations.md
       - 0008 Duplicate the detection logic: adr/0008-duplicate-the-genealogy-detection-logic.md
       - 0009 Third-party gazetteers: adr/0009-reach-third-party-gazetteers.md
+      - 0010 Tests against a local stack: adr/0010-run-the-tests-against-a-local-stack.md

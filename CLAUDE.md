@@ -58,23 +58,41 @@
   `tests/test_client_merge.py` and `tests/test_http_error_detail.py` do.
   Assertions must read the output of the code under test, never the stub's
   call arguments - a test that asserts on its own mock proves nothing.
-- **Most tests need a live Gramps Web server** (`GRAMPS_API_URL` etc. from `.env`)
-  and fail with connection errors offline - this is expected, not a regression.
-  Server-dependent test modules (or, within a mixed module, the classes that
-  need it) carry `pytestmark = pytest.mark.integration`. To run only the
-  tests that work offline: `uv run pytest -m "not integration"`. That selection
-  is green. CI still runs a narrower explicit file list in
-  `.github/workflows/ci.yml`, a strict subset of what the marker selects.
-- **The Gramps Web server is remote** (`GRAMPS_API_URL` in `.env` points at a
-  hosted instance). Live tests run from the macOS host against it with no env
-  override - do not edit `.env`. An empty `docker ps` says nothing about
-  whether the tree is reachable; check the API itself.
+- **The tests never touch the live tree.** `tests/conftest.py` calls
+  `local_stack.apply_test_environment()` at import time, which points
+  `GRAMPS_API_URL` at the local stack and refuses any host outside
+  `localhost`, `127.0.0.1`, `::1`, `host.docker.internal`. pytest does not
+  read `.env` at all. `scripts/backup_prod.py` is the only thing in the
+  repository that still talks to the live server.
+- **Starting the test environment**, in this order:
+  ```bash
+  uv run python scripts/backup_prod.py      # once; reads the live tree
+  docker compose -f docker-compose.test.yml up -d
+  uv run python scripts/seed_test_tree.py   # restores the backup, idempotent
+  uv run pytest                             # 813 passed, 1 skipped
+  ```
+  `backup/` and `tests/.local-tree-id` are gitignored: the first holds real
+  data on living people and this repository is public, the second holds a
+  UUID minted when the stack's volumes are created. Re-running the seed
+  script also wipes whatever residue a failed teardown left behind - the
+  restore replaces the tree's contents rather than adding to them.
+- **Integration tests still carry `pytestmark = pytest.mark.integration`**
+  (32 modules, 157 tests) and still need the stack running.
+  `uv run pytest -m "not integration"` (657 tests) passes with the stack
+  down, which is what CI runs - `.github/workflows/ci.yml` names the
+  `tests/` directory and the marker filter, no allowlist.
 - **`GRAMPS_API_URL` has no `/api` suffix.** The REST base is
   `${GRAMPS_API_URL%/}/api`; calling it without the suffix returns the app's HTML
   page with HTTP 200, not an error.
-- **`tree_stats` returns a permission error even for the owner-role account
-  in `.env`.** A `tree_stats` failure ("Permission denied for this
-  operation") is an environment fact, not a regression.
+- **`tree_stats` fails against the live tree** ("Permission denied for this
+  operation"): the account in `.env` has the owner role, and the tool reads
+  `/trees/<id>`, which only an admin may do. Not a regression. The test
+  stack's account is created with the admin role precisely so the tool can
+  be tested, so `tree_stats` passes there and fails in production.
+- **The token endpoint is capped at one request per second.** `AuthManager`
+  retries a 429 up to five times, 1.2 s apart (`auth.py`). Without that,
+  a burst of clients authenticating together - which the suite does - fails
+  with "Authentication failed: HTTP 429", an error about nothing being wrong.
 - **The MCP server runs in Docker**, container `gramps-mcp-gramps-mcp-1` on the
   published image `ghcr.io/fjacquet/gramps-mcp:latest`, exposed on
   `http://localhost:8000/mcp` (what `.mcp.json` targets). So it executes the

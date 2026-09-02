@@ -31,6 +31,14 @@ from .config import get_api_base_url, get_settings
 
 logger = logging.getLogger(__name__)
 
+# Reason: the server's limit is one token request per second, so a wait
+# just over that clears it. Five retries after the first attempt - six
+# requests over about six seconds - covers a burst of clients
+# authenticating together without letting a permanently limited server
+# hold the call open indefinitely.
+RATE_LIMIT_RETRY_SECONDS = 1.2
+RATE_LIMIT_MAX_RETRIES = 5
+
 
 class AuthManager:
     """Singleton JWT authentication for Gramps Web API."""
@@ -118,6 +126,45 @@ class AuthManager:
             self._loop = current_loop
         return self._client
 
+    async def _post_token(self) -> httpx.Response:
+        """
+        Ask for a token, waiting out the endpoint's rate limit.
+
+        Returns:
+            httpx.Response: The last response received, whatever its status.
+        """
+        # Reason: Gramps Web caps /token/ at one request per second
+        # (gramps_webapi/api/resources/token.py). Anything authenticating
+        # several clients in quick succession - the integration suite does
+        # exactly that - gets an HTTP 429, which used to reach the caller
+        # as "Authentication failed: HTTP 429": an error report about
+        # nothing being wrong. Waiting is the correct response to a rate
+        # limit, and the loop is bounded so a server that always answers
+        # 429 still raises rather than hanging.
+        response = await self._post_token_once()
+        for _ in range(RATE_LIMIT_MAX_RETRIES):
+            if response.status_code != 429:
+                return response
+            logger.info("Token endpoint rate limited, retrying")
+            await asyncio.sleep(RATE_LIMIT_RETRY_SECONDS)
+            response = await self._post_token_once()
+        return response
+
+    async def _post_token_once(self) -> httpx.Response:
+        """
+        Issue one token request.
+
+        Returns:
+            httpx.Response: The server's response, whatever its status.
+        """
+        return await self.client.post(
+            "/token/",
+            json={
+                "username": self.settings.gramps_username,
+                "password": self.settings.gramps_password,
+            },
+        )
+
     async def authenticate(self) -> str:
         """
         Authenticate with Gramps Web API and get access token.
@@ -126,13 +173,7 @@ class AuthManager:
             Access token string
         """
         try:
-            response = await self.client.post(
-                "/token/",
-                json={
-                    "username": self.settings.gramps_username,
-                    "password": self.settings.gramps_password,
-                },
-            )
+            response = await self._post_token()
             response.raise_for_status()
 
             data = response.json()
