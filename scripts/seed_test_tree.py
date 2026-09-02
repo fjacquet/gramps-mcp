@@ -46,10 +46,13 @@ from tests import local_stack  # noqa: E402
 
 BACKUP_DIR = REPO_ROOT / "backup"
 COMPOSE_FILE = REPO_ROOT / "docker-compose.test.yml"
-# Reason: mirror the live account's role (owner, not admin) so the tests
-# meet the same permission surface they meet in production - including
-# whatever tree_stats does with it.
-OWNER_ROLE = 4
+# Reason: ROLE_ADMIN (5), not ROLE_OWNER (4) as the live account uses.
+# get_tree_info reads GET /trees/, which an owner is refused with "Not
+# authorized to view other trees" - the same 403 CLAUDE.md records
+# against production. A test account that cannot exercise the tool under
+# test would leave that test permanently red for a reason unrelated to
+# the code.
+OWNER_ROLE = 5
 TIMEOUT = httpx.Timeout(1800.0, connect=30.0)
 STAMP = re.compile(r"^tree-(\d{4}-\d{2}-\d{2})\.gramps\.gz$")
 
@@ -337,6 +340,34 @@ async def upload_media(client: httpx.AsyncClient, headers: dict, archive: Path) 
     print(f"MEDIA  {archive.name} uploaded")
 
 
+async def record_tree_id(client: httpx.AsyncClient, headers: dict) -> None:
+    """
+    Write the stack's tree id where local_stack.tree_id() reads it.
+
+    Args:
+        client (httpx.AsyncClient): Client used for the request.
+        headers (dict): Authorization header.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: When the metadata carries no database id.
+    """
+    response = await client.get(api("metadata/"), headers=headers, timeout=TIMEOUT)
+    if response.status_code != 200:
+        sys.exit(f"Metadata request failed: HTTP {response.status_code}")
+    # Reason: the id is minted when the stack's volumes are created, so it
+    # changes with every "down -v". get_tree_info reads /trees/<id> and
+    # answers 404 for a stale one, which is why it is recorded rather than
+    # hardcoded.
+    database_id = (response.json().get("database") or {}).get("id")
+    if not database_id:
+        sys.exit("Metadata carried no database id.")
+    local_stack.TREE_ID_FILE.write_text(f"{database_id}\n")
+    print(f"TREE   {database_id}")
+
+
 async def report_counts(client: httpx.AsyncClient, headers: dict) -> None:
     """
     Print how many media objects the seeded tree has, and how many lack files.
@@ -376,6 +407,7 @@ async def main() -> None:
         headers = {"Authorization": f"Bearer {await get_token(client)}"}
         await restore_tree(client, headers, xml)
         await upload_media(client, headers, media)
+        await record_tree_id(client, headers)
         await report_counts(client, headers)
 
 

@@ -12,6 +12,9 @@ class _FakeResponse:
 
     def __init__(self, token: str) -> None:
         self._token = token
+        # Reason: authenticate() reads the status before anything else, to
+        # tell a rate-limited request (429) from a real answer.
+        self.status_code = 200
 
     def raise_for_status(self) -> None:
         """No-op: the fake transport never returns an error status."""
