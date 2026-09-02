@@ -196,6 +196,41 @@
 - See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
   research/data-entry workflow (sourcing chain, media attachment, match vs.
   hypothesis handling, homonym hygiene).
+- **Occupations are events, never attributes.** On 2026-09-01 the tree was
+  converged: all 28 `attribute_list` entries of type `Occupation` became
+  `Occupation` events, leaving 145 events and zero such attributes. An event
+  carries a date, a place and citations; an attribute carries none of the
+  three. Do not reintroduce the attribute form. Store the trade bilingually in
+  `description`, reader's language first: `Charpentier (all. Zimmermann)`,
+  `arystokrata ... (aristocrate ...)`.
+- **Gramps localises nothing you write.** `locale=fr` translates only its own
+  enums via the profile (event type, relationship); free text - occupation
+  descriptions, note bodies, citation `page` - is stored and served verbatim.
+  Bilingual content therefore has to be written into the field itself.
+- **`attribute_list` merges on update and the MCP tools cannot replace it.**
+  A second `create_person` carrying a different `Occupation` appends a
+  duplicate instead of overwriting, `detach_reference` only handles
+  reference-lists (`event_ref_list`, `media_list`, ...), and
+  `create_person`'s schema rejects `replace_lists` outright. The only way to
+  rewrite or empty it is a script calling
+  `make_api_call(ApiCalls.PUT_PERSON, ..., replace_lists=["attribute_list"])`
+  - the parameter is generic (`client.py`, `merge.py`), it is merely absent
+  from that one tool's advertised schema.
+- **Do not bulk-promote a place or a date out of citation text.** Measured on
+  2026-09-01: of 12 events whose citation named a known place next to a word
+  for that event's own act type, **1** was right. The source title is the
+  trap - every `K Nidau ...` citation contains "Nidau", so the register's name
+  matches as if it were the location, while the actual place sits later in the
+  page (Biel, Genève, Gorgier, Rueggisberg). The rest attached a *birth* place
+  to a death ("née à Bourges" on a death act) or a relative's place to the
+  wrong person. Dates fail the same way: a year in an occupation citation is
+  the person's birth year, not the year of the trade. Promote these one at a
+  time, reading the page, never in a lot.
+- **Reading the tree over REST: `?page=1` is the first page** (`page=0` returns
+  HTTP 422), and `?gql=` silently returns 0 for any `attribute_list.any.*`
+  filter - page through and filter in Python instead. An audit scoped to an ID
+  range or a hand-picked sample will miss records; scope it to the whole tree
+  or say plainly that it did not.
 - **Never pass a `gramps_id` string (e.g. `"C0619"`) into a `*_list` field
   (`citation_list`, `note_list`, etc.).** The API stores it literally as a
   broken pseudo-handle, invisible until GEDCOM export crashes with
