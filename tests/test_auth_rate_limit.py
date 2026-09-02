@@ -96,10 +96,24 @@ class TestTokenRateLimit:
 class _Client:
     """Minimal stand-in exposing the one method authenticate() calls."""
 
-    def __init__(self, post):
+    def __init__(self, post: AsyncMock) -> None:
+        """
+        Hold the mock that stands in for httpx.AsyncClient.post.
+
+        Args:
+            post (AsyncMock): The coroutine authenticate() will await.
+        """
         self.post = post
 
 
-def post_client(post):
-    """Wrap a mock post callable in an object shaped like httpx.AsyncClient."""
+def post_client(post: AsyncMock) -> _Client:
+    """
+    Wrap a mock post callable in an object shaped like httpx.AsyncClient.
+
+    Args:
+        post (AsyncMock): The coroutine to expose as .post.
+
+    Returns:
+        _Client: An object authenticate() can use as its client.
+    """
     return _Client(post)

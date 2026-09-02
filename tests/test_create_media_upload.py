@@ -30,6 +30,7 @@ the client's own validation all run for real, and the assertions read the
 text the tool returns.
 """
 
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -75,10 +76,16 @@ class FakeSettings:
     gramps_tree_id = "test_tree"
 
     def __init__(self, import_root: str) -> None:
+        """
+        Record the directory media_path values must resolve inside.
+
+        Args:
+            import_root (str): The test's own temporary directory.
+        """
         self.gramps_media_import_root = import_root
 
 
-async def _fake_transport(method, url, **kwargs):
+async def _fake_transport(method: str, url: str, **kwargs: object) -> object:
     """Answer every request with the raw record the real server returns."""
     if method == "POST":
         return [{"new": dict(RAW_MEDIA_OBJECT)}]
@@ -86,7 +93,7 @@ async def _fake_transport(method, url, **kwargs):
 
 
 @pytest.fixture
-def staged_scan(tmp_path, monkeypatch):
+def staged_scan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     """Write a file inside a patched import root and return its path."""
     settings = FakeSettings(str(tmp_path))
     monkeypatch.setattr(media_upload, "get_settings", lambda: settings)

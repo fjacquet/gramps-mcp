@@ -77,7 +77,7 @@
   script also wipes whatever residue a failed teardown left behind - the
   restore replaces the tree's contents rather than adding to them.
 - **Integration tests still carry `pytestmark = pytest.mark.integration`**
-  (28 modules, 156 tests) and still need the stack running.
+  (32 modules, 157 tests) and still need the stack running.
   `uv run pytest -m "not integration"` (657 tests) passes with the stack
   down, which is what CI runs - `.github/workflows/ci.yml` names the
   `tests/` directory and the marker filter, no allowlist.

@@ -35,6 +35,7 @@ import re
 import shlex
 import subprocess
 import sys
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import httpx
@@ -52,7 +53,7 @@ COMPOSE_FILE = REPO_ROOT / "docker-compose.test.yml"
 # against production. A test account that cannot exercise the tool under
 # test would leave that test permanently red for a reason unrelated to
 # the code.
-OWNER_ROLE = 5
+TEST_ACCOUNT_ROLE = 5
 TIMEOUT = httpx.Timeout(1800.0, connect=30.0)
 STAMP = re.compile(r"^tree-(\d{4}-\d{2}-\d{2})\.gramps\.gz$")
 
@@ -60,8 +61,28 @@ WAIT_ATTEMPTS = 60
 WAIT_SECONDS = 5
 TASK_ATTEMPTS = 360
 TASK_SECONDS = 5
+CHUNK_BYTES = 1024 * 1024
 TOKEN_ATTEMPTS = 12
 TOKEN_RETRY_SECONDS = 15
+
+
+async def file_chunks(path: Path) -> AsyncIterator[bytes]:
+    """
+    Yield a file's bytes a megabyte at a time.
+
+    Args:
+        path (Path): File to stream.
+
+    Yields:
+        bytes: One chunk of the file.
+    """
+    # Reason: the media archive is close to a gigabyte. Reading it whole
+    # holds it in memory and then again in the request body - the shape
+    # CodeRabbit flagged on media_upload.py in PR #4, and that PR #32
+    # bounded there. Streaming it keeps the script's footprint flat.
+    with path.open("rb") as handle:
+        while chunk := handle.read(CHUNK_BYTES):
+            yield chunk
 
 
 def api(path: str) -> str:
@@ -141,9 +162,9 @@ async def wait_for_server(client: httpx.AsyncClient) -> None:
     )
 
 
-def create_owner() -> None:
+def create_account() -> None:
     """
-    Create the stack's owner account through the container's own CLI.
+    Create the stack's admin account through the container's own CLI.
 
     Returns:
         None
@@ -161,7 +182,7 @@ def create_owner() -> None:
         "/venv/bin/python -m gramps_webapi --config /app/config/config.cfg user add "
         f"{shlex.quote(local_stack.USERNAME)} {shlex.quote(local_stack.PASSWORD)} "
         f"--fullname {shlex.quote(local_stack.FULL_NAME)} "
-        f"--email {shlex.quote(local_stack.EMAIL)} --role {OWNER_ROLE}"
+        f"--email {shlex.quote(local_stack.EMAIL)} --role {TEST_ACCOUNT_ROLE}"
     )
     result = subprocess.run(
         [
@@ -185,7 +206,7 @@ def create_owner() -> None:
             "Could not create the owner account:\n"
             f"{result.stdout[-500:]}{result.stderr[-500:]}"
         )
-    print(f"owner  {local_stack.USERNAME} created")
+    print(f"admin  {local_stack.USERNAME} created")
 
 
 async def get_token(client: httpx.AsyncClient) -> str:
@@ -223,7 +244,7 @@ async def get_token(client: httpx.AsyncClient) -> str:
             await asyncio.sleep(TOKEN_RETRY_SECONDS)
             continue
         if response.status_code in (401, 403) and not created:
-            create_owner()
+            create_account()
             created = True
             continue
         sys.exit(f"Token request failed: HTTP {response.status_code} {response.text}")
@@ -295,14 +316,13 @@ async def restore_tree(client: httpx.AsyncClient, headers: dict, xml: Path) -> N
     Raises:
         SystemExit: When either call fails.
     """
-    payload = xml.read_bytes()
     # Reason: /restore replaces the tree's contents; /file would add to
     # them, so a second run would duplicate every record in the tree.
     url = api("importers/gramps/file/restore")
     dry = await client.post(
         url,
         params={"dry_run": "true"},
-        content=payload,
+        content=file_chunks(xml),
         headers=headers,
         timeout=TIMEOUT,
     )
@@ -310,7 +330,9 @@ async def restore_tree(client: httpx.AsyncClient, headers: dict, xml: Path) -> N
     for key in ("to_add", "to_update", "to_delete"):
         print(f"dry    {key}: {summary.get(key)}")
 
-    real = await client.post(url, content=payload, headers=headers, timeout=TIMEOUT)
+    real = await client.post(
+        url, content=file_chunks(xml), headers=headers, timeout=TIMEOUT
+    )
     await run_task(client, headers, real, "restore")
     print(f"XML    {xml.name} restored")
 
@@ -332,7 +354,7 @@ async def upload_media(client: httpx.AsyncClient, headers: dict, archive: Path) 
     """
     response = await client.post(
         api("media/archive/upload/zip"),
-        content=archive.read_bytes(),
+        content=file_chunks(archive),
         headers=headers,
         timeout=TIMEOUT,
     )

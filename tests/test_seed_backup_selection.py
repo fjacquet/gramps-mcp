@@ -7,12 +7,14 @@ puzzling test failures rather than as a seeding error. The selection
 therefore refuses a date that has only one half.
 """
 
+from pathlib import Path
+
 import pytest
 
 from scripts.seed_test_tree import newest_backup_pair
 
 
-def _pair(directory, stamp, xml=True, media=True):
+def _pair(directory: Path, stamp: str, xml: bool = True, media: bool = True) -> None:
     """Write one or both halves of a backup for the given date stamp."""
     if xml:
         (directory / f"tree-{stamp}.gramps.gz").write_bytes(b"x")
