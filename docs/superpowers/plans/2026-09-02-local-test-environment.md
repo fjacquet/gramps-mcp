@@ -15,7 +15,7 @@
 - Every command runs from the repo root through uv: `uv run pytest`, `uv run python`, `uv run git commit`.
 - No file over 500 lines, `tests/` included - enforced by pre-commit.
 - Type hints throughout, Google-style docstrings on every function, no emoji.
-- `uv run ruff check src tests scripts` and `uv run ruff format --check` must pass; `uv run mypy src/gramps_mcp --ignore-missing-imports` must stay clean.
+- `uv run ruff check src tests` and `uv run ruff format --check src tests scripts` must pass (CI lints `src/` and `tests/` only; `scripts/add_copyright_notice.py`, `check_file_length.py` and `check_no_emojis.py` carry seven pre-existing UP violations - leave them alone, they are not this plan's business); `uv run mypy src/gramps_mcp --ignore-missing-imports` must stay clean.
 - `uv run pytest -m "not integration"` must stay green at every commit. It is 638 tests before this plan starts.
 - Never `git stash` or `git reset --hard`.
 - The live server's coordinates stay in `.env`, which pytest must stop reading. Do not edit `.env` or `.env-local`.
