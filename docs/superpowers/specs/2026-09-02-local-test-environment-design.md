@@ -94,7 +94,7 @@ restore a backup over the live tree.
 
 1. Wait for the container healthcheck.
 2. `POST /api/users/<owner>/create_owner/` with the credentials
-   `.env-test` declares. Skip when the user already exists.
+   `tests/local_stack.py` declares. Skip when the user already exists.
 3. Obtain a token.
 4. Locate the newest `backup/tree-*.gramps.gz` and matching
    `backup/media-*.zip`. Missing or mismatched dates is an error naming
@@ -109,10 +109,21 @@ and this repository is public.
 
 ### 3. Switching and the guard - root `tests/conftest.py`
 
-`.env-test` is loaded **at conftest import time**, before
-`src.gramps_mcp.config` is first touched. `get_settings()` is a cached
-singleton; loading it from a fixture would arrive after some module has
-already read the live configuration.
+The test target is set **at conftest import time**, in `os.environ`,
+before any test module is imported. `get_settings()` reads `os.environ`
+on every call and caches nothing, and `config.py`'s module-level
+`load_dotenv()` does not override variables already set - so a value
+placed in `os.environ` by the conftest wins over `.env` no matter which
+module imports the configuration first. pytest imports `conftest.py`
+before test modules, which is what makes that ordering guaranteed.
+
+The values live in a tracked module, `tests/local_stack.py`, not in a
+dotenv file: `.gitignore` already swallows `.env-*`, so an env file
+would be untracked and every contributor would have to recreate it. The
+seed script imports the same module, so the credentials it creates and
+the ones pytest authenticates with cannot drift. `gramps_tree_id` may be
+any non-empty string - `_build_url` ignores it, the tree is selected by
+the token (`client.py:73-85`).
 
 The guard compares the **host** of `GRAMPS_API_URL` against an explicit
 list - `localhost`, `127.0.0.1`, `host.docker.internal`. Not a prefix or
