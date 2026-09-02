@@ -1,0 +1,88 @@
+# Gramps Web stack the test suite runs against.
+#
+# Derived from docker-compose-sqllite.yml, with three deliberate
+# differences: no MCP container (the tests import the working tree, and an
+# MCP container would run the published image instead), the port is
+# published on the loopback interface only, and every volume carries a
+# gramps_test_ prefix so that
+#   docker compose -f docker-compose.test.yml down -v
+# resets the test tree and destroys nothing else.
+#
+# Start it, then seed it:
+#   docker compose -f docker-compose.test.yml up -d
+#   uv run python scripts/seed_test_tree.py
+services:
+  grampsweb: &grampsweb
+    image: ghcr.io/gramps-project/grampsweb:latest
+    container_name: grampsweb_test
+    restart: unless-stopped
+    ports:
+      # Reason: loopback only. The stack holds a copy of the real tree and
+      # its owner account's credentials are in tests/local_stack.py, in a
+      # public repository - it must not be reachable off this machine.
+      - "127.0.0.1:5555:5000"
+    environment:
+      GRAMPSWEB_CELERY_CONFIG__broker_url: "redis://grampsweb_test_redis:6379/0"
+      GRAMPSWEB_CELERY_CONFIG__result_backend: "redis://grampsweb_test_redis:6379/0"
+      GRAMPSWEB_RATELIMIT_STORAGE_URI: redis://grampsweb_test_redis:6379/1
+      GRAMPSWEB_TREE: "TestTree" # will create a new tree if not exists
+    depends_on:
+      - grampsweb_test_redis
+    # Reason: the entrypoint runs "user migrate" (alembic upgrade head) before
+    # exec'ing gunicorn, so an open port 5000 means the user DB migration is
+    # done. The celery service keys its startup off this to avoid two
+    # containers migrating the same users.sqlite concurrently.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import socket; socket.create_connection(('localhost', 5000), 2).close()",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+
+    volumes:
+      - gramps_test_users:/app/users # persist user database
+      - gramps_test_index:/app/indexdir # persist search index
+      - gramps_test_thumb_cache:/app/thumbnail_cache # persist thumbnails
+      - gramps_test_cache:/app/cache # persist export and report caches
+      - gramps_test_secret:/app/secret # persist flask secret
+      - gramps_test_db:/root/.gramps/grampsdb # persist Gramps database
+      - gramps_test_media:/app/media # persist media files
+      - gramps_test_tmp:/tmp
+
+  grampsweb_celery:
+    <<: *grampsweb # YAML merge key copying the entire grampsweb service config
+    ports: []
+    container_name: grampsweb_test_celery
+    # Wait for grampsweb to finish migrating the shared user database.
+    # A plain "depends_on: [grampsweb]" only waits for the container to start,
+    # which let both entrypoints run "alembic upgrade head" against the same
+    # SQLite file and corrupt alembic_version (two overlapping revision rows).
+    depends_on:
+      grampsweb:
+        condition: service_healthy
+      grampsweb_test_redis:
+        condition: service_started
+    healthcheck:
+      disable: true # inherited from the anchor; celery serves no HTTP port
+    command: celery -A gramps_webapi.celery worker --loglevel=INFO --concurrency=2
+
+  grampsweb_test_redis:
+    image: docker.io/valkey/valkey:8-alpine
+    container_name: grampsweb_test_redis
+    restart: unless-stopped
+
+volumes:
+  gramps_test_users:
+  gramps_test_index:
+  gramps_test_thumb_cache:
+  gramps_test_cache:
+  gramps_test_secret:
+  gramps_test_db:
+  gramps_test_media:
+  gramps_test_tmp:
