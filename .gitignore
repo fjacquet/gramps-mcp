@@ -29,3 +29,7 @@ output/
 
 # MkDocs build output
 site/
+
+# Local backups of the live tree: Gramps XML plus the media archive.
+# Real genealogy data on living people - this repository is public.
+backup/
