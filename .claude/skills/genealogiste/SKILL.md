@@ -229,6 +229,29 @@ every citation's `media_list` link stay intact, only the stored file and
 its checksum change. See the `gramps-rest-recovery` skill for the batch
 version of this fix.
 
+**A failed `create_media(media_path=...)` may still have created the
+record.** The upload and the metadata PUT are two calls: the file is
+uploaded first, and only then is `desc`/`citation_list` attached. Any
+error raised after the upload leaves a media record behind. Before
+retrying, look for it:
+`find_type(type="media", gql='checksum = "<md5 of the local file>"')`.
+One clean upload yields exactly one match; a blind retry yields two or
+more with identical checksums - `DELETE /api/media/<extra-handle>` the
+duplicates via REST, keep one. Then attach `desc` and `citation_list`
+with `create_media(handle=...)` and **no** `media_path`.
+
+Never conclude a scan failed to upload just because the tool call errored -
+check by checksum before retrying, or duplicate media records pile up.
+
+(The systematic crash on every upload - `date._class` / `date.calendar` /
+`date.format` / `date.newyear` / `date.sortval` "Extra inputs are not
+permitted" - was a defect in `create_media_tool`, fixed in the source on
+2026-09-02. It echoed the server's own record back into the PUT, where
+the raw `date` object failed revalidation. The MCP tool runs the
+published image, not the working tree, so the crash persists until that
+image is rebuilt and the container restarted - keep using the checksum
+check above until it is.)
+
 ## Style
 
 Keep per-record confirmations short — one or two lines naming who was

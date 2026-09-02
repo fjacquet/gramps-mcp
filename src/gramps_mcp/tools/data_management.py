@@ -399,26 +399,21 @@ async def create_media_tool(arguments: dict) -> list[TextContent]:
             )
             media_handle = initial_media_object["handle"]
 
-            # 2. Merge initial object with metadata and update via PUT
-            # Reason: initial_media_object is the raw Gramps API response for
-            # the just-uploaded file. It carries server-computed fields
-            # (_class, checksum, thumb, change, gramps_id, private, tag_list,
-            # attribute_list) that MediaSaveParams does not declare and now
-            # refuses under extra="forbid" (StrictModel). Filter to the keys
-            # the model actually accepts before merging in the caller's
-            # metadata and sending the PUT.
-            allowed_keys = set(MediaSaveParams.model_fields.keys())
-            final_media_data = {
-                key: value
-                for key, value in initial_media_object.items()
-                if key in allowed_keys
-            }
-            if params:
-                final_media_data.update(params.model_dump(exclude_none=True))
-
+            # 2. Attach the caller's metadata to the uploaded record via PUT
+            # Reason: send the caller's own model, never an echo of the
+            # server's response. The PUT re-reads the record it is about to
+            # update and runs it through merge_put_data (client.py), so every
+            # server-computed field the payload omits - checksum, thumb,
+            # gramps_id, path, date - is preserved untouched. Echoing them
+            # back was not merely redundant: a dict payload is re-validated
+            # against MediaSaveParams, and the raw `date` object carries
+            # _class/calendar/format/newyear/sortval, which DateValue refuses
+            # under extra="forbid". Every upload then failed validation after
+            # the record had already been created. Passing the model skips
+            # that re-validation, exactly as the update branch above does.
             result = await client.make_api_call(
                 api_call=ApiCalls.PUT_MEDIA_ITEM,
-                params=final_media_data,
+                params=params,
                 tree_id=tree_id,
                 handle=media_handle,
             )
