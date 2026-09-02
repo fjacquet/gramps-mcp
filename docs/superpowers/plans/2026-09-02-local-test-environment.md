@@ -16,7 +16,7 @@
 - No file over 500 lines, `tests/` included - enforced by pre-commit.
 - Type hints throughout, Google-style docstrings on every function, no emoji.
 - `uv run ruff check src tests` and `uv run ruff format --check src tests scripts` must pass (CI lints `src/` and `tests/` only; `scripts/add_copyright_notice.py`, `check_file_length.py` and `check_no_emojis.py` carry seven pre-existing UP violations - leave them alone, they are not this plan's business); `uv run mypy src/gramps_mcp --ignore-missing-imports` must stay clean.
-- `uv run pytest -m "not integration"` must stay green at every commit. It is 638 tests before this plan starts.
+- `uv run pytest -m "not integration"` must stay green at every commit. It is 638 tests before this plan starts and 657 after it (the guard, the backup-selection and the token rate-limit tests). The whole suite ends at 813 passed, 1 skipped, of which 156 are integration.
 - Never `git stash` or `git reset --hard`.
 - The live server's coordinates stay in `.env`, which pytest must stop reading. Do not edit `.env` or `.env-local`.
 - `backup/` is gitignored and must stay so: it holds real data on living people, this repository is public.
@@ -219,7 +219,7 @@ Expected: 11 passed (the host allowlist parametrisation counts as three).
 - [ ] **Step 6: Verify the offline suite is unharmed**
 
 Run: `uv run pytest -m "not integration" -q`
-Expected: 649 passed (638 + the 11 new).
+Expected: 649 passed (638 + the 11 new). It reaches 657 by the end of the plan.
 
 - [ ] **Step 7: Verify the guard actually bites**
 

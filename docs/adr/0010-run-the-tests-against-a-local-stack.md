@@ -80,6 +80,16 @@ the owner role. That is a deliberate divergence: `get_tree_info` reads
 would leave that test permanently red for a reason unrelated to the code.
 `tree_stats` therefore passes locally and fails against production.
 
+Two things drift and are not defects. `test_get_recent_changes_real_api`
+asserts that the tool returns between one and ten transactions, counted
+from a history the suite itself writes to; it is therefore order-sensitive
+and can fail in a full run with nothing wrong. It is left as it is on
+purpose - loosening the bound would leave an assertion that checks
+nothing. And the media object count climbs past 1231 as tests upload
+`tests/sample/33SQ-GP8N-NLK.jpg`; the seed script's `CHECK` line reporting
+1233 after a suite run is residue, not a partial restore. Re-seeding
+resets both.
+
 The backup is a point-in-time copy and will drift from the live tree. It is
 gitignored - real data on living people, in a public repository - so each
 contributor takes their own, and a test that comes to depend on data added
