@@ -31,6 +31,26 @@ Match on name + era + place, not name alone — the same given name and
 surname recurs across centuries in small villages, and merging two different
 people is worse than leaving them unlinked.
 
+**Search every person the document names, not just its subject.** A death
+act names the deceased, the surviving spouse, the previous spouse and both
+parents - five people, and each one needs its own lookup before anything is
+written. On 2026-09-04 three clusters had to be merged (12 people, 6
+families, 4 events) because acts from Breitenbach 1819, Plou 1825 and Tarsul
+1870 were each entered by creating the subject *and the whole surrounding
+family* in one go. Nothing in the tree flags this: two same-named records
+coexist silently, and the newer one, carrying the better citation, looks
+like the right one.
+
+The only reliable proof of identity is **two dates coinciding** - birth and
+death, to the day. A shared name proves nothing in these parishes. The tell
+that a duplicate slipped through is a person whose events split across two
+records, or a family whose parents repeat under a spelling variant
+(Hadler/Stadler, Gaudicher/Gaudichet, Demoulier/Demouliere). Variants are
+what an external duplicate report can see; identical spellings it cannot -
+`scratchpad/sweep_recent.py` groups the whole tree by normalised name and
+reports only the groups touching recently created `gramps_id`s, which is
+the bounded way to catch those.
+
 If age/date arithmetic implied by one record contradicts another (e.g. a
 birth record says an infant died weeks later, but a separate index card
 implies that same name married 20 years on), trust the record with the more
@@ -212,9 +232,24 @@ grayscale source: the media page shows a broken-image icon even though the
 underlying file is intact. 44 of 55 uploads in one session broke this way
 before it was caught.
 
+**Measured on 2026-09-04: grayscale alone does not reproduce it.** Five
+media whose stored file is a mode-`L` JPEG **with no ICC profile** (AD18
+IIPImage exports, O1092-O1095 and O1255) all return a valid thumbnail:
+`GET /api/media/<handle>/thumbnail/300` yields bytes beginning
+`\x00\x00\x00 ftypavif` that decode to `AVIF RGB (300, ...)`. So the
+failing input was the *other* half of the description above - `sips`
+output carrying an **embedded gray ICC profile** - and that case has not
+been retested. Convert when the file came through `sips`; a scan
+downloaded straight from an archive viewer can go up as-is.
+
+Do not diagnose a broken thumbnail from the page's broken-image icon
+alone - fetch `/api/media/<handle>/thumbnail/300` and look at the first
+bytes. That is the only test that distinguishes a bad stored thumbnail
+from a rendering or caching problem in the browser.
+
 Before `create_media`, force RGB on the file that will actually be
 uploaded (the `sips` thumbnail is fine to read from, but don't upload that
-same file if it came out grayscale):
+same file if it came out grayscale **with an ICC profile**):
 
 ```python
 from PIL import Image
