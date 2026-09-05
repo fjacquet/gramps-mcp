@@ -60,6 +60,28 @@ def _event_from_raw(raw: dict) -> EventFact:
     )
 
 
+def _first_primary(raw: dict, events: list[EventFact], kind: str) -> EventFact | None:
+    """Find the person's own event of one type, ignoring the ref indexes.
+
+    Args:
+        raw (dict): The raw person record.
+        events (list[EventFact]): `extended.events`, positionally aligned
+            with `event_ref_list` - the API renders one per reference, in
+            order.
+        kind (str): "Birth" or "Death".
+
+    Returns:
+        EventFact | None: The first event of that type the person holds
+        as Primary. Roles other than Primary are skipped: a witness at
+        someone else's death carries that event in their own list, and
+        reading it as their death would kill them decades early.
+    """
+    for ref, event in zip(raw.get("event_ref_list") or [], events):
+        if event.type == kind and (ref or {}).get("role") == "Primary":
+            return event
+    return None
+
+
 def person_from_json(raw: dict) -> PersonFacts:
     """Map one raw person (profile=all & extend=event_ref_list) to PersonFacts."""
     name = raw.get("primary_name") or {}
@@ -71,6 +93,16 @@ def person_from_json(raw: dict) -> PersonFacts:
     bi, di = raw.get("birth_ref_index", -1), raw.get("death_ref_index", -1)
     birth = events[bi] if 0 <= bi < len(events) else None
     death = events[di] if 0 <= di < len(events) else None
+    # Reason: both indexes are stored on the Gramps Person and only ever
+    # written by the Gramps UIs. A person created through the REST API
+    # comes back with -1 for both, even when its event_ref_list holds one
+    # Primary Death - so trusting the index alone hides the birth and
+    # death of every person this server itself created, and with them
+    # every date rule that would have caught a duplicate.
+    if birth is None:
+        birth = _first_primary(raw, events, "Birth")
+    if death is None:
+        death = _first_primary(raw, events, "Death")
 
     profile = raw.get("profile") or {}
     prof_cites = sum(

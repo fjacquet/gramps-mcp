@@ -42,6 +42,61 @@ class CollectResult:
     error: str | None = None
 
 
+# Reason: 500 rows is what a live probe returned in seconds where the
+# unbounded read never came back. The rows are heavy - `_LIST_PARAMS` asks
+# for `profile=all` and extends `event_ref_list`, so one person carries
+# every event it references - which is why the page has to be this small
+# and why the whole tree cannot be asked for at once.
+_PAGE_SIZE = 500
+
+
+async def _fetch_every_page(
+    client: GrampsWebAPIClient,
+    api_call: ApiCalls,
+    tree_id: str,
+    base_params: dict[str, str | int],
+) -> list[dict]:
+    """Read a list endpoint page by page until it runs out of rows.
+
+    Asking for a whole tree in one request is what made `find_duplicates`
+    time out and then report "None found" over a scan that had read
+    nothing: 2141 people with `profile=all` exceed the client timeout,
+    while the same rows fetched 500 at a time return in seconds.
+
+    Args:
+        client (GrampsWebAPIClient): Client to issue the reads with.
+        api_call (ApiCalls): List endpoint to page through.
+        tree_id (str): Family tree identifier.
+        base_params (dict[str, str | int]): Query parameters common to
+            every page; `page` and `pagesize` are added per request.
+
+    Returns:
+        list[dict]: Every row the endpoint returned, in order.
+
+    Raises:
+        Exception: Whatever the client raises. Callers gather this with
+            `return_exceptions=True` so a failure on one endpoint leaves
+            the other's rows intact and only marks the scan partial.
+    """
+    rows: list[dict] = []
+    page = 1
+    while True:
+        params = dict(base_params)
+        params["page"] = page
+        params["pagesize"] = _PAGE_SIZE
+        batch = await client.make_api_call(
+            api_call=api_call, params=params, tree_id=tree_id
+        )
+        rows.extend(batch)
+        # Reason: a short page means the end of the collection. Stopping
+        # only on an empty page would cost one extra round trip per scan,
+        # and stopping on a full one would silently truncate a tree whose
+        # size is an exact multiple of the page.
+        if len(batch) < _PAGE_SIZE:
+            return rows
+        page += 1
+
+
 async def collect_tree(
     client: GrampsWebAPIClient, tree_id: str, limit: int | None = None
 ) -> CollectResult:
@@ -93,13 +148,19 @@ async def collect_tree(
     # return_exceptions=True so a failure on one read does not discard facts
     # already fetched on the other - the same "keep what was read" behaviour
     # the previous sequential version had for free.
-    results: tuple[Any, Any] = await asyncio.gather(
+    # Reason: `limit` already bounds the request to one short page, so it
+    # keeps the single cheap read described above; only the unbounded scan
+    # needs paging.
+    people_read = (
         client.make_api_call(
             api_call=ApiCalls.GET_PEOPLE, params=people_params, tree_id=tree_id
-        ),
-        client.make_api_call(
-            api_call=ApiCalls.GET_FAMILIES, params=dict(_LIST_PARAMS), tree_id=tree_id
-        ),
+        )
+        if limit is not None
+        else _fetch_every_page(client, ApiCalls.GET_PEOPLE, tree_id, people_params)
+    )
+    results: tuple[Any, Any] = await asyncio.gather(
+        people_read,
+        _fetch_every_page(client, ApiCalls.GET_FAMILIES, tree_id, dict(_LIST_PARAMS)),
         return_exceptions=True,
     )
     raw_people_result, raw_families_result = results

@@ -25,6 +25,7 @@ from mcp.types import TextContent
 from ..client import GrampsAPIError
 from ..config import get_settings
 from ..genealogy.collect import collect_tree
+from ..genealogy.date_collision import find_date_collisions
 from ..genealogy.domain import MergePair
 from ..genealogy.duplicates import etager
 from ..genealogy.geo.places_parse import parse_pname
@@ -118,6 +119,11 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
         arbitration = [
             p for p in pairs if p.tier == "arbitrage" and _has_name_evidence(p)
         ]
+        # Reason: run independently of the name blocking above. The pairs
+        # that matter most here are invisible to it - two records of one
+        # man filed under different surnames share no blocking key at all,
+        # and only their death date puts them together.
+        collisions = find_date_collisions(collected.people, collected.families)
 
         return [
             TextContent(
@@ -131,6 +137,7 @@ async def find_duplicates_tool(client, arguments: dict) -> list[TextContent]:
                     error=collected.error,
                     ignored=len(ignored),
                     limit=params.limit,
+                    collisions=collisions,
                 ),
             )
         ]
