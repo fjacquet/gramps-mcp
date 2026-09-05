@@ -105,6 +105,14 @@ _COLLISION_TIERS = (
         "Safe to merge after reading the records.",
     ),
     (
+        "parents_differents",
+        "parents differents",
+        "The dates and the name would prove it, but both records name "
+        "parents and the couples differ - so these are two people, often "
+        "cousins named alike. Do not merge: look instead for a fact "
+        "recorded on the wrong one of them.",
+    ),
+    (
         "fort",
         "fort",
         "One day-precise date coincides and the surnames differ by a letter "

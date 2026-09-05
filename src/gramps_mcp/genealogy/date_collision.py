@@ -48,7 +48,7 @@ class DateCollision:
 
     a: str
     b: str
-    tier: str  # "prouve" | "fort" | "a_verifier"
+    tier: str  # "prouve" | "parents_differents" | "fort" | "a_verifier"
     reasons: list[str] = field(default_factory=list)
 
 
@@ -106,28 +106,61 @@ def _key(text: str) -> str:
     return "".join(c for c in text.lower() if c.isalpha())
 
 
+def _parent_families(person: PersonFacts, families: dict[str, FamilyFacts]) -> set[str]:
+    """Every family this person is recorded as a child of.
+
+    Args:
+        person (PersonFacts): The person to place.
+        families (dict[str, FamilyFacts]): Families by handle. Read because
+            the child link is stored on both sides and either side may be
+            missing: a person's own `parent_family_handles` can be empty
+            while the family lists them among its children.
+
+    Returns:
+        set[str]: Family handles, empty when the parentage is unrecorded.
+    """
+    found = set(person.parent_family_handles)
+    for family in families.values():
+        if person.handle in family.child_handles:
+            found.add(family.handle)
+    return found
+
+
 def _siblings(a: PersonFacts, b: PersonFacts, families: dict[str, FamilyFacts]) -> bool:
     """Whether the two share a parent family, in either direction.
 
     Args:
         a (PersonFacts): One person.
         b (PersonFacts): The other.
-        families (dict[str, FamilyFacts]): Families by handle, used when a
-            person's own `parent_family_handles` is empty but the family
-            lists them as a child - the link is stored on both sides and
-            either one may be missing.
+        families (dict[str, FamilyFacts]): Families by handle.
 
     Returns:
         bool: True when they are siblings, and so twins rather than
         duplicates if they share a birth date.
     """
-    if set(a.parent_family_handles) & set(b.parent_family_handles):
-        return True
-    for family in families.values():
-        children = set(family.child_handles)
-        if a.handle in children and b.handle in children:
-            return True
-    return False
+    return bool(_parent_families(a, families) & _parent_families(b, families))
+
+
+def _parents_known_and_differ(
+    a: PersonFacts, b: PersonFacts, families: dict[str, FamilyFacts]
+) -> bool:
+    """Whether both parentages are recorded and share no family.
+
+    Args:
+        a (PersonFacts): One person.
+        b (PersonFacts): The other.
+        families (dict[str, FamilyFacts]): Families by handle.
+
+    Returns:
+        bool: True only when both sides have a parent family recorded and
+        none is shared. An unrecorded parentage contradicts nothing, so it
+        returns False and leaves the pair's tier alone.
+    """
+    left = _parent_families(a, families)
+    right = _parent_families(b, families)
+    if not left or not right:
+        return False
+    return not (left & right)
 
 
 def find_date_collisions(
@@ -173,14 +206,26 @@ def find_date_collisions(
         if _siblings(a, b, families):
             continue
         same_name = (_key(a.given), _key(a.surname)) == (_key(b.given), _key(b.surname))
+        note: list[str] = []
         if len(why) > 1 or same_name:
-            tier = "prouve"
+            # Reason: a name and a date can both be copied onto the wrong
+            # record; a parentage recorded on both sides cannot. Two people
+            # documented as children of different couples are not one
+            # person, however well their dates line up - so the pair still
+            # deserves reporting, but never under "safe to merge".
+            if _parents_known_and_differ(a, b, families):
+                tier = "parents_differents"
+                note = ["parents documentes differents"]
+            else:
+                tier = "prouve"
         elif _levenshtein(_key(a.surname), _key(b.surname)) <= _NEAR_SURNAME_DISTANCE:
             tier = "fort"
         else:
             tier = "a_verifier"
-        found.append(DateCollision(a=left, b=right, tier=tier, reasons=sorted(why)))
+        found.append(
+            DateCollision(a=left, b=right, tier=tier, reasons=sorted(why) + note)
+        )
 
-    order = {"prouve": 0, "fort": 1, "a_verifier": 2}
+    order = {"prouve": 0, "parents_differents": 1, "fort": 2, "a_verifier": 3}
     found.sort(key=lambda c: (order[c.tier], c.a, c.b))
     return found
