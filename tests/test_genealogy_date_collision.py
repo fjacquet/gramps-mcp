@@ -177,3 +177,87 @@ class TestRendering:
 
     def test_no_collision_renders_no_section(self):
         assert "date collision" not in self._render([]).lower()
+
+
+class TestParentsDiffer:
+    """Two cousins named alike, dying the same day, are not one person.
+
+    Measured on the live tree on 2026-09-05: I0429 and I0967 are both
+    "Louis Pagan", both carry a death on 08/03/1918, and the rule called
+    them proved. They are first cousins - sons of two brothers, Emile Elie
+    and Louis Charles Pagan - and the Journal de Geneve of 12 March 1918
+    names the aviator's father, settling it. What was really wrong was a
+    death recorded on the wrong cousin, and "safe to merge after reading
+    the records" is the one thing the report must not say about that.
+    """
+
+    def test_known_and_different_parents_block_the_proved_tier(self):
+        fam_a = FamilyFacts(gramps_id="FA", handle="fA", child_handles=["hI0429"])
+        fam_b = FamilyFacts(gramps_id="FB", handle="fB", child_handles=["hI0967"])
+        a = _person("I0429", "Louis", "Pagan", death=_day(8, 3, 1918), parents=["fA"])
+        b = _person("I0967", "Louis", "Pagan", death=_day(8, 3, 1918), parents=["fB"])
+
+        found = find_date_collisions([a, b], {"fA": fam_a, "fB": fam_b})
+
+        assert [f.tier for f in found] == ["parents_differents"]
+
+    def test_two_colliding_dates_do_not_override_different_parents(self):
+        """Parentage is structural; two copied dates are not."""
+        fam_a = FamilyFacts(gramps_id="FA", handle="fA", child_handles=["hI1"])
+        fam_b = FamilyFacts(gramps_id="FB", handle="fB", child_handles=["hI2"])
+        a = _person(
+            "I1", "Jean", "Pagan", _day(1, 2, 1850), _day(3, 4, 1900), parents=["fA"]
+        )
+        b = _person(
+            "I2", "Jean", "Pagan", _day(1, 2, 1850), _day(3, 4, 1900), parents=["fB"]
+        )
+
+        found = find_date_collisions([a, b], {"fA": fam_a, "fB": fam_b})
+
+        assert [f.tier for f in found] == ["parents_differents"]
+
+    def test_an_unknown_parentage_still_proves(self):
+        """Demote only on evidence. A person with no parents recorded
+        contradicts nothing, and the Voisot pair - the duplicate this
+        module exists to catch - has none on either side.
+        """
+        fam_a = FamilyFacts(gramps_id="FA", handle="fA", child_handles=["hI1"])
+        a = _person("I1", "Pierre", "Voisot", death=_day(12, 12, 1870), parents=["fA"])
+        b = _person("I2", "Pierre", "Voisot", death=_day(12, 12, 1870))
+
+        found = find_date_collisions([a, b], {"fA": fam_a})
+
+        assert [f.tier for f in found] == ["prouve"]
+
+    def test_parentage_recorded_only_on_the_family_still_counts(self):
+        """The child link is stored on both sides and either may be
+        missing - the sibling check already reads it both ways, and the
+        demotion must read it the same way or it fires only by luck.
+        """
+        fam_a = FamilyFacts(gramps_id="FA", handle="fA", child_handles=["hI1"])
+        fam_b = FamilyFacts(gramps_id="FB", handle="fB", child_handles=["hI2"])
+        a = _person("I1", "Louis", "Pagan", death=_day(8, 3, 1918))
+        b = _person("I2", "Louis", "Pagan", death=_day(8, 3, 1918))
+
+        found = find_date_collisions([a, b], {"fA": fam_a, "fB": fam_b})
+
+        assert [f.tier for f in found] == ["parents_differents"]
+
+    def test_the_reason_says_why_it_is_not_proved(self):
+        fam_a = FamilyFacts(gramps_id="FA", handle="fA", child_handles=["hI1"])
+        fam_b = FamilyFacts(gramps_id="FB", handle="fB", child_handles=["hI2"])
+        a = _person("I1", "Louis", "Pagan", death=_day(8, 3, 1918), parents=["fA"])
+        b = _person("I2", "Louis", "Pagan", death=_day(8, 3, 1918), parents=["fB"])
+
+        found = find_date_collisions([a, b], {"fA": fam_a, "fB": fam_b})
+
+        assert any("parents" in r for r in found[0].reasons)
+        assert "meme deces 08/03/1918" in found[0].reasons
+
+    def test_siblings_are_still_dropped_not_demoted(self):
+        """Twins share a family, so the sibling rule fires first."""
+        fam = FamilyFacts(gramps_id="FA", handle="fA", child_handles=["hI1", "hI2"])
+        a = _person("I1", "Renee", "Cocu", _day(22, 7, 1901), parents=["fA"])
+        b = _person("I2", "Marguerite", "Cocu", _day(22, 7, 1901), parents=["fA"])
+
+        assert find_date_collisions([a, b], {"fA": fam}) == []
