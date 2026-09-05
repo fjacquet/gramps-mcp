@@ -22,6 +22,7 @@ MergePair objects, already produced by `genealogy.duplicates.etager` and
 `genealogy.merge_plan.plan_fusions`.
 """
 
+from ..genealogy.date_collision import DateCollision
 from ..genealogy.domain import MergeCluster, MergePair, PersonFacts
 from ..genealogy.duplicates import MAX_BLOC
 from .scan_status import people_limit_phrase, scan_status_lines
@@ -91,6 +92,34 @@ def _format_arbitration_pair(pair: MergePair) -> str:
     return f"- {pair.gramps_id_a} <-> {pair.gramps_id_b} (blocked on {blocs})"
 
 
+# Reason: the three tiers are rendered under separate headings and never
+# merged. A pair two dates prove and a pair one date merely hints at call
+# for different actions, and a report that flattens them trains the reader
+# to skim - which is how the duplicates this tool exists to catch survived
+# in the tree for months.
+_COLLISION_TIERS = (
+    (
+        "prouve",
+        "prouve",
+        "Two day-precise dates coincide, or one does and the names match. "
+        "Safe to merge after reading the records.",
+    ),
+    (
+        "fort",
+        "fort",
+        "One day-precise date coincides and the surnames differ by a letter "
+        "or two - the shape a duplicate takes when one act was transcribed "
+        "under a variant spelling.",
+    ),
+    (
+        "a_verifier",
+        "a verifier",
+        "One day-precise date coincides but the names are unrelated. Often "
+        "two neighbouring acts of the same register rather than a duplicate.",
+    ),
+)
+
+
 def format_duplicate_clusters(
     clusters: list[MergeCluster],
     arbitration_pairs: list[MergePair],
@@ -100,6 +129,7 @@ def format_duplicate_clusters(
     error: str | None,
     ignored: int = 0,
     limit: int | None = None,
+    collisions: list[DateCollision] | None = None,
 ) -> str:
     """
     Render the full find_duplicates result as markdown.
@@ -147,6 +177,15 @@ def format_duplicate_clusters(
             f"{ignored} blocking key(s) covered more than {MAX_BLOC} people "
             "and were skipped - pairs findable only through one of those "
             "keys are missing from both sections below."
+        )
+
+    for tier, heading, note in _COLLISION_TIERS:
+        rows = [c for c in (collisions or []) if c.tier == tier]
+        if not rows:
+            continue
+        lines = "\n".join(f"- {c.a} <-> {c.b} ({'; '.join(c.reasons)})" for c in rows)
+        sections.append(
+            f"## Date collision - {heading} ({len(rows)} pair(s))\n\n{note}\n\n{lines}"
         )
 
     if clusters:

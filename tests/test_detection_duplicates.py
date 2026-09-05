@@ -224,13 +224,19 @@ class TestFindDuplicatesToolRouting:
         arbitration_heading = text.index("Needs human arbitration")
 
         # The proved pair is named after the proved heading and before the
-        # arbitration heading.
-        assert proved_heading < text.index("I0001") < arbitration_heading
-        assert proved_heading < text.index("I0002") < arbitration_heading
+        # arbitration heading. Searched from the heading onwards: the pair
+        # also shares a day-precise birth date, so it is named a second
+        # time in the date-collision section that precedes both headings.
+        assert (
+            proved_heading < text.index("I0001", proved_heading) < arbitration_heading
+        )
+        assert (
+            proved_heading < text.index("I0002", proved_heading) < arbitration_heading
+        )
 
         # The arbitration pair is named after the arbitration heading.
-        assert arbitration_heading < text.index("I0003")
-        assert arbitration_heading < text.index("I0004")
+        assert arbitration_heading < text.index("I0003", arbitration_heading)
+        assert arbitration_heading < text.index("I0004", arbitration_heading)
 
         # The rejet pair - name resemblance alone - is never a proof and
         # must not appear anywhere in the output.
