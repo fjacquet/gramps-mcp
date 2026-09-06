@@ -3,7 +3,8 @@
   - **Commands**: `uv run python` / `uv run <command>`. Run them **from the repo
     root**: a `cd` elsewhere in the same compound command selects another project
     and breaks the venv (`ModuleNotFoundError: httpx`).
-  - **Dependencies**: `uv add <package>` to add, `uv sync` to install
+  - **Dependencies**: `uv add <package>` to add, `uv sync` to install. **Pillow is
+    not one of them**: `uv run --with pillow python` to read, crop or convert a scan.
   - **Git commits**: `uv run git commit`, so pre-commit hooks run correctly
   - **Run the server**: `uv run python -m src.gramps_mcp.server` (HTTP, port 8000)
     or `uv run python -m src.gramps_mcp.server stdio` (stdio transport)
@@ -115,16 +116,27 @@
 - **Access tokens expire mid-session**, and a failed `curl -o` leaves its target
   untouched - so a stale dump passes for a fresh one. Check the token response,
   and validate a snapshot before `mv`.
+- **`AuthManager.get_token()`** is the accessor for raw REST calls (thumbnail
+  checks, `X-Total-Count` counts) - there is no `get_access_token`.
 - **For a bulk lot, a one-off script calling
   `GrampsWebAPIClient.make_api_call(ApiCalls.PUT_*)` is the right tool** - it goes
   through `merge_put_data()`, so semantics match the MCP tools, which do not scale
   to hundreds of calls. Make it idempotent (source by exact title, media by md5
   against `checksum`, citation by source+page) or a rerun after a partial failure
   duplicates everything.
+- **`ApiCalls` is plural for collections, singular for one record**: `POST_PEOPLE`,
+  `POST_FAMILIES`, `POST_EVENTS`, `POST_CITATIONS`, `POST_SOURCES`, `POST_NOTES`,
+  but `PUT_PERSON`, `PUT_FAMILY`, `PUT_EVENT`, `PUT_NOTE`.
+- **POST/PUT return a *list* of transaction entries** `[{_class, handle, new, old,
+  type}]`, not the record. Select by `_class`, **never by position** -
+  `POST_FAMILIES` returns the father's Person update first.
 - **Parameter models require fields even for a one-field update**:
   `EventSaveParams` needs `type` and `citation_list` to change only `place`;
   `PersonData` needs `primary_name` and `gender`; `DateValue` accepts only
   `dateval`/`modifier`/`quality`/`text` - there is no `year`.
+  `FamilySaveParams` and `PersonData` reject `citation_list` outright
+  (`extra_forbidden`): source a filiation on the `child_ref_list` entry
+  (`{"ref": ..., "citation_list": [...]}`), and a corrected name in a note.
 - **`create_event`'s `place` is required, and must be a Place handle, not a
   name** - passing a commune name string is rejected outright
   (`place must be a place handle, not a name`). `find_type(type='place',
@@ -249,6 +261,11 @@
   filter - page through and filter in Python instead. An audit scoped to an ID
   range or a hand-picked sample will miss records; scope it to the whole tree
   or say plainly that it did not.
+- **A citation reused across events it does not cover is invisible to a
+  reference audit.** `C0659` declared its own scope ("il s'agit de Jacques
+  VILLAUDY I0754") yet carried five events; `C0658` carries 17. Read a
+  citation's `page` against every event it sources - `0 broken references`
+  says nothing about this.
 - **Never pass a `gramps_id` string (e.g. `"C0619"`) into a `*_list` field
   (`citation_list`, `note_list`, etc.).** The API stores it literally as a
   broken pseudo-handle, invisible until GEDCOM export crashes with

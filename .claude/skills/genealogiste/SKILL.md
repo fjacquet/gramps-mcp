@@ -62,6 +62,41 @@ distinct people and re-pointing the marriage event.
 
 ### 2. Source everything
 
+**Not every source is worth the same, and the citation must say which it
+is.** Three tiers, decided on 2026-09-06:
+
+1. **Official document** — parish or civil register, the archive's own scan.
+   This is the only thing that *proves* a fact.
+2. **Associative index** (CGHB relevés on Filae, Geneanet dépouillements) —
+   a finding aid. Use it to locate the date and the reference, never to
+   establish the fact.
+3. **Online tree** (Geneanet, Geni, MyHeritage, FamilySearch Family Tree or
+   Pedigree Resource File) — **never a proof**. At best a lead; mark the
+   citation `SOURCE DÉRIVÉE` and say what is uncorroborated.
+
+Demonstrated on this tree: the PRF file `S0279` dates `I1516`'s birth to
+26/03/1731; that act belongs to a namesake who died at three days. A
+confident file, and wrong. Two official acts likewise overturned a given
+name the tree had carried for months (`I1485` Marthe → Marie Larpent).
+
+**Finding the official act — Filae, `img=true`.** The source line
+"Etat civil - Archives du Cher" returns the register view itself,
+readable and downloadable. The search URL is fully parameterised, so skip
+the form:
+
+```
+https://www.filae.com/search?ln=<NAME>&fn=<Given>&sy=<from>&ey=<to>
+  &pn=<Commune>%2C+<Dept>%2C+<Region>%2C+France&fc=PPL&di=<id>
+  &lat=<lat>&lon=<lon>&gid=<id>&ri=<id>&tab=0&ps=50&pi=0&img=true
+```
+
+`img=false` adds the associative relevés — useful as an index, never as
+proof. Wildcards work in the surname and are often mandatory: the index
+spells VILLAUDY as *VILLANDY*, and `Cam*at` found CAMUZAT where the
+handwriting was ambiguous. **Never conclude a record is absent without
+trying a wildcard.** Allow ~5 seconds for the page to compute before
+reading it. Downloading the view is a user-authorised action — ask first.
+
 Every fact that comes from a document gets a citation chain, never a bare
 fact bolted onto a person or event:
 
@@ -85,6 +120,20 @@ retype or remember a handle from earlier in the conversation — copy it
 fresh from the result. Mismatched/stale handles silently produce an event
 with no citation attached, and the only way to catch it is noticing the
 citation list came back empty.
+
+**One citation per fact, and check the ones already there.** Reusing a
+single citation for everything drawn from one file is the mirror image of
+that mistake, and worse because it looks correct: `C0659` states its own
+scope ("il s'agit de Jacques VILLAUDY I0754") yet sourced five events
+about three other people; `C0658` carries seventeen. A reference audit
+sees nothing — every handle is valid. The only test is reading a
+citation's `page` against each event it sources. Before trusting an
+existing citation, read it.
+
+`FamilySaveParams` and `PersonData` reject `citation_list`. A filiation is
+therefore sourced on the `child_ref_list` entry
+(`{"ref": <child>, "citation_list": [<cit>]}`) — which is right anyway: the
+act proves the parent-child link, not the couple.
 
 ### 3. Place is not optional
 
