@@ -36,3 +36,7 @@ backup/
 
 # Tree id of the local test stack, minted when its volumes are created.
 tests/.local-tree-id
+
+# Coverage report: names of living people, and this repository is public.
+media_coverage.csv
+scratchpad/

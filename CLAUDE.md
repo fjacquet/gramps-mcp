@@ -124,6 +124,16 @@
   to hundreds of calls. Make it idempotent (source by exact title, media by md5
   against `checksum`, citation by source+page) or a rerun after a partial failure
   duplicates everything.
+- **Only `person.media_list` renders on a person page.** Verified 14/09/2026 on
+  I1751 (media shown) against I1201 (scan on an event's citation, nothing
+  shown). Media on citations and places never surface on the person: the tree
+  held 1290 media of which 652 sat on places and 562 on citations, while 63
+  people carried one. An image meant to be seen on a person must be in that
+  person's own `media_list`.
+- **Uploading a media file needs no `docker cp` over REST.**
+  `client.upload_media_file(bytes, mime)` POSTs to `media/` and the server
+  computes the checksum. The `docker cp` note above applies only to the MCP
+  tools' `media_path`, which resolves inside the container.
 - **`ApiCalls` is plural for collections, singular for one record**: `POST_PEOPLE`,
   `POST_FAMILIES`, `POST_EVENTS`, `POST_CITATIONS`, `POST_SOURCES`, `POST_NOTES`,
   but `PUT_PERSON`, `PUT_FAMILY`, `PUT_EVENT`, `PUT_NOTE`.
@@ -137,6 +147,10 @@
   `FamilySaveParams` and `PersonData` reject `citation_list` outright
   (`extra_forbidden`): source a filiation on the `child_ref_list` entry
   (`{"ref": ..., "citation_list": [...]}`), and a corrected name in a note.
+  `MediaSaveParams` needs `desc` to add a `note_list` or `citation_list`;
+  `CitationData` rejects `confidence` outright. `media_list` is declared on
+  `BaseDataModel`, so `PUT_PERSON` accepts it despite `PersonData` not naming
+  it, and `replace_lists=["media_list"]` detaches one.
 - **`create_event`'s `place` is required, and must be a Place handle, not a
   name** - passing a commune name string is rejected outright
   (`place must be a place handle, not a name`). `find_type(type='place',
@@ -246,26 +260,6 @@
   `make_api_call(ApiCalls.PUT_PERSON, ..., replace_lists=["attribute_list"])`
   - the parameter is generic (`client.py`, `merge.py`), it is merely absent
   from that one tool's advertised schema.
-- **Do not bulk-promote a place or a date out of citation text.** Measured on
-  2026-09-01: of 12 events whose citation named a known place next to a word
-  for that event's own act type, **1** was right. The source title is the
-  trap - every `K Nidau ...` citation contains "Nidau", so the register's name
-  matches as if it were the location, while the actual place sits later in the
-  page (Biel, Genève, Gorgier, Rueggisberg). The rest attached a *birth* place
-  to a death ("née à Bourges" on a death act) or a relative's place to the
-  wrong person. Dates fail the same way: a year in an occupation citation is
-  the person's birth year, not the year of the trade. Promote these one at a
-  time, reading the page, never in a lot.
-- **Reading the tree over REST: `?page=1` is the first page** (`page=0` returns
-  HTTP 422), and `?gql=` silently returns 0 for any `attribute_list.any.*`
-  filter - page through and filter in Python instead. An audit scoped to an ID
-  range or a hand-picked sample will miss records; scope it to the whole tree
-  or say plainly that it did not.
-- **A citation reused across events it does not cover is invisible to a
-  reference audit.** `C0659` declared its own scope ("il s'agit de Jacques
-  VILLAUDY I0754") yet carried five events; `C0658` carries 17. Read a
-  citation's `page` against every event it sources - `0 broken references`
-  says nothing about this.
 - **Never pass a `gramps_id` string (e.g. `"C0619"`) into a `*_list` field
   (`citation_list`, `note_list`, etc.).** The API stores it literally as a
   broken pseudo-handle, invisible until GEDCOM export crashes with
@@ -293,26 +287,6 @@
   `parent_family_list` is not set automatically - call `create_person` with
   `parent_family_list: [<family handle>]` separately, or ancestor lookups
   from the child fail silently.
-- **The citation `page` outranks the source `title` for an event's place.** A
-  title names the register or the archive's seat, not where the act happened:
-  "Table des successions, Bourges" covers deaths at Saint-Martin-d'Auxigny.
-  Measured corollaries: match place names on word boundaries ("genevoises"
-  matched Genève by substring, 35 events); take the act type named **first** in
-  the page, since "mariage ... ne le ..." is a marriage act; and "von X" / "de X"
-  in Swiss registers is bourgeois origin, not birthplace.
-- **Verify a gazetteer QID against the nearest identified ancestor**, never
-  against a region or country: "Le Rocher" (Cher) matched Saint-Antoine-du-Rocher
-  (Indre-et-Loire) on the region alone, and "le rocher" is a genuine alias of that
-  commune - the label is no protection.
-- **`Unknown` places created by Check and Repair are usually not orphans**: 8 of 9
-  were the parent of a real commune. Repoint the children onto the right parent
-  and check backlinks record by record before deleting anything.
-- **Surname casing: store Title Case (`Jacquet`), never ALL-CAPS.** GEDCOM 5.5.1
-  mandates the opposite of upper-case ("capitalize the first letter of each part
-  and lowercase the other letters") and FamilySearch follows it; ALL-CAPS is a
-  French correspondence convention, not a genealogy rule. Matches the sibling
-  `genecrew` repo's tested `GrampsUpdateNameTool` invariant, which recases
-  `JACQUET` -> `Jacquet` and never the reverse.
 
 ### AI Behavior Rules
 - **Never use `git stash` or `git reset --hard`.** Both have destroyed
