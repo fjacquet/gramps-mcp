@@ -122,8 +122,33 @@ reading it. Downloading the view is a user-authorised action — ask first.
   (thousands of results instead of a few dozen) with no warning that the
   place filter didn't apply. Worked example, Saint-Martin-d'Auxigny (Cher):
   `di=3025480&lat=47.20371&lon=2.41553&gid=2978420&ri=3027939` — its 20 km
-  radius also covers Vignoux-sous-les-Aix, Saint-Georges-sur-Moulon and
-  Pigny, so the same quadruplet serves searches in those communes too.
+  radius also covers Vignoux-sous-les-Aix, Saint-Georges-sur-Moulon,
+  Pigny and Bourges, so the same quadruplet serves searches in those
+  communes too.
+- **The quadruplet is a centre plus a 20 km radius, not a commune filter,
+  and `pn=` does not correct it.** Reusing one commune's quadruplet while
+  writing another commune into `pn=` searches around the *first* one. That
+  silently hides everything past 20 km from that centre: the Saint-Martin
+  quadruplet reaches Bourges (15 km) but not Lunery (35 km), so a death at
+  Lunery returns zero and reads as "no such record". Before concluding a
+  record is absent, check the distance from the centre you actually used —
+  the phrase to write in a note is "not indexed within 20 km of X", never
+  "not indexed". To mint a quadruplet for a new centre, type the commune
+  into the search bar's *Commune ou département* box and pick the
+  suggestion; the URL that comes back carries it. Lunery (Cher):
+  `di=3025480&lat=46.93569&lon=2.26895&gid=2997111&ri=3027939`.
+- **A "Tables des successions et absences" hit is a death, dated by the
+  register, and its wording is worth reading on the image.** It is a tier-2
+  administrative register compiled from the état civil, so it dates the
+  death itself — the "relevé = date de déclaration, décalé d'un jour" rule
+  does *not* apply to it — but it is not the act, and saying so in the
+  citation is part of the entry. Its columns carry more than the index
+  exposes: trade, age (approximate, computed by the clerk), the hamlet of
+  residence, whether the estate had any assets, and the marital status —
+  `Vᵉ <nom>` for a widow, `vf <nom>` for a widower, a name alone for a
+  living spouse. That last column dates a *spouse's* death without naming
+  it: "vf Goblet Marie" on 10 March 1948 proved Marie died before that day,
+  which no index field said.
 
 **The CGH-B (genea18.fr) is a second, URL-driven index — use it for filiation
 searches Filae can't do, never as proof:**
