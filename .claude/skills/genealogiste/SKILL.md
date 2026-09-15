@@ -222,6 +222,61 @@ the account name in the top bar), navigate that tab to the search URL and
 `get_page_text` instead of `WebFetch` — same URL, unmasked. `iParoiss` codes
 are INSEE commune codes (confirmed: `18279` = Vasselay).
 
+**The ANOM (Archives nationales d'outre-mer) carry the whole of Algerian civil
+registration, and they are a tier-1 source — the register itself, not an
+index.** Six acts were read from it on 2026-09-15, each one settling a question
+no online tree had settled. The search form is fully parameterised:
+
+```
+http://anom.archivesnationales.culture.gouv.fr/caomec2/resultats.php
+  ?territoire=ALGERIE&commune=<COMMUNE>&nom=<NOM>&prenom=&typeacte=<AC_MA|AC_NA|AC_DE>
+  &annee=<annee>&debut=&fin=&vue=
+```
+
+- **Search without a commune first.** Names are indexed nationwide for
+  **1830-1904** (past 1904 only commune + act type work). A HEIDT marriage that
+  would have taken hours to place was the fourth of five nationwide hits. Then
+  narrow. The lesson repeats: a marriage is celebrated **in the bride's
+  commune**, so a groom's act is routinely absent from his own — KOCH × FÜG was
+  missing from Kellermann because it was held at Guélaât-bou-sbâ.
+- **`commune=` takes the ANOM spelling**, from the form's own dropdown
+  (`KELLERMANN`, `GUELAAT BOU SBA`, `GUELMA CM`). It is not the modern name.
+
+**Read the act from the DeepZoom tiles, never from the viewer.** The viewer
+resets its zoom, cannot be panned reliably, and at readable magnification shows
+a few lines at a time — none of the six acts was legible through it. Every act
+has an OpenSeadragon source; get its URL from `read_network_requests` filtered
+on `collection` after opening the page (network capture starts when the tool is
+first called, so **reload once** if it comes back empty):
+
+```
+.../caomec2/collection/ALGERIE/<fonds>/DAFANCAOM02_ALGEC<fonds>_<vue>.dzi
+.../DAFANCAOM02_ALGEC<fonds>_<vue>_files/<level>/<col>_<row>.jpeg
+```
+
+Fetch the `.dzi` for `Width`/`Height`, then stitch the maximum level
+(`ceil(log2(max(W,H)))` — 13 for the usual 4431x3136 plate, 18 columns by 13
+rows, 234 tiles). **Overlap is 1 pixel on every edge but the first**, so paste
+each tile at `(col*256 - (1 if col else 0), row*256 - (1 if row else 0))`.
+`uv run --with pillow --with numpy python`.
+
+**An act usually spans two views**: the subject and his filiation on one,
+the bride's filiation, the publications, the witnesses and the signatures on
+the next. **Fetch `<vue>` and `<vue>+1` and read both** — the witnesses are
+where the kinship is. On the 1867 act they gave an uncle and a stepfather; on
+the 1861 one they gave the bride's grandfather-in-law's own age, which dated
+him better than the tree did.
+
+**Read the marginal notes.** They carry the later death, the later marriage,
+the rectifying judgment. Félix KOCH's exact death date (27/02/1951) came from
+the margin of his birth act.
+
+**Two acts about the same fact will disagree.** Prefer the one whose own
+subject is the person concerned: her own marriage act names her *Adèle* where
+her son's names her *Odile*; her own remarriage dates her first husband's death
+to the 10th where her son's act says the 11th. Record the loser in a note —
+never silently.
+
 Every fact that comes from a document gets a citation chain, never a bare
 fact bolted onto a person or event:
 
