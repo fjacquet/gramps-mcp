@@ -148,7 +148,9 @@
   (`extra_forbidden`): source a filiation on the `child_ref_list` entry
   (`{"ref": ..., "citation_list": [...]}`), and a corrected name in a note.
   `MediaSaveParams` needs `desc` to add a `note_list` or `citation_list`;
-  `CitationData` rejects `confidence` outright. `media_list` is declared on
+  `CitationData` rejects `confidence` outright and requires `source_handle`
+  even to change only a citation's `page` or `media_list`;
+  `PlaceSaveParams` rejects `title` (the server derives it). `media_list` is declared on
   `BaseDataModel`, so `PUT_PERSON` accepts it despite `PersonData` not naming
   it, and `replace_lists=["media_list"]` detaches one.
 - **`create_event`'s `place` is required, and must be a Place handle, not a
