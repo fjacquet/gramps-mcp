@@ -91,7 +91,20 @@ https://www.filae.com/search?ln=<NAME>&fn=<Given>&sy=<from>&ey=<to>
 ```
 
 `img=false` adds the associative relevés — useful as an index, never as
-proof. Wildcards work in the surname and are often mandatory: the index
+proof.
+
+**Never settle a conflict between relevés by counting them.** On 15/09/2026
+three CGH-B relevés dated one birth: two said 30 October 1832, one said the
+29th. The majority lost. The primary act (Filae,
+`EC18223-1832-N-003204-0000000781`) has the child born **the 29th at nine in
+the evening** and the act drawn up the **30th in the morning** — with the
+words *« le jour d'hier »* struck out and replaced by *« 29 »* in the
+registrar's own hand. Both relevés saying 30 were indexing the **act date**:
+one testimony wearing two hats, not two. Relevés from the same index are
+correlated, so they do not vote. Note also that the one-day gap between event
+and declaration, first measured on deaths, applies to births identically.
+
+Wildcards work in the surname and are often mandatory: the index
 spells VILLAUDY as *VILLANDY*, and `Cam*at` found CAMUZAT where the
 handwriting was ambiguous. **Never conclude a record is absent without
 trying a wildcard.** Allow ~5 seconds for the page to compute before
@@ -120,11 +133,24 @@ https://www.genea18.fr/p/ActeRi.php?Act=R&iNom1=<nom>&iPrenom1=<prenom>
   &iMotReq=<mots>&iDateActe=<de>&iDateActeF=<a>&iParoiss=<code>&iRayon=&iLigne=50
 ```
 
-`iParoiss` is a commune code (e.g. `18223` = Saint-Martin-d'Auxigny,
-`18189` = Quantilly); leaving `iRayon=` empty restricts to that commune,
+`iParoiss` is a CGH-B commune code, **not the INSEE code and not the code
+in an AD act reference** — `18211` is Saint-Georges-sur-Moulon on the CGH-B,
+while the Archives du Cher reference for Saint-Martin-d'Auxigny reads
+`EC18223-...`. Three numbering systems in one department; never carry a code
+from one to another. Verified 15/09/2026. Read the value off the
+*Commune* dropdown (`read_page` the select) rather than assuming INSEE;
+earlier notes in this file gave `18223` for Saint-Martin-d'Auxigny and
+`18279` for Vasselay, both wrong. **An invalid code does not merely fail
+to filter: the page comes back masked, exactly as if logged out, with the
+unfiltered row count.** That masking is the tell that the code is bad, not
+that the session expired. Leaving `iRayon=` empty restricts to that commune,
 filling it widens the radius and dilutes the result list. The name match is
 **phonetic**; a trailing `*` means "starts with" and turns phonetic matching
-off — try both before concluding a name is absent. The `iMotReq=` field
+off — try both before concluding a name is absent. The phonetic key is printed
+next to the timing (e.g. `(JAKE)`), and **two spellings of what is historically
+one name can hash apart**: `jacquet` gives JAKE (15097 acts in the Cher) and
+`jaquier` gives JAKIYE (1773). Neither query returns the other's rows, so a
+name with a known variant must be searched under **each** variant, every time. The `iMotReq=` field
 (*Mot(s)*) searches the whole record, so `iMotReq=Paul` against a surname
 returns every act where a Paul appears as a parent — this is the filiation
 search Filae's `ffn`/`fln` cannot do. The listing's `Mère, nom` column names
@@ -225,6 +251,12 @@ are different claims, and both must be checked.
   dates before trusting an existing attachment.
 - **Living people are out of scope**, as they are for LinkedIn or any other
   social profile: no death date recorded, or a recent one, means don't look.
+
+These checks belong to the moment an image is attached. They are not a
+standing programme: once a face is found, the work is done. Dating the
+artwork, auditing painter attributions across the tree, or hunting the
+portraits a noble branch still lacks is art history, not genealogy - the
+repo owner closed that direction on 2026-09-15. Do not reopen it.
 
 ### 3. Place is not optional
 
@@ -366,11 +398,22 @@ find . -type f ! -name '.DS_Store' -exec md5 -r {} \; | sort | uniq -D -w32
 
 ### Verify the name against the content
 
-Filenames already on disk can be wrong. Before trusting one as evidence,
-open the image. This has already bitten: `autres/registre-paroissial-
-verreux-1823-raucaz-hugonier.jpg` is in fact the 1856 death record of Joseph
-RAUCAZ at Verrens-Arvey. When a stored name contradicts the image, rename
-the file rather than propagating the wrong label into a citation.
+Filenames already on disk can be wrong, and wrong often enough that the name
+is never evidence. Eleven have been disproved by opening the image. Two of
+them had contaminated each other: `villaudy-massicot/registre-deces-depigny-
+pierre-chollet-gerard-...-1881.jpeg` held the 1891 register and the file then
+named for 1891 held 1895 — each had been named from its neighbour. When a
+stored name contradicts the image, rename the file rather than propagating the
+wrong label into a citation.
+
+**A file already cited in the tree is never a lead.** A scan sits on disk
+because someone entered it, so it already carries a citation naming the act it
+shows. Pairing an unproven event to a scan by commune + year + act type was
+tried on 13 events and named the wrong act **12 times**. Check with
+`piece.py <relpath>` — md5 against every media `checksum`, then every citation
+referencing it — before treating any file as a lead. Note md5 alone is not
+enough either: the same page re-encoded gives a different md5 (the Plou 1825
+page sits on disk and in the tree under two checksums).
 
 macOS `sips -s format jpeg -Z 1400 <in> --out <out>` gives a readable
 thumbnail cheaply — batch-convert before reading, don't read 5 MB scans.
