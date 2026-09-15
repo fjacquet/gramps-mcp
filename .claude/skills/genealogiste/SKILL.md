@@ -164,8 +164,11 @@ while the Archives du Cher reference for Saint-Martin-d'Auxigny reads
 `EC18223-...`. Three numbering systems in one department; never carry a code
 from one to another. Verified 15/09/2026. Read the value off the
 *Commune* dropdown (`read_page` the select) rather than assuming INSEE;
-earlier notes in this file gave `18223` for Saint-Martin-d'Auxigny and
-`18279` for Vasselay, both wrong. **An invalid code does not merely fail
+earlier notes in this file gave `18279` for Vasselay, which is wrong.
+`18223` **does** select Saint-Martin-d'Auxigny: on 15/09/2026, logged in, it
+came back with that commune in the *Commune* dropdown and every row in it.
+An earlier note here called it wrong; that note was written from a masked
+page, which is what a logged-out session looks like too. **An invalid code does not merely fail
 to filter: the page comes back masked, exactly as if logged out, with the
 unfiltered row count.** That masking is the tell that the code is bad, not
 that the session expired. Leaving `iRayon=` empty restricts to that commune,
@@ -178,7 +181,13 @@ one name can hash apart**: `jacquet` gives JAKE (15097 acts in the Cher) and
 name with a known variant must be searched under **each** variant, every time. The `iMotReq=` field
 (*Mot(s)*) searches the whole record, so `iMotReq=Paul` against a surname
 returns every act where a Paul appears as a parent — this is the filiation
-search Filae's `ffn`/`fln` cannot do. The listing's `Mère, nom` column names
+search Filae's `ffn`/`fln` cannot do — but **it searches the body of the
+record, not the `Conjoint` columns, so it misses marriages**:
+`iNom1=LARPENT&iMotReq=Boulet` over 1700-1714 returned a single line and
+silently skipped the 08/02/1712 marriage of Sylvain LARPENT to Sylvine
+BOULET, where BOULET sits in the spouse column. For a marriage, search the
+wife under `iNom1`/`iPrenom1`, or tick the *Mariage* act-type box — never
+`iMotReq` alone. The listing's `Mère, nom` column names
 the mother **of the first-listed person only**; open the actual fiche (click
 "Acte") for father, mother, and the free-text *Informations* field, which
 carries hamlets, parents' ages, and stated relationships ("gd-onc.",
@@ -189,6 +198,22 @@ parents on the results listing does not refresh row to row** — it can go on
 showing the previous row's parents on a later row with a different mother
 in its own `Mère` column. Never trust the tooltip as the discriminant; only
 the listing's own column, or the opened fiche, is authoritative.
+
+**A CGH-B fiche carries the whole act, not just the couple**: each spouse's
+father and mother (`+` marks those already dead), a `Veuf/Veuve de` field
+naming a previous spouse *with a link to that marriage*, and an
+`Informations` line with the dispensation and the witnesses. Chaining two
+fiches through `Veuf de` gave a Sylvain LARPENT's first marriage (1707) and,
+with it, his own parents — which is how a man carrying no dates at all
+becomes placeable. It stays tier 2: it locates the acts to read, it does not
+establish a filiation, and a filiation is the one thing that cannot be undone
+once written.
+
+**`get_page_text` can return a stale, logged-out DOM on genea18.fr** — it
+showed the masked table while the session was live and the rows were
+rendered. A screenshot plus `zoom` showed the real values. When a CGH-B
+result looks masked, check with an image before concluding the session is
+dead or the commune code is bad.
 
 **genea18.fr masks names/dates behind asterisks unless logged in** — a plain
 `WebFetch` sees the masked table (counts are still correct, but no dates, no

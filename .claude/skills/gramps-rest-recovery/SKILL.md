@@ -84,6 +84,15 @@ Zero output under `TOTAL:` is the only acceptable result. Extend the same
 pattern (`bad.match(ref) or ref not in <handle_set>`) to `note_list`,
 `media_list`, `family_list`, `parent_family_list`, `child_ref_list`,
 `father_handle`/`mother_handle` when the batch touched people or families —
+but **drop the `isinstance(ref, str)` guard when you do**. It is correct
+above only because `citation_list` holds bare handle strings. `media_list`,
+`child_ref_list`, `event_ref_list`, `placeref_list`, `personref_list` and
+`reporef_list` hold dicts, resolved through `el["ref"]`, and that guard skips
+every one of them in silence — the audit then prints `TOTAL: 0` because it
+checked nothing. Walk their nested `citation_list`/`note_list` too, and treat
+a missing or empty `ref` inside an entry as a defect rather than skipping it.
+Before trusting a clean result, assert that the collection endpoint actually
+returned those fields —
 see the full version used in this project's `catalog.md` audit for the
 person/family field list.
 
