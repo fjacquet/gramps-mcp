@@ -322,11 +322,22 @@ autres/              a-trier/
 
 `<type>` is one of the observed set — stick to it, don't invent variants:
 `acte-naissance`, `acte-mariage`, `acte-deces`, `acte-bapteme`,
-`promesse-mariage` (singular = one act on the view; plural `actes-deces`,
-`actes-naissance` when the view carries several), `registre-paroissial`,
-`registre-naissances`, `registre-mariages`, `recensement`,
-`table-successions`, `fiche-matricule`, `fiche-parlementaire`, `livret-famille`,
-`carte-postale`, `arbre-manuscrit`, `portrait`.
+`promesse-mariage` / `publications-mariage` (singular = one act on the view;
+plural `actes-deces`, `actes-naissance` when the view carries several),
+`registre-paroissial`, `registre-naissances`, `registre-mariages`,
+`registre-sepultures`, `recensement`, `table-successions`, `fiche-matricule`,
+`fiche-parlementaire`, `livret-famille`, `carte-postale`, `arbre-manuscrit`,
+`portrait`, `tombe`, `armoiries` (aussi `blason`), `notice`,
+`notices-genealogiques`, `document-non-identifie`, `presse`, `gravure`,
+`buste`, `jeton`, `palais`.
+
+Two shapes sit outside the pattern on purpose and are correct as they are:
+a published document dated by its own issue takes the date first
+(`20191023-jean-pierre-pagan.pdf`), and a file whose identity *is* its
+archive reference keeps that reference (`i94-arrivee-gerard-maib-newyork-1958.jpg`).
+A `hr-` prefix marks the high-resolution replacement of a file already in the
+tree. Extend this list when a new kind of document appears - do not rename a
+scan to force it into an existing type.
 
 Names lowercase, unaccented, hyphen-separated, surname before given name.
 `-2`, `-3` suffix = additional *pages/views of the same act*, never a copy of
