@@ -122,8 +122,33 @@ reading it. Downloading the view is a user-authorised action — ask first.
   (thousands of results instead of a few dozen) with no warning that the
   place filter didn't apply. Worked example, Saint-Martin-d'Auxigny (Cher):
   `di=3025480&lat=47.20371&lon=2.41553&gid=2978420&ri=3027939` — its 20 km
-  radius also covers Vignoux-sous-les-Aix, Saint-Georges-sur-Moulon and
-  Pigny, so the same quadruplet serves searches in those communes too.
+  radius also covers Vignoux-sous-les-Aix, Saint-Georges-sur-Moulon,
+  Pigny and Bourges, so the same quadruplet serves searches in those
+  communes too.
+- **The quadruplet is a centre plus a 20 km radius, not a commune filter,
+  and `pn=` does not correct it.** Reusing one commune's quadruplet while
+  writing another commune into `pn=` searches around the *first* one. That
+  silently hides everything past 20 km from that centre: the Saint-Martin
+  quadruplet reaches Bourges (15 km) but not Lunery (35 km), so a death at
+  Lunery returns zero and reads as "no such record". Before concluding a
+  record is absent, check the distance from the centre you actually used —
+  the phrase to write in a note is "not indexed within 20 km of X", never
+  "not indexed". To mint a quadruplet for a new centre, type the commune
+  into the search bar's *Commune ou département* box and pick the
+  suggestion; the URL that comes back carries it. Lunery (Cher):
+  `di=3025480&lat=46.93569&lon=2.26895&gid=2997111&ri=3027939`.
+- **A "Tables des successions et absences" hit is a death, dated by the
+  register, and its wording is worth reading on the image.** It is a tier-2
+  administrative register compiled from the état civil, so it dates the
+  death itself — the "relevé = date de déclaration, décalé d'un jour" rule
+  does *not* apply to it — but it is not the act, and saying so in the
+  citation is part of the entry. Its columns carry more than the index
+  exposes: trade, age (approximate, computed by the clerk), the hamlet of
+  residence, whether the estate had any assets, and the marital status —
+  `Vᵉ <nom>` for a widow, `vf <nom>` for a widower, a name alone for a
+  living spouse. That last column dates a *spouse's* death without naming
+  it: "vf Goblet Marie" on 10 March 1948 proved Marie died before that day,
+  which no index field said.
 
 **The CGH-B (genea18.fr) is a second, URL-driven index — use it for filiation
 searches Filae can't do, never as proof:**
@@ -139,8 +164,11 @@ while the Archives du Cher reference for Saint-Martin-d'Auxigny reads
 `EC18223-...`. Three numbering systems in one department; never carry a code
 from one to another. Verified 15/09/2026. Read the value off the
 *Commune* dropdown (`read_page` the select) rather than assuming INSEE;
-earlier notes in this file gave `18223` for Saint-Martin-d'Auxigny and
-`18279` for Vasselay, both wrong. **An invalid code does not merely fail
+earlier notes in this file gave `18279` for Vasselay, which is wrong.
+`18223` **does** select Saint-Martin-d'Auxigny: on 15/09/2026, logged in, it
+came back with that commune in the *Commune* dropdown and every row in it.
+An earlier note here called it wrong; that note was written from a masked
+page, which is what a logged-out session looks like too. **An invalid code does not merely fail
 to filter: the page comes back masked, exactly as if logged out, with the
 unfiltered row count.** That masking is the tell that the code is bad, not
 that the session expired. Leaving `iRayon=` empty restricts to that commune,
@@ -153,7 +181,13 @@ one name can hash apart**: `jacquet` gives JAKE (15097 acts in the Cher) and
 name with a known variant must be searched under **each** variant, every time. The `iMotReq=` field
 (*Mot(s)*) searches the whole record, so `iMotReq=Paul` against a surname
 returns every act where a Paul appears as a parent — this is the filiation
-search Filae's `ffn`/`fln` cannot do. The listing's `Mère, nom` column names
+search Filae's `ffn`/`fln` cannot do — but **it searches the body of the
+record, not the `Conjoint` columns, so it misses marriages**:
+`iNom1=LARPENT&iMotReq=Boulet` over 1700-1714 returned a single line and
+silently skipped the 08/02/1712 marriage of Sylvain LARPENT to Sylvine
+BOULET, where BOULET sits in the spouse column. For a marriage, search the
+wife under `iNom1`/`iPrenom1`, or tick the *Mariage* act-type box — never
+`iMotReq` alone. The listing's `Mère, nom` column names
 the mother **of the first-listed person only**; open the actual fiche (click
 "Acte") for father, mother, and the free-text *Informations* field, which
 carries hamlets, parents' ages, and stated relationships ("gd-onc.",
@@ -165,12 +199,83 @@ showing the previous row's parents on a later row with a different mother
 in its own `Mère` column. Never trust the tooltip as the discriminant; only
 the listing's own column, or the opened fiche, is authoritative.
 
+**A CGH-B fiche carries the whole act, not just the couple**: each spouse's
+father and mother (`+` marks those already dead), a `Veuf/Veuve de` field
+naming a previous spouse *with a link to that marriage*, and an
+`Informations` line with the dispensation and the witnesses. Chaining two
+fiches through `Veuf de` gave a Sylvain LARPENT's first marriage (1707) and,
+with it, his own parents — which is how a man carrying no dates at all
+becomes placeable. It stays tier 2: it locates the acts to read, it does not
+establish a filiation, and a filiation is the one thing that cannot be undone
+once written.
+
+**`get_page_text` can return a stale, logged-out DOM on genea18.fr** — it
+showed the masked table while the session was live and the rows were
+rendered. A screenshot plus `zoom` showed the real values. When a CGH-B
+result looks masked, check with an image before concluding the session is
+dead or the commune code is bad.
+
 **genea18.fr masks names/dates behind asterisks unless logged in** — a plain
 `WebFetch` sees the masked table (counts are still correct, but no dates, no
 parents). If the shared Chrome tab already has a CGH-B session (check for
 the account name in the top bar), navigate that tab to the search URL and
 `get_page_text` instead of `WebFetch` — same URL, unmasked. `iParoiss` codes
 are INSEE commune codes (confirmed: `18279` = Vasselay).
+
+**The ANOM (Archives nationales d'outre-mer) carry the whole of Algerian civil
+registration, and they are a tier-1 source — the register itself, not an
+index.** Six acts were read from it on 2026-09-15, each one settling a question
+no online tree had settled. The search form is fully parameterised:
+
+```
+http://anom.archivesnationales.culture.gouv.fr/caomec2/resultats.php
+  ?territoire=ALGERIE&commune=<COMMUNE>&nom=<NOM>&prenom=&typeacte=<AC_MA|AC_NA|AC_DE>
+  &annee=<annee>&debut=&fin=&vue=
+```
+
+- **Search without a commune first.** Names are indexed nationwide for
+  **1830-1904** (past 1904 only commune + act type work). A HEIDT marriage that
+  would have taken hours to place was the fourth of five nationwide hits. Then
+  narrow. The lesson repeats: a marriage is celebrated **in the bride's
+  commune**, so a groom's act is routinely absent from his own — KOCH × FÜG was
+  missing from Kellermann because it was held at Guélaât-bou-sbâ.
+- **`commune=` takes the ANOM spelling**, from the form's own dropdown
+  (`KELLERMANN`, `GUELAAT BOU SBA`, `GUELMA CM`). It is not the modern name.
+
+**Read the act from the DeepZoom tiles, never from the viewer.** The viewer
+resets its zoom, cannot be panned reliably, and at readable magnification shows
+a few lines at a time — none of the six acts was legible through it. Every act
+has an OpenSeadragon source; get its URL from `read_network_requests` filtered
+on `collection` after opening the page (network capture starts when the tool is
+first called, so **reload once** if it comes back empty):
+
+```
+.../caomec2/collection/ALGERIE/<fonds>/DAFANCAOM02_ALGEC<fonds>_<vue>.dzi
+.../DAFANCAOM02_ALGEC<fonds>_<vue>_files/<level>/<col>_<row>.jpeg
+```
+
+Fetch the `.dzi` for `Width`/`Height`, then stitch the maximum level
+(`ceil(log2(max(W,H)))` — 13 for the usual 4431x3136 plate, 18 columns by 13
+rows, 234 tiles). **Overlap is 1 pixel on every edge but the first**, so paste
+each tile at `(col*256 - (1 if col else 0), row*256 - (1 if row else 0))`.
+`uv run --with pillow --with numpy python`.
+
+**An act usually spans two views**: the subject and his filiation on one,
+the bride's filiation, the publications, the witnesses and the signatures on
+the next. **Fetch `<vue>` and `<vue>+1` and read both** — the witnesses are
+where the kinship is. On the 1867 act they gave an uncle and a stepfather; on
+the 1861 one they gave the bride's grandfather-in-law's own age, which dated
+him better than the tree did.
+
+**Read the marginal notes.** They carry the later death, the later marriage,
+the rectifying judgment. Félix KOCH's exact death date (27/02/1951) came from
+the margin of his birth act.
+
+**Two acts about the same fact will disagree.** Prefer the one whose own
+subject is the person concerned: her own marriage act names her *Adèle* where
+her son's names her *Odile*; her own remarriage dates her first husband's death
+to the 10th where her son's act says the 11th. Record the loser in a note —
+never silently.
 
 Every fact that comes from a document gets a citation chain, never a bare
 fact bolted onto a person or event:
