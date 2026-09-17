@@ -138,6 +138,14 @@ class AuthManager:
                 logger.info("HTTP client recreated in AuthManager")
 
             # Create new client with current event loop
+            # Reason: 30 s ne suffisait pas aux deux outils de detection.
+            # `collect_tree` lit tout l'arbre avec `profile=all`, et une
+            # mesure du 17/09/2026 sur 2543 personnes a demande environ deux
+            # minutes - le client expirait donc au milieu, `audit_quality` et
+            # `find_duplicates` rendaient un scan partiel, et jusqu'a ce jour
+            # ils le presentaient comme une absence de defaut. Le delai de
+            # connexion reste court : c'est la lecture qui est longue, pas
+            # l'etablissement de la connexion.
             self._client = httpx.AsyncClient(
                 base_url=get_api_base_url(self.settings),
                 timeout=httpx.Timeout(timeout=REQUEST_TIMEOUT_SECONDS, connect=10.0),
