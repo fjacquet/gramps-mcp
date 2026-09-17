@@ -227,10 +227,23 @@ class AuthManager:
             if e.response.status_code == 403:
                 raise ValueError("Invalid username or password")
             raise ValueError(f"Authentication failed: HTTP {e.response.status_code}")
-        except httpx.ConnectError as e:
-            raise ValueError(f"Cannot connect to Gramps API: {e}")
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            # Reason: httpx.ConnectTimeout descend de TimeoutException et non
+            # de ConnectError, donc il tombait dans le `except Exception`
+            # ci-dessous. Et le `str()` de ces exceptions de transport est
+            # souvent vide : le 17/09/2026, un serveur devenu injoignable en
+            # pleine session a rendu, mot pour mot, "Authentication error: " -
+            # un message d'erreur sans erreur dedans, qui se lit comme un
+            # probleme d'identifiants. Le type et l'URL sont ce qui manquait
+            # pour distinguer une panne reseau d'un mot de passe refuse.
+            raise ValueError(
+                f"Cannot reach the Gramps API at "
+                f"{get_api_base_url(self.settings)} ({type(e).__name__})"
+            ) from e
         except Exception as e:
-            raise ValueError(f"Authentication error: {e}")
+            raise ValueError(
+                f"Authentication error ({type(e).__name__}): {e}".rstrip(": ")
+            ) from e
 
     def _lock_for_current_loop(self) -> asyncio.Lock:
         """
