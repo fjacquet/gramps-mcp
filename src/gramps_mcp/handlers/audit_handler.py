@@ -113,11 +113,24 @@ def format_anomalies(
         sections.append(scope_note)
 
     if not anomalies:
-        clean_line = (
-            f"## Anomalies\n\nNone found within this scope ({', '.join(scope_bits)})."
-            if scope_bits
-            else "## Anomalies\n\nNone found - the tree is clean."
-        )
+        # Reason: un scan partiel est une restriction de portee au meme titre
+        # qu'un `limit` ou un `severity`, et la plus trompeuse des trois -
+        # mesure du 17/09/2026, le tool expirait sur 2543 personnes et rendait
+        # "Partial scan: Request timeout" suivi de "the tree is clean" dans la
+        # meme reponse. Des deux phrases, c'est la seconde qu'on retient.
+        if partial:
+            clean_line = (
+                "## Anomalies\n\nNone found in what was read before the scan "
+                "stopped. This is not a clean bill of health: the tree was "
+                "not read in full."
+            )
+        elif scope_bits:
+            clean_line = (
+                f"## Anomalies\n\nNone found within this scope "
+                f"({', '.join(scope_bits)})."
+            )
+        else:
+            clean_line = "## Anomalies\n\nNone found - the tree is clean."
         sections.append(clean_line)
         return "\n\n".join(sections) + "\n"
 
