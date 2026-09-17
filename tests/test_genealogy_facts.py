@@ -185,3 +185,24 @@ def test_person_from_json_lieu_absent_donne_chaine_vide():
     }
     p = person_from_json(raw)
     assert p.birth.place == "" and p.birth.place_name == ""
+
+
+def test_person_from_json_carries_the_event_role():
+    raw = {
+        "gramps_id": "I0951",
+        "handle": "h",
+        "primary_name": {"first_name": "Pierre", "surname_list": [{"surname": "J"}]},
+        "gender": 1,
+        "event_ref_list": [
+            {"ref": "e1", "role": "Primary"},
+            {"ref": "e2", "role": "Witness"},
+        ],
+        "extended": {
+            "events": [
+                {"type": "Death", "date": {"sortval": 2373000, "year": 1788}},
+                {"type": "Burial", "date": {"sortval": 2372000, "year": 1785}},
+            ]
+        },
+    }
+    roles = [e.role for e in person_from_json(raw).events]
+    assert roles == ["Primary", "Witness"]

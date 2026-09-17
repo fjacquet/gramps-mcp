@@ -56,6 +56,22 @@ from .domain import (
 
 DAYS_PER_YEAR = 365.25
 POSTMORTEM_TYPES = {"Burial", "Cremation", "Probate", "Will"}
+
+
+def is_own(ev: EventFact) -> bool:
+    """Tell whether the event belongs to the person or is merely attended.
+
+    Args:
+        ev (EventFact): One event carried by the person's event_ref_list.
+
+    Returns:
+        bool: True for role Primary. A Witness at a father's burial carries
+        that burial in their own list; read as their own it dates their
+        interment years before their death.
+    """
+    return ev.role == "Primary"
+
+
 R7_BEFORE_TYPES = {"Baptism", "Burial"}
 """Event types R7 already checks against a specific reference date (baptism
 vs. birth, burial vs. death). Excluded from R6's generic before-birth check
@@ -255,6 +271,8 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
     for ev in person.events:
         if ev.type in {"Birth", "Death"} or not is_valid(ev):
             continue
+        if not is_own(ev):
+            continue
         if ev.type not in R7_BEFORE_TYPES and is_valid(b) and strictly_before(ev, b):
             out.append(
                 _anom(
@@ -282,6 +300,8 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
 
     # R7 — baptism before birth ; burial before death
     for ev in person.events:
+        if not is_own(ev):
+            continue
         if (
             ev.type == "Baptism"
             and is_valid(ev)
