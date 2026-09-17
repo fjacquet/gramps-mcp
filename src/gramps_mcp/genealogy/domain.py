@@ -42,6 +42,7 @@ class EventFact(BaseModel):
     quality: int = 0  # 0 normal,1 estimated,2 calculated
     dateval: list = Field(default_factory=list)
     has_citation: bool = False
+    role: str = "Primary"  # rôle porté par l'event_ref de la personne
     place: str = ""  # hiérarchie complète, depuis profile.<birth|death>.place
     place_name: str = ""  # commune seule, depuis profile.<birth|death>.place_name
 

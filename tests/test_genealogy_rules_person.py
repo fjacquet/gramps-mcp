@@ -310,3 +310,56 @@ def test_r6_silent_when_event_date_carries_a_modifier():
         ],
     )
     assert "R6" not in _rules(check_person(p))
+
+
+def test_r7_ignores_a_burial_the_person_only_witnessed():
+    # Reason: E1744, sépulture de Jean Jacquet le 02/07/1785, porte son fils
+    # Pierre en rôle Witness. Sans filtre de rôle, R7 lit cette inhumation
+    # comme celle de Pierre (†1788) et la déclare antérieure à son décès.
+    p = _p(
+        death=EventFact(type="Death", sortval=2373000, year=1788),
+        events=[
+            EventFact(
+                type="Burial",
+                sortval=2372000,
+                year=1785,
+                dateval=[2, 7, 1785, False],
+                role="Witness",
+            )
+        ],
+    )
+    assert "R7" not in _rules(check_person(p))
+
+
+def test_r7_still_flags_the_person_s_own_burial():
+    p = _p(
+        death=EventFact(type="Death", sortval=2373000, year=1788),
+        events=[
+            EventFact(
+                type="Burial",
+                sortval=2372000,
+                year=1785,
+                dateval=[2, 7, 1785, False],
+                role="Primary",
+            )
+        ],
+    )
+    assert "R7" in _rules(check_person(p))
+
+
+def test_r6_ignores_an_event_the_person_only_witnessed():
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2372000, year=1785, dateval=[16, 5, 1785, False]
+        ),
+        events=[
+            EventFact(
+                type="Occupation",
+                sortval=2380000,
+                year=1806,
+                dateval=[1, 1, 1806, False],
+                role="Witness",
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))
