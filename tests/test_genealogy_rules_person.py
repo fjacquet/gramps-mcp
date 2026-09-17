@@ -205,3 +205,108 @@ def test_d3_unknown_gender_flagged():
 
 def test_d3_absent_for_known_gender():
     assert "D3" not in _rules(check_person(_p(sex="F")))
+
+
+# --- Précision et modificateur de date : pas de comparaison stricte abusive ---
+#
+# Mesuré le 17/09/2026 sur l'arbre entier : 35 des 38 anomalies unitaires
+# étaient des faux positifs, tous nés de deux confusions - une date à l'année
+# seule sort au 1er janvier, et un modificateur « avant » était lu comme une
+# date exacte.
+
+
+def test_r1_silent_when_death_is_year_only_in_the_birth_year():
+    """Née le 9 janvier 1782, morte « en 1782 » : l'arbre a raison.
+
+    Le sortval d'une date à l'année seule tombe au 1er janvier, donc une
+    naissance datée au jour dans la même année lui est postérieure. Cas réel
+    I0943, une enfant morte dans son année de naissance.
+    """
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2371931, year=1782, dateval=[9, 1, 1782, False]
+        ),
+        death=EventFact(
+            type="Death", sortval=2371923, year=1782, dateval=[0, 0, 1782, False]
+        ),
+    )
+    assert "R1" not in _rules(check_person(p))
+
+
+def test_r1_still_fires_when_both_dates_are_exact_days():
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2400000, year=1850, dateval=[1, 6, 1850, False]
+        ),
+        death=EventFact(
+            type="Death", sortval=2390000, year=1820, dateval=[1, 6, 1820, False]
+        ),
+    )
+    assert "R1" in _rules(check_person(p))
+
+
+def test_r7_silent_when_burial_is_year_only_in_the_death_year():
+    """Mort le 30/04/1971, inhumé « 1971 » : cas réel I0408."""
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2441072, year=1971, dateval=[30, 4, 1971, False]
+        ),
+        events=[
+            EventFact(
+                type="Burial", sortval=2440953, year=1971, dateval=[0, 0, 1971, False]
+            )
+        ],
+    )
+    assert "R7" not in _rules(check_person(p))
+
+
+def test_r7_still_fires_on_a_real_burial_before_death():
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2441072, year=1971, dateval=[30, 4, 1971, False]
+        ),
+        events=[
+            EventFact(
+                type="Burial", sortval=2440000, year=1968, dateval=[2, 5, 1968, False]
+            )
+        ],
+    )
+    assert "R7" in _rules(check_person(p))
+
+
+def test_r6_silent_when_event_is_year_only_in_the_birth_year():
+    """Recensement « 1833 » pour une naissance du 10/06/1833 : cas réel I0763."""
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2390710, year=1833, dateval=[10, 6, 1833, False]
+        ),
+        events=[
+            EventFact(
+                type="Census", sortval=2390550, year=1833, dateval=[0, 0, 1833, False]
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))
+
+
+def test_r6_silent_when_event_date_carries_a_modifier():
+    """Profession datée « avant le 16/04/1895 » chez un mort de 1852 : I2385.
+
+    Un modificateur non nul veut dire que le sortval n'est pas un point, donc
+    qu'aucune comparaison stricte n'est licite.
+    """
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2397569, year=1852, dateval=[21, 3, 1852, False]
+        ),
+        events=[
+            EventFact(
+                type="Occupation",
+                sortval=2413300,
+                year=1895,
+                dateval=[16, 4, 1895, False],
+                modifier=1,
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))

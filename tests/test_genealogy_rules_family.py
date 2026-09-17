@@ -109,3 +109,131 @@ def test_r5_child_within_9_months_of_father_death_is_ok():
         gramps_id="F1", handle="F1", father_handle="P", child_handles=["C"]
     )
     assert "R5" not in _rules(check_family(fam, {"P": father, "C": child}))
+
+
+# --- Précision et modificateur de date, côté famille ---
+#
+# Un âge calculé depuis une date « avant 1400 » ou « vers 1880 » n'est pas un
+# âge. Mesuré le 17/09/2026 : les pères d'âge négatif de la branche Cœur
+# venaient tous de là.
+
+
+def _facts(gid, sex, birth=None, death=None):
+    return PersonFacts(
+        gramps_id=gid,
+        handle=gid,
+        name=gid,
+        surname=gid,
+        given=gid,
+        sex=sex,
+        birth=birth,
+        death=death,
+        has_any_citation=True,
+    )
+
+
+def test_r3_silent_when_the_parent_birth_carries_a_modifier():
+    """Pierre Cœur est né « avant 1400 », pas en 1400 : cas réel I1720."""
+    father = _facts(
+        "F",
+        "M",
+        birth=EventFact(
+            type="Birth",
+            sortval=2232400,
+            year=1400,
+            dateval=[0, 0, 1400, False],
+            modifier=1,
+        ),
+    )
+    child = _facts(
+        "C",
+        "M",
+        birth=EventFact(
+            type="Birth", sortval=2230575, year=1395, dateval=[0, 0, 1395, False]
+        ),
+    )
+    fam = FamilyFacts(
+        gramps_id="FAM",
+        handle="FAM",
+        father_handle="F",
+        child_handles=["C"],
+    )
+    persons = {"F": father, "C": child}
+    assert "R3" not in _rules(check_family(fam, persons))
+
+
+def test_r3_still_fires_on_a_twelve_year_old_father():
+    """Père né en 1767, enfant né le 28/01/1779 : cas réel I1220, vrai défaut."""
+    father = _facts(
+        "F",
+        "M",
+        birth=EventFact(
+            type="Birth", sortval=2366120, year=1767, dateval=[0, 0, 1767, False]
+        ),
+    )
+    child = _facts(
+        "C",
+        "M",
+        birth=EventFact(
+            type="Birth", sortval=2370508, year=1779, dateval=[28, 1, 1779, False]
+        ),
+    )
+    fam = FamilyFacts(
+        gramps_id="FAM",
+        handle="FAM",
+        father_handle="F",
+        child_handles=["C"],
+    )
+    persons = {"F": father, "C": child}
+    assert "R3" in _rules(check_family(fam, persons))
+
+
+def test_r5_silent_when_the_mother_death_is_year_only_in_the_birth_year():
+    mother = _facts(
+        "M",
+        "F",
+        death=EventFact(
+            type="Death", sortval=2371923, year=1782, dateval=[0, 0, 1782, False]
+        ),
+    )
+    child = _facts(
+        "C",
+        "M",
+        birth=EventFact(
+            type="Birth", sortval=2372100, year=1782, dateval=[5, 7, 1782, False]
+        ),
+    )
+    fam = FamilyFacts(
+        gramps_id="FAM",
+        handle="FAM",
+        mother_handle="M",
+        child_handles=["C"],
+    )
+    persons = {"M": mother, "C": child}
+    assert "R5" not in _rules(check_family(fam, persons))
+
+
+def test_r5_still_fires_when_the_father_died_eleven_months_earlier():
+    """Jeanne VILLAUDY née le 02/10/1848, père mort le 11/11/1847 : I0113."""
+    father = _facts(
+        "F",
+        "M",
+        death=EventFact(
+            type="Death", sortval=2395723, year=1847, dateval=[11, 11, 1847, False]
+        ),
+    )
+    child = _facts(
+        "C",
+        "F",
+        birth=EventFact(
+            type="Birth", sortval=2396048, year=1848, dateval=[2, 10, 1848, False]
+        ),
+    )
+    fam = FamilyFacts(
+        gramps_id="FAM",
+        handle="FAM",
+        father_handle="F",
+        child_handles=["C"],
+    )
+    persons = {"F": father, "C": child}
+    assert "R5" in _rules(check_family(fam, persons))
