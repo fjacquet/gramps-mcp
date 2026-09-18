@@ -446,3 +446,42 @@ def test_r6_ignores_an_event_the_person_only_witnessed():
         ],
     )
     assert "R6" not in _rules(check_person(p))
+
+
+def test_r8_accepte_les_modificateurs_from_et_to():
+    """Gramps 5.2 a ajoute « from » (7) et « to » (8) : ce sont des dates valides.
+
+    Mesure le 18/09/2026 sur l'arbre : trois evenements portent `modifier=7` et
+    le serveur (gramps 6.0.8) les rend « from 1446-09-02 », « from 2021-05 ».
+    R8 les signalait comme dates malformees parce qu'il bornait le modificateur
+    a `range(0, 7)`.
+    """
+    for modifier in (7, 8):
+        p = _p(
+            events=[
+                EventFact(
+                    type="Occupation",
+                    sortval=2249445,
+                    year=1446,
+                    dateval=[2, 9, 1446, False],
+                    modifier=modifier,
+                )
+            ]
+        )
+        assert "R8" not in _rules(check_person(p)), f"modifier {modifier} refuse"
+
+
+def test_r8_signale_toujours_un_modificateur_hors_bornes():
+    """Au-dela de « to » (8), plus rien n'est defini : R8 doit rester sensible."""
+    p = _p(
+        events=[
+            EventFact(
+                type="Occupation",
+                sortval=2249445,
+                year=1446,
+                dateval=[2, 9, 1446, False],
+                modifier=9,
+            )
+        ]
+    )
+    assert "R8" in _rules(check_person(p))
