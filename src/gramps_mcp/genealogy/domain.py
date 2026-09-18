@@ -38,7 +38,9 @@ class EventFact(BaseModel):
     type: str  # "Birth", "Death", "Baptism", "Burial", "Marriage"...
     sortval: int = 0  # Julian day number; 0 = unknown/unsortable
     year: int | None = None
-    modifier: int = 0  # 0 exact,1 before,2 after,3 about,4 range,5 span,6 text
+    # 0 exact, 1 before, 2 after, 3 about, 4 range, 5 span, 6 text,
+    # 7 from, 8 to (les deux derniers ajoutes par Gramps 5.2)
+    modifier: int = 0
     quality: int = 0  # 0 normal,1 estimated,2 calculated
     dateval: list = Field(default_factory=list)
     has_citation: bool = False

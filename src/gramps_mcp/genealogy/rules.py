@@ -348,7 +348,11 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
             and isinstance(ev.dateval[1], int)
             and (ev.dateval[0] > 31 or ev.dateval[1] > 12)
         )
-        aberrant_meta = ev.modifier not in range(0, 7) or ev.quality not in range(0, 3)
+        # Reason: Gramps 5.2 a ajoute MOD_FROM (7) et MOD_TO (8) aux sept
+        # modificateurs d'origine. La borne a 7 datait d'avant, et sur
+        # gramps 6.0.8 elle signalait comme malformees trois dates que le
+        # serveur rend sans broncher (« from 1446-09-02 »).
+        aberrant_meta = ev.modifier not in range(0, 9) or ev.quality not in range(0, 3)
         if out_of_bounds or aberrant_meta or (has_real_date and ev.sortval == 0):
             out.append(
                 _anom(
