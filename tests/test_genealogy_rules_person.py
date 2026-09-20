@@ -106,6 +106,89 @@ def test_r6_does_not_double_count_a_baptism_before_birth():
     assert rules_fired.count("R7") == 1
 
 
+def test_r1_not_flagged_when_death_is_year_only_same_year_as_exact_birth():
+    """I0943 : naissance exacte le 09/01/1782, deces a l'annee seule 1782 -
+    meme annee, l'ordre reel est inconnu, ne doit pas etre signale."""
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2370010, year=1782, dateval=[9, 1, 1782, False]
+        ),
+        death=EventFact(
+            type="Death", sortval=2370001, year=1782, dateval=[0, 0, 1782, False]
+        ),
+    )
+    assert "R1" not in _rules(check_person(p))
+
+
+def test_r6_event_not_flagged_before_birth_when_year_only_same_year():
+    """I0763 : recensement '1833' (annee seule) contre naissance exacte du
+    10/06/1833 - meme mecanisme que R1/R7."""
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2390100, year=1833, dateval=[10, 6, 1833, False]
+        ),
+        events=[
+            EventFact(
+                type="Census", sortval=2390000, year=1833, dateval=[0, 0, 1833, False]
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))
+
+
+def test_r6_still_flags_event_clearly_before_birth_year():
+    """Regression : un evenement d'une annee anterieure reste signale meme a
+    precision annee seule."""
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2390100, year=1833, dateval=[10, 6, 1833, False]
+        ),
+        events=[
+            EventFact(
+                type="Census", sortval=2385000, year=1830, dateval=[0, 0, 1830, False]
+            )
+        ],
+    )
+    assert "R6" in _rules(check_person(p))
+
+
+def test_r6_before_modifier_date_not_flagged_after_death():
+    """I2385 : profession datee 'avant le 16/04/1895' (modifier=1) pour un
+    homme mort en 1852 - le modificateur ne fixe pas la date."""
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2398000, year=1852, dateval=[1, 1, 1852, False]
+        ),
+        events=[
+            EventFact(
+                type="Occupation",
+                sortval=2415000,
+                year=1895,
+                modifier=1,
+                dateval=[16, 4, 1895, False],
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))
+
+
+def test_r7_burial_not_flagged_when_year_only_same_year_as_exact_death():
+    """I0408 : mort le 30/04/1971 (exact), inhume '1971' (annee seule) - le
+    1er janvier calcule pour l'inhumation ne prouve pas qu'elle a precede le
+    deces."""
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2500100, year=1971, dateval=[30, 4, 1971, False]
+        ),
+        events=[
+            EventFact(
+                type="Burial", sortval=2500000, year=1971, dateval=[0, 0, 1971, False]
+            )
+        ],
+    )
+    assert "R7" not in _rules(check_person(p))
+
+
 def test_r7_burial_before_death():
     p = _p(
         death=EventFact(type="Death", sortval=2420000, year=1905),

@@ -68,6 +68,29 @@ def test_r3_ok_normal_ages():
     assert "R3" not in _rules(check_family(fam, {"M": mother, "C": child}))
 
 
+def test_r3_not_flagged_when_parent_birth_is_not_exact():
+    """I1720/I1721 : pere ne 'avant 1400' (modifier=1) - le modificateur ne
+    fixe pas la date, l'age negatif est un artefact du calcul, pas un fait."""
+    father = _person("P", "M", birth_sort=2232408, birth_year=1400)
+    father.birth.modifier = 1
+    child = _person("C", "M", birth_sort=2230000, birth_year=1395)
+    fam = FamilyFacts(
+        gramps_id="F1", handle="F1", father_handle="P", child_handles=["C"]
+    )
+    assert "R3" not in _rules(check_family(fam, {"P": father, "C": child}))
+
+
+def test_r3_flagged_when_parent_birth_is_exact():
+    """Regression : le meme ecart d'age, mais avec une date exacte, reste
+    signale."""
+    father = _person("P", "M", birth_sort=2232408, birth_year=1400)
+    child = _person("C", "M", birth_sort=2230000, birth_year=1395)
+    fam = FamilyFacts(
+        gramps_id="F1", handle="F1", father_handle="P", child_handles=["C"]
+    )
+    assert "R3" in _rules(check_family(fam, {"P": father, "C": child}))
+
+
 def test_r4_marriage_before_13():
     wife = _person("W", "F", birth_sort=2300000, birth_year=1700)
     fam = FamilyFacts(
