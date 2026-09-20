@@ -27,9 +27,17 @@ from typing import Optional
 import httpx
 import jwt
 
+from . import __version__
 from .config import get_api_base_url, get_settings
 
 logger = logging.getLogger(__name__)
+
+# Reason: https://gramps.discourse.group/t/gramps-web-api-client-authors-please-send-a-user-agent/10006
+# asks every client to identify itself by tool name and version, so a server
+# admin can attribute an error to this tool instead of seeing an anonymous
+# httpx default - the discourse post ties rising server errors from
+# unidentified AI-agent clients to this exact gap.
+USER_AGENT = f"gramps-mcp/{__version__} (+https://github.com/fjacquet/gramps-mcp)"
 
 # Reason: the server's limit is one token request per second, so a wait
 # just over that clears it. Five retries after the first attempt - six
@@ -133,6 +141,7 @@ class AuthManager:
             self._client = httpx.AsyncClient(
                 base_url=get_api_base_url(self.settings),
                 timeout=httpx.Timeout(timeout=REQUEST_TIMEOUT_SECONDS, connect=10.0),
+                headers={"User-Agent": USER_AGENT},
             )
             self._loop = current_loop
         return self._client
