@@ -40,6 +40,17 @@ class TestAuditRendering:
         assert "partial" in text.lower()
         assert "timeout" in text
 
+    def test_a_partial_scan_with_no_anomalies_is_never_called_clean(self):
+        """A scan that stopped early and found nothing is not a clean bill
+        of health - it read nothing, or too little. Reported 2026-09-17:
+        `audit_quality` rendered 'Partial scan: Request timeout' immediately
+        followed by 'None found - the tree is clean', and the second phrase
+        is the one a caller remembers.
+        """
+        text = format_anomalies([], skipped=0, partial=True, error="Request timeout")
+
+        assert "clean" not in text.lower()
+
     def test_highest_severity_renders_first_with_real_domain_values(self):
         """Uses the actual severities the rules engine emits (rules.py), not
         the placeholder "high"/"low" strings above - this is the test that

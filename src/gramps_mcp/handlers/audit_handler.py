@@ -82,6 +82,8 @@ def format_anomalies(
     string - an empty answer reads exactly like a broken one - and states
     the scope it was clean *within*, so a caller who filtered or limited the
     scan is never told the whole tree is clean when only a slice was read.
+    A partial scan is never called "clean" either, even with zero anomalies -
+    reading nothing and finding nothing look identical unless said apart.
 
     Args:
         anomalies (list[Anomaly]): Findings from check_person and
@@ -113,11 +115,19 @@ def format_anomalies(
         sections.append(scope_note)
 
     if not anomalies:
-        clean_line = (
-            f"## Anomalies\n\nNone found within this scope ({', '.join(scope_bits)})."
-            if scope_bits
-            else "## Anomalies\n\nNone found - the tree is clean."
-        )
+        if partial:
+            clean_line = (
+                "## Anomalies\n\nNone found in the part of the tree read "
+                "before the scan stopped. This is not a verdict on the "
+                "rest of the tree, which was not examined."
+            )
+        elif scope_bits:
+            clean_line = (
+                f"## Anomalies\n\nNone found within this scope "
+                f"({', '.join(scope_bits)})."
+            )
+        else:
+            clean_line = "## Anomalies\n\nNone found - the tree is clean."
         sections.append(clean_line)
         return "\n\n".join(sections) + "\n"
 

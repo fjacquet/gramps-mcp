@@ -39,6 +39,17 @@ logger = logging.getLogger(__name__)
 RATE_LIMIT_RETRY_SECONDS = 1.2
 RATE_LIMIT_MAX_RETRIES = 5
 
+# Reason: `profile=all&extend=event_ref_list` (collect.py's page reads for
+# audit_quality/find_duplicates) pulls every event of every person on the
+# page, and a 500-row page of that shape measured close to 30s under load -
+# occasionally over it, which the old 30s budget read as "Request timeout"
+# mid-scan. audit_quality then rendered "Partial scan: Request timeout"
+# immediately followed by "the tree is clean", a scan that read a few
+# hundred people out of 2543 reporting a clean bill of health. This client
+# is shared by every call, not only the heavy ones, so the margin is set to
+# comfortably cover the slow page rather than the fast common case.
+REQUEST_TIMEOUT_SECONDS = 120.0
+
 
 class AuthManager:
     """Singleton JWT authentication for Gramps Web API."""
@@ -121,7 +132,7 @@ class AuthManager:
             # Create new client with current event loop
             self._client = httpx.AsyncClient(
                 base_url=get_api_base_url(self.settings),
-                timeout=httpx.Timeout(timeout=30.0, connect=10.0),
+                timeout=httpx.Timeout(timeout=REQUEST_TIMEOUT_SECONDS, connect=10.0),
             )
             self._loop = current_loop
         return self._client

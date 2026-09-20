@@ -78,6 +78,44 @@ def years_between(a: EventFact, b: EventFact) -> float:
     return (b.sortval - a.sortval) / DAYS_PER_YEAR
 
 
+def _exact(ev: EventFact) -> bool:
+    """True when ev's date is fixed rather than merely bounded or approximated.
+
+    Gramps modifier 0 is the only value that FIXES a date; 1-6 (before,
+    after, about, range, span, text) bound or approximate it. Comparing a
+    bound as if it were the fact itself is what made R3/R6 report 35 false
+    positives out of 38 in the 2026-09-17 audit run: a father "born before
+    1400" is not born in 1400, and a profession "dated before 16/04/1895"
+    for a man dead since 1852 is not necessarily dated after his death.
+    """
+    return ev.modifier == 0
+
+
+def _year_only(ev: EventFact) -> bool:
+    """True when ev carries a year but no day/month (dateval [0, 0, Y, _])."""
+    return len(ev.dateval) >= 3 and not ev.dateval[0] and not ev.dateval[1]
+
+
+def _before(a: EventFact, b: EventFact) -> bool:
+    """True only when a is unambiguously earlier than b.
+
+    Both dates must be exact (`_exact`) - a non-null modifier on either side
+    forbids the comparison outright. When either side is year-only
+    precision, the comparison drops to whole years: a day-precision sortval
+    compared against a year-only one - which sorts at 1 January - makes
+    same-year events look ordered when the true order is unknown, so equal
+    years are never reported as an anomaly (the fix for I0943, I0408, I0763
+    in the 2026-09-17 audit run).
+    """
+    if not (_exact(a) and _exact(b)):
+        return False
+    if _year_only(a) or _year_only(b):
+        if not a.year or not b.year:
+            return False
+        return a.year < b.year
+    return a.sortval < b.sortval
+
+
 def _anom(rule, severity, p: PersonFacts, message, **detail) -> Anomaly:
     return Anomaly(
         rule=rule,
@@ -95,7 +133,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
     b, d = person.birth, person.death
 
     # R1 — birth after death
-    if is_valid(b) and is_valid(d) and b.sortval > d.sortval:
+    if is_valid(b) and is_valid(d) and _before(d, b):
         out.append(
             _anom(
                 "R1",
@@ -127,7 +165,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
     for ev in person.events:
         if ev.type in {"Birth", "Death"} or not is_valid(ev):
             continue
-        if ev.type not in R7_BEFORE_TYPES and is_valid(b) and ev.sortval < b.sortval:
+        if ev.type not in R7_BEFORE_TYPES and is_valid(b) and _before(ev, b):
             out.append(
                 _anom(
                     "R6",
@@ -139,7 +177,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
                     birth_year=b.year,
                 )
             )
-        elif ev.type not in POSTMORTEM_TYPES and is_valid(d) and ev.sortval > d.sortval:
+        elif ev.type not in POSTMORTEM_TYPES and is_valid(d) and _before(d, ev):
             out.append(
                 _anom(
                     "R6",
@@ -154,12 +192,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
 
     # R7 — baptism before birth ; burial before death
     for ev in person.events:
-        if (
-            ev.type == "Baptism"
-            and is_valid(ev)
-            and is_valid(b)
-            and ev.sortval < b.sortval
-        ):
+        if ev.type == "Baptism" and is_valid(ev) and is_valid(b) and _before(ev, b):
             out.append(
                 _anom(
                     "R7",
@@ -170,12 +203,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
                     birth_year=b.year,
                 )
             )
-        if (
-            ev.type == "Burial"
-            and is_valid(ev)
-            and is_valid(d)
-            and ev.sortval < d.sortval
-        ):
+        if ev.type == "Burial" and is_valid(ev) and is_valid(d) and _before(ev, d):
             out.append(
                 _anom(
                     "R7",
@@ -266,13 +294,13 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
 
     # R3 — parent age at each child's birth
     for child in children:
-        if not is_valid(child.birth):
+        if not is_valid(child.birth) or not _exact(child.birth):
             continue
         for parent, lo, hi, label in (
             (mother, 13, 55, "de la mère"),
             (father, 13, 80, "du père"),
         ):
-            if parent and is_valid(parent.birth):
+            if parent and is_valid(parent.birth) and _exact(parent.birth):
                 age = years_between(parent.birth, child.birth)
                 if age < lo or age > hi:
                     out.append(
@@ -287,9 +315,9 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
                     )
 
     # R4 — marriage before age 13 (each dated spouse)
-    if is_valid(family.marriage):
+    if is_valid(family.marriage) and _exact(family.marriage):
         for spouse in (mother, father):
-            if spouse and is_valid(spouse.birth):
+            if spouse and is_valid(spouse.birth) and _exact(spouse.birth):
                 age = years_between(spouse.birth, family.marriage)
                 if age < 13:
                     out.append(
@@ -305,11 +333,7 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
     for child in children:
         if not is_valid(child.birth):
             continue
-        if (
-            mother
-            and is_valid(mother.death)
-            and child.birth.sortval > mother.death.sortval
-        ):
+        if mother and is_valid(mother.death) and _before(mother.death, child.birth):
             out.append(
                 _fanom(
                     "R5",
@@ -321,6 +345,8 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
         if (
             father
             and is_valid(father.death)
+            and _exact(father.death)
+            and _exact(child.birth)
             and child.birth.sortval > father.death.sortval + DAYS_9_MONTHS
         ):
             out.append(
