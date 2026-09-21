@@ -138,6 +138,14 @@ class AuthManager:
                 logger.info("HTTP client recreated in AuthManager")
 
             # Create new client with current event loop
+            # Reason: 30 s ne suffisait pas aux deux outils de detection.
+            # `collect_tree` lit tout l'arbre avec `profile=all`, et une
+            # mesure du 17/09/2026 sur 2543 personnes a demande environ deux
+            # minutes - le client expirait donc au milieu, `audit_quality` et
+            # `find_duplicates` rendaient un scan partiel, et jusqu'a ce jour
+            # ils le presentaient comme une absence de defaut. Le delai de
+            # connexion reste court : c'est la lecture qui est longue, pas
+            # l'etablissement de la connexion.
             self._client = httpx.AsyncClient(
                 base_url=get_api_base_url(self.settings),
                 timeout=httpx.Timeout(timeout=REQUEST_TIMEOUT_SECONDS, connect=10.0),
@@ -219,10 +227,23 @@ class AuthManager:
             if e.response.status_code == 403:
                 raise ValueError("Invalid username or password")
             raise ValueError(f"Authentication failed: HTTP {e.response.status_code}")
-        except httpx.ConnectError as e:
-            raise ValueError(f"Cannot connect to Gramps API: {e}")
+        except (httpx.ConnectError, httpx.TimeoutException) as e:
+            # Reason: httpx.ConnectTimeout descend de TimeoutException et non
+            # de ConnectError, donc il tombait dans le `except Exception`
+            # ci-dessous. Et le `str()` de ces exceptions de transport est
+            # souvent vide : le 17/09/2026, un serveur devenu injoignable en
+            # pleine session a rendu, mot pour mot, "Authentication error: " -
+            # un message d'erreur sans erreur dedans, qui se lit comme un
+            # probleme d'identifiants. Le type et l'URL sont ce qui manquait
+            # pour distinguer une panne reseau d'un mot de passe refuse.
+            raise ValueError(
+                f"Cannot reach the Gramps API at "
+                f"{get_api_base_url(self.settings)} ({type(e).__name__})"
+            ) from e
         except Exception as e:
-            raise ValueError(f"Authentication error: {e}")
+            raise ValueError(
+                f"Authentication error ({type(e).__name__}): {e}".rstrip(": ")
+            ) from e
 
     def _lock_for_current_loop(self) -> asyncio.Lock:
         """

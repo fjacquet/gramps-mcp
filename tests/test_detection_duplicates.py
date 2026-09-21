@@ -432,3 +432,41 @@ class TestALimitedScanSaysSo:
         )
 
         assert "scope" not in text.lower()
+
+
+class TestPartialScanNeverReadsAsClean:
+    """Meme defaut que dans audit_handler : une reponse qui commence par
+    « Partial scan » ne doit pas enchainer sur un « None found. » nu, qui se
+    lit comme une absence etablie.
+    """
+
+    def test_a_partial_scan_qualifies_the_absence_of_duplicates(self):
+        text = format_duplicate_clusters(
+            [],
+            [],
+            {},
+            skipped=0,
+            partial=True,
+            error="Request timeout",
+            ignored=0,
+            limit=None,
+            collisions=[],
+        )
+
+        assert "partial" in text.lower()
+        assert "## Proved duplicates\n\nNone found." not in text
+
+    def test_a_complete_scan_still_says_none_found(self):
+        text = format_duplicate_clusters(
+            [],
+            [],
+            {},
+            skipped=0,
+            partial=False,
+            error=None,
+            ignored=0,
+            limit=None,
+            collisions=[],
+        )
+
+        assert "None found." in text

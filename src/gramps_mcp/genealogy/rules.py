@@ -56,6 +56,22 @@ from .domain import (
 
 DAYS_PER_YEAR = 365.25
 POSTMORTEM_TYPES = {"Burial", "Cremation", "Probate", "Will"}
+
+
+def is_own(ev: EventFact) -> bool:
+    """Tell whether the event belongs to the person or is merely attended.
+
+    Args:
+        ev (EventFact): One event carried by the person's event_ref_list.
+
+    Returns:
+        bool: True for role Primary. A Witness at a father's burial carries
+        that burial in their own list; read as their own it dates their
+        interment years before their death.
+    """
+    return ev.role == "Primary"
+
+
 R7_BEFORE_TYPES = {"Baptism", "Burial"}
 """Event types R7 already checks against a specific reference date (baptism
 vs. birth, burial vs. death). Excluded from R6's generic before-birth check
@@ -78,42 +94,132 @@ def years_between(a: EventFact, b: EventFact) -> float:
     return (b.sortval - a.sortval) / DAYS_PER_YEAR
 
 
-def _exact(ev: EventFact) -> bool:
-    """True when ev's date is fixed rather than merely bounded or approximated.
+# Reason: mesure du 17/09/2026 sur l'arbre entier - 35 des 38 anomalies
+# unitaires etaient fausses, et les deux causes sont ici. Une date a l'annee
+# seule a pour sortval le 1er janvier de cette annee, donc toute date au jour
+# dans la meme annee lui est "posterieure" ; et un modificateur non nul
+# (avant, apres, vers, intervalle) veut dire que le sortval n'est pas un
+# point. Comparer ces dates strictement revient a inventer une precision que
+# la source n'a pas.
 
-    Gramps modifier 0 is the only value that FIXES a date; 1-6 (before,
-    after, about, range, span, text) bound or approximate it. Comparing a
-    bound as if it were the fact itself is what made R3/R6 report 35 false
-    positives out of 38 in the 2026-09-17 audit run: a father "born before
-    1400" is not born in 1400, and a profession "dated before 16/04/1895"
-    for a man dead since 1852 is not necessarily dated after his death.
+_DAY, _MONTH, _YEAR, _NONE = 3, 2, 1, 0
+
+
+def date_precision(ev: EventFact) -> int:
+    """Finesse reelle de la date, lue sur `dateval`.
+
+    Args:
+        ev (EventFact): Evenement dont la date est mesuree.
+
+    Returns:
+        int: 3 au jour, 2 au mois, 1 a l'annee, 0 si rien n'est datable.
+            Un `dateval` absent rend 3 : le `sortval` est alors la seule
+            information disponible et on lui fait confiance.
     """
+    dv = ev.dateval
+    if len(dv) < 3 or not all(isinstance(x, int) for x in dv[:3]):
+        return _DAY
+    day, month, year = dv[0], dv[1], dv[2]
+    if day:
+        return _DAY
+    if month:
+        return _MONTH
+    if year:
+        return _YEAR
+    return _NONE
+
+
+def is_point(ev: EventFact) -> bool:
+    """True quand la date designe un instant et non un intervalle."""
     return ev.modifier == 0
 
 
-def _year_only(ev: EventFact) -> bool:
-    """True when ev carries a year but no day/month (dateval [0, 0, Y, _])."""
-    return len(ev.dateval) >= 3 and not ev.dateval[0] and not ev.dateval[1]
+def _key(ev: EventFact, precision: int) -> tuple[int, ...]:
+    """Cle de comparaison tronquee a la precision demandee."""
+    dv = ev.dateval
+    year = ev.year if ev.year is not None else (dv[2] if len(dv) >= 3 else 0)
+    month = dv[1] if len(dv) >= 2 else 0
+    if precision == _YEAR:
+        return (year or 0,)
+    return (year or 0, month or 0)
 
 
-def _before(a: EventFact, b: EventFact) -> bool:
-    """True only when a is unambiguously earlier than b.
+def strictly_before(a: EventFact, b: EventFact) -> bool:
+    """True seulement si l'anteriorite de `a` sur `b` est certaine.
 
-    Both dates must be exact (`_exact`) - a non-null modifier on either side
-    forbids the comparison outright. When either side is year-only
-    precision, the comparison drops to whole years: a day-precision sortval
-    compared against a year-only one - which sorts at 1 January - makes
-    same-year events look ordered when the true order is unknown, so equal
-    years are never reported as an anomaly (the fix for I0943, I0408, I0763
-    in the 2026-09-17 audit run).
+    Deux dates ne se comparent qu'a la precision de la plus grossiere des
+    deux, et seulement si aucune ne porte de modificateur. Dans le doute la
+    fonction rend False : une regle qui se tait vaut mieux qu'une regle qui
+    crie a tort.
+
+    Args:
+        a (EventFact): Date supposee anterieure.
+        b (EventFact): Date supposee posterieure.
+
+    Returns:
+        bool: True quand `a` precede `b` de facon indiscutable.
     """
-    if not (_exact(a) and _exact(b)):
+    if not (is_valid(a) and is_valid(b)):
         return False
-    if _year_only(a) or _year_only(b):
-        if not a.year or not b.year:
-            return False
-        return a.year < b.year
-    return a.sortval < b.sortval
+    if not (is_point(a) and is_point(b)):
+        return False
+    precision = min(date_precision(a), date_precision(b))
+    if precision == _NONE:
+        return False
+    if precision == _DAY:
+        return a.sortval < b.sortval
+    return _key(a, precision) < _key(b, precision)
+
+
+def strictly_after(a: EventFact, b: EventFact, slack_days: int = 0) -> bool:
+    """True seulement si `a` suit `b` d'au moins `slack_days`, sans doute.
+
+    Args:
+        a (EventFact): Date supposee posterieure.
+        b (EventFact): Date supposee anterieure.
+        slack_days (int): Marge exigee, en jours. A l'annee ou au mois, elle
+            est convertie dans l'unite de la comparaison, arrondie au
+            superieur : mieux vaut exiger un an de trop que signaler a tort.
+
+    Returns:
+        bool: True quand `a` suit `b` de facon indiscutable.
+    """
+    if not (is_valid(a) and is_valid(b)):
+        return False
+    if not (is_point(a) and is_point(b)):
+        return False
+    precision = min(date_precision(a), date_precision(b))
+    if precision == _NONE:
+        return False
+    if precision == _DAY:
+        return a.sortval > b.sortval + slack_days
+    if precision == _YEAR:
+        slack = -(-slack_days // 365) if slack_days else 0
+    else:
+        slack = -(-slack_days // 30) if slack_days else 0
+    key_a, key_b = _key(a, precision), _key(b, precision)
+    if slack == 0:
+        return key_a > key_b
+    bumped = list(key_b)
+    bumped[-1] += slack
+    return key_a > tuple(bumped)
+
+
+def comparable_ages(a: EventFact, b: EventFact) -> bool:
+    """True quand un ecart d'annees entre `a` et `b` veut dire quelque chose.
+
+    Un age calcule depuis une date « avant 1400 » ou « vers 1880 » n'est pas
+    un age : c'est ce qui donnait des peres d'age negatif dans la branche
+    Coeur.
+    """
+    return (
+        is_valid(a)
+        and is_valid(b)
+        and is_point(a)
+        and is_point(b)
+        and date_precision(a) != _NONE
+        and date_precision(b) != _NONE
+    )
 
 
 def _anom(rule, severity, p: PersonFacts, message, **detail) -> Anomaly:
@@ -133,7 +239,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
     b, d = person.birth, person.death
 
     # R1 — birth after death
-    if is_valid(b) and is_valid(d) and _before(d, b):
+    if is_valid(b) and is_valid(d) and strictly_after(b, d):
         out.append(
             _anom(
                 "R1",
@@ -146,7 +252,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
         )
 
     # R2 — age at death > 105
-    if is_valid(b) and is_valid(d):
+    if is_valid(b) and is_valid(d) and comparable_ages(b, d):
         age = years_between(b, d)
         if age > 105:
             out.append(
@@ -165,7 +271,9 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
     for ev in person.events:
         if ev.type in {"Birth", "Death"} or not is_valid(ev):
             continue
-        if ev.type not in R7_BEFORE_TYPES and is_valid(b) and _before(ev, b):
+        if not is_own(ev):
+            continue
+        if ev.type not in R7_BEFORE_TYPES and is_valid(b) and strictly_before(ev, b):
             out.append(
                 _anom(
                     "R6",
@@ -177,7 +285,7 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
                     birth_year=b.year,
                 )
             )
-        elif ev.type not in POSTMORTEM_TYPES and is_valid(d) and _before(d, ev):
+        elif ev.type not in POSTMORTEM_TYPES and is_valid(d) and strictly_after(ev, d):
             out.append(
                 _anom(
                     "R6",
@@ -192,7 +300,14 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
 
     # R7 — baptism before birth ; burial before death
     for ev in person.events:
-        if ev.type == "Baptism" and is_valid(ev) and is_valid(b) and _before(ev, b):
+        if not is_own(ev):
+            continue
+        if (
+            ev.type == "Baptism"
+            and is_valid(ev)
+            and is_valid(b)
+            and strictly_before(ev, b)
+        ):
             out.append(
                 _anom(
                     "R7",
@@ -203,7 +318,12 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
                     birth_year=b.year,
                 )
             )
-        if ev.type == "Burial" and is_valid(ev) and is_valid(d) and _before(ev, d):
+        if (
+            ev.type == "Burial"
+            and is_valid(ev)
+            and is_valid(d)
+            and strictly_before(ev, d)
+        ):
             out.append(
                 _anom(
                     "R7",
@@ -228,7 +348,11 @@ def check_person(person: PersonFacts) -> list[Anomaly]:
             and isinstance(ev.dateval[1], int)
             and (ev.dateval[0] > 31 or ev.dateval[1] > 12)
         )
-        aberrant_meta = ev.modifier not in range(0, 7) or ev.quality not in range(0, 3)
+        # Reason: Gramps 5.2 a ajoute MOD_FROM (7) et MOD_TO (8) aux sept
+        # modificateurs d'origine. La borne a 7 datait d'avant, et sur
+        # gramps 6.0.8 elle signalait comme malformees trois dates que le
+        # serveur rend sans broncher (« from 1446-09-02 »).
+        aberrant_meta = ev.modifier not in range(0, 9) or ev.quality not in range(0, 3)
         if out_of_bounds or aberrant_meta or (has_real_date and ev.sortval == 0):
             out.append(
                 _anom(
@@ -294,13 +418,18 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
 
     # R3 — parent age at each child's birth
     for child in children:
-        if not is_valid(child.birth) or not _exact(child.birth):
+        if not is_valid(child.birth):
             continue
         for parent, lo, hi, label in (
             (mother, 13, 55, "de la mère"),
             (father, 13, 80, "du père"),
         ):
-            if parent and is_valid(parent.birth) and _exact(parent.birth):
+            if (
+                parent
+                and is_valid(parent.birth)
+                and is_valid(child.birth)
+                and comparable_ages(parent.birth, child.birth)
+            ):
                 age = years_between(parent.birth, child.birth)
                 if age < lo or age > hi:
                     out.append(
@@ -315,9 +444,14 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
                     )
 
     # R4 — marriage before age 13 (each dated spouse)
-    if is_valid(family.marriage) and _exact(family.marriage):
+    if is_valid(family.marriage):
         for spouse in (mother, father):
-            if spouse and is_valid(spouse.birth) and _exact(spouse.birth):
+            if (
+                spouse
+                and is_valid(spouse.birth)
+                and is_valid(family.marriage)
+                and comparable_ages(spouse.birth, family.marriage)
+            ):
                 age = years_between(spouse.birth, family.marriage)
                 if age < 13:
                     out.append(
@@ -333,7 +467,12 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
     for child in children:
         if not is_valid(child.birth):
             continue
-        if mother and is_valid(mother.death) and _before(mother.death, child.birth):
+        if (
+            mother
+            and is_valid(child.birth)
+            and is_valid(mother.death)
+            and strictly_after(child.birth, mother.death)
+        ):
             out.append(
                 _fanom(
                     "R5",
@@ -344,10 +483,9 @@ def check_family(family: FamilyFacts, persons: dict[str, PersonFacts]) -> list[A
             )
         if (
             father
+            and is_valid(child.birth)
             and is_valid(father.death)
-            and _exact(father.death)
-            and _exact(child.birth)
-            and child.birth.sortval > father.death.sortval + DAYS_9_MONTHS
+            and strictly_after(child.birth, father.death, DAYS_9_MONTHS)
         ):
             out.append(
                 _fanom(

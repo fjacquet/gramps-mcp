@@ -47,9 +47,10 @@ _SEX = {0: "F", 1: "M", 2: "U"}
 _LIST_PARAMS = {"profile": "all", "extend": "event_ref_list", "sort": "gramps_id"}
 
 
-def _event_from_raw(raw: dict) -> EventFact:
+def _event_from_raw(raw: dict, role: str = "Primary") -> EventFact:
     date = raw.get("date") or {}
     return EventFact(
+        role=role or "Primary",
         type=raw.get("type", ""),
         sortval=date.get("sortval", 0) or 0,
         year=date.get("year"),
@@ -88,7 +89,16 @@ def person_from_json(raw: dict) -> PersonFacts:
     surnames = name.get("surname_list") or [{}]
     surname = surnames[0].get("surname", "") if surnames else ""
     given = name.get("first_name", "")
-    events = [_event_from_raw(e) for e in (raw.get("extended") or {}).get("events", [])]
+    # Reason: extended.events est positionnellement aligné sur event_ref_list ;
+    # le rôle ne vit que du côté de la référence. Sans lui, une sépulture où la
+    # personne n'est que témoin passe pour la sienne (R6/R7).
+    raw_events = (raw.get("extended") or {}).get("events", [])
+    refs: list[dict] = list(raw.get("event_ref_list") or [])
+    refs += [{}] * (len(raw_events) - len(refs))
+    events = [
+        _event_from_raw(e, (r or {}).get("role", "Primary"))
+        for e, r in zip(raw_events, refs)
+    ]
 
     bi, di = raw.get("birth_ref_index", -1), raw.get("death_ref_index", -1)
     birth = events[bi] if 0 <= bi < len(events) else None

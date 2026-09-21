@@ -203,6 +203,15 @@ def format_duplicate_clusters(
         sections.append(
             f"## Proved duplicates ({len(clusters)} cluster(s))\n\n{cluster_lines}"
         )
+    elif partial:
+        # Reason: meme defaut que dans audit_handler - un "None found." nu
+        # apres une banniere de scan partiel se lit comme une absence
+        # etablie. C'est precisement ce que `collect.py` documente avoir
+        # deja fait rendre ici, sur un scan qui n'avait rien lu.
+        sections.append(
+            "## Proved duplicates\n\nNone found in what was read before the "
+            "scan stopped - the tree was not read in full."
+        )
     else:
         sections.append("## Proved duplicates\n\nNone found.")
 

@@ -288,3 +288,200 @@ def test_d3_unknown_gender_flagged():
 
 def test_d3_absent_for_known_gender():
     assert "D3" not in _rules(check_person(_p(sex="F")))
+
+
+# --- Précision et modificateur de date : pas de comparaison stricte abusive ---
+#
+# Mesuré le 17/09/2026 sur l'arbre entier : 35 des 38 anomalies unitaires
+# étaient des faux positifs, tous nés de deux confusions - une date à l'année
+# seule sort au 1er janvier, et un modificateur « avant » était lu comme une
+# date exacte.
+
+
+def test_r1_silent_when_death_is_year_only_in_the_birth_year():
+    """Née le 9 janvier 1782, morte « en 1782 » : l'arbre a raison.
+
+    Le sortval d'une date à l'année seule tombe au 1er janvier, donc une
+    naissance datée au jour dans la même année lui est postérieure. Cas réel
+    I0943, une enfant morte dans son année de naissance.
+    """
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2371931, year=1782, dateval=[9, 1, 1782, False]
+        ),
+        death=EventFact(
+            type="Death", sortval=2371923, year=1782, dateval=[0, 0, 1782, False]
+        ),
+    )
+    assert "R1" not in _rules(check_person(p))
+
+
+def test_r1_still_fires_when_both_dates_are_exact_days():
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2400000, year=1850, dateval=[1, 6, 1850, False]
+        ),
+        death=EventFact(
+            type="Death", sortval=2390000, year=1820, dateval=[1, 6, 1820, False]
+        ),
+    )
+    assert "R1" in _rules(check_person(p))
+
+
+def test_r7_silent_when_burial_is_year_only_in_the_death_year():
+    """Mort le 30/04/1971, inhumé « 1971 » : cas réel I0408."""
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2441072, year=1971, dateval=[30, 4, 1971, False]
+        ),
+        events=[
+            EventFact(
+                type="Burial", sortval=2440953, year=1971, dateval=[0, 0, 1971, False]
+            )
+        ],
+    )
+    assert "R7" not in _rules(check_person(p))
+
+
+def test_r7_still_fires_on_a_real_burial_before_death():
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2441072, year=1971, dateval=[30, 4, 1971, False]
+        ),
+        events=[
+            EventFact(
+                type="Burial", sortval=2440000, year=1968, dateval=[2, 5, 1968, False]
+            )
+        ],
+    )
+    assert "R7" in _rules(check_person(p))
+
+
+def test_r6_silent_when_event_is_year_only_in_the_birth_year():
+    """Recensement « 1833 » pour une naissance du 10/06/1833 : cas réel I0763."""
+    p = _p(
+        birth=EventFact(
+            type="Birth", sortval=2390710, year=1833, dateval=[10, 6, 1833, False]
+        ),
+        events=[
+            EventFact(
+                type="Census", sortval=2390550, year=1833, dateval=[0, 0, 1833, False]
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))
+
+
+def test_r6_silent_when_event_date_carries_a_modifier():
+    """Profession datée « avant le 16/04/1895 » chez un mort de 1852 : I2385.
+
+    Un modificateur non nul veut dire que le sortval n'est pas un point, donc
+    qu'aucune comparaison stricte n'est licite.
+    """
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2397569, year=1852, dateval=[21, 3, 1852, False]
+        ),
+        events=[
+            EventFact(
+                type="Occupation",
+                sortval=2413300,
+                year=1895,
+                dateval=[16, 4, 1895, False],
+                modifier=1,
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))
+
+
+def test_r7_ignores_a_burial_the_person_only_witnessed():
+    # Reason: E1744, sépulture de Jean Jacquet le 02/07/1785, porte son fils
+    # Pierre en rôle Witness. Sans filtre de rôle, R7 lit cette inhumation
+    # comme celle de Pierre (†1788) et la déclare antérieure à son décès.
+    p = _p(
+        death=EventFact(type="Death", sortval=2373000, year=1788),
+        events=[
+            EventFact(
+                type="Burial",
+                sortval=2372000,
+                year=1785,
+                dateval=[2, 7, 1785, False],
+                role="Witness",
+            )
+        ],
+    )
+    assert "R7" not in _rules(check_person(p))
+
+
+def test_r7_still_flags_the_person_s_own_burial():
+    p = _p(
+        death=EventFact(type="Death", sortval=2373000, year=1788),
+        events=[
+            EventFact(
+                type="Burial",
+                sortval=2372000,
+                year=1785,
+                dateval=[2, 7, 1785, False],
+                role="Primary",
+            )
+        ],
+    )
+    assert "R7" in _rules(check_person(p))
+
+
+def test_r6_ignores_an_event_the_person_only_witnessed():
+    p = _p(
+        death=EventFact(
+            type="Death", sortval=2372000, year=1785, dateval=[16, 5, 1785, False]
+        ),
+        events=[
+            EventFact(
+                type="Occupation",
+                sortval=2380000,
+                year=1806,
+                dateval=[1, 1, 1806, False],
+                role="Witness",
+            )
+        ],
+    )
+    assert "R6" not in _rules(check_person(p))
+
+
+def test_r8_accepte_les_modificateurs_from_et_to():
+    """Gramps 5.2 a ajoute « from » (7) et « to » (8) : ce sont des dates valides.
+
+    Mesure le 18/09/2026 sur l'arbre : trois evenements portent `modifier=7` et
+    le serveur (gramps 6.0.8) les rend « from 1446-09-02 », « from 2021-05 ».
+    R8 les signalait comme dates malformees parce qu'il bornait le modificateur
+    a `range(0, 7)`.
+    """
+    for modifier in (7, 8):
+        p = _p(
+            events=[
+                EventFact(
+                    type="Occupation",
+                    sortval=2249445,
+                    year=1446,
+                    dateval=[2, 9, 1446, False],
+                    modifier=modifier,
+                )
+            ]
+        )
+        assert "R8" not in _rules(check_person(p)), f"modifier {modifier} refuse"
+
+
+def test_r8_signale_toujours_un_modificateur_hors_bornes():
+    """Au-dela de « to » (8), plus rien n'est defini : R8 doit rester sensible."""
+    p = _p(
+        events=[
+            EventFact(
+                type="Occupation",
+                sortval=2249445,
+                year=1446,
+                dateval=[2, 9, 1446, False],
+                modifier=9,
+            )
+        ]
+    )
+    assert "R8" in _rules(check_person(p))

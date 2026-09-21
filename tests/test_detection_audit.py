@@ -51,6 +51,22 @@ class TestAuditRendering:
 
         assert "clean" not in text.lower()
 
+    def test_a_partial_scan_with_a_scope_still_never_claims_cleanliness(self):
+        text = format_anomalies(
+            [], skipped=0, partial=True, error="Request timeout", limit=100
+        )
+
+        assert "the tree is clean" not in text.lower()
+
+    def test_a_complete_scan_may_still_call_the_tree_clean(self):
+        """Le correctif ne doit pas bailonner le cas ou l'arbre est vraiment
+        propre : c'est la seule assertion qui empeche de rendre le message
+        inutile.
+        """
+        text = format_anomalies([], skipped=0, partial=False, error=None)
+
+        assert "the tree is clean" in text.lower()
+
     def test_highest_severity_renders_first_with_real_domain_values(self):
         """Uses the actual severities the rules engine emits (rules.py), not
         the placeholder "high"/"low" strings above - this is the test that
