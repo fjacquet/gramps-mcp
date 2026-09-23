@@ -16,9 +16,11 @@
 
 """Build normalized PersonFacts / FamilyFacts from the Gramps Web API.
 
-Pure mappers only: `person_from_json` and `family_from_json`. One list call
-per page uses `profile=all&extend=event_ref_list`, so vital dates (raw, with
-sortval) and citation counts arrive together.
+Pure mappers only: `person_from_json` and `family_from_json`. One people
+list call per page uses `profile=all&extend=event_ref_list`, so vital dates
+(raw, with sortval) and citation counts arrive together. Families are read
+with `extend=event_ref_list` alone (`_FAMILY_LIST_PARAMS`): their mapper
+never reads the profile.
 
 Copied from fjacquet/crewai-custom-tools v0.31.1 (19d78f7),
 src/crewai_custom_tools/tools/genealogy/gramps/facts.py.
@@ -45,6 +47,11 @@ logger = logging.getLogger(__name__)
 
 _SEX = {0: "F", 1: "M", 2: "U"}
 _LIST_PARAMS = {"profile": "all", "extend": "event_ref_list", "sort": "gramps_id"}
+# Reason: `family_from_json` reads only `extended.events`. With `profile=all`
+# the server builds the profile of every member of every family: measured on
+# the live tree (23/09/2026), a 500-family page never came back in 600 s,
+# the same page without it came back in 0.4 s.
+_FAMILY_LIST_PARAMS = {"extend": "event_ref_list", "sort": "gramps_id"}
 
 
 def _event_from_raw(raw: dict, role: str = "Primary") -> EventFact:
