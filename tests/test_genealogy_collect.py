@@ -251,6 +251,57 @@ class TestCollectPaginates:
 
         assert len(result.people) == 1000
 
+    async def test_families_are_read_without_the_profile_the_server_chokes_on(
+        self,
+    ):
+        """The defect this guards: audit_quality on the live tree ended in
+        "Partial scan: Request timeout". A page of 500 families with
+        `profile=all` never came back in 600 s, the same page without it in
+        0.4 s - and `family_from_json` never reads the profile anyway.
+        """
+        from src.gramps_mcp.models.api_calls import ApiCalls
+
+        people = [_person(n) for n in range(1, 3)]
+        families = [
+            {
+                "handle": "f1",
+                "gramps_id": "F0001",
+                "father_handle": "p1",
+                "mother_handle": "p2",
+                "child_ref_list": [],
+                "extended": {
+                    "events": [
+                        {
+                            "type": "Marriage",
+                            "date": {"dateval": [4, 3, 1794, False], "year": 1794},
+                        }
+                    ]
+                },
+            }
+        ]
+        paged = _paged_server(people, families, page_cap=500)
+
+        async def serve(api_call=None, params=None, tree_id=None, **kw):
+            if api_call == ApiCalls.GET_FAMILIES and "profile" in (params or {}):
+                raise TimeoutError("Request timeout")
+            return await paged(api_call=api_call, params=params, tree_id=tree_id)
+
+        with patch(
+            "src.gramps_mcp.client.GrampsWebAPIClient.make_api_call",
+            new_callable=AsyncMock,
+        ) as call:
+            call.side_effect = serve
+            from src.gramps_mcp.client import GrampsWebAPIClient
+
+            result = await collect_tree(GrampsWebAPIClient(), "tree")
+
+        assert result.partial is False
+        assert result.error is None
+        assert len(result.people) == 2
+        marriage = result.families["f1"].marriage
+        assert marriage is not None
+        assert marriage.year == 1794
+
 
 class TestCollectLive:
     pytestmark = pytest.mark.integration

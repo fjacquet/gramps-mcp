@@ -1,0 +1,572 @@
+[
+  {
+    "gramps_id": "I0755",
+    "nom": "Silvain Villaudy",
+    "source_event": "E2949",
+    "citation": "C2192"
+  },
+  {
+    "gramps_id": "I1513",
+    "nom": "Catherine Jacquier",
+    "source_event": "E3203",
+    "citation": "C2294"
+  },
+  {
+    "gramps_id": "I2328",
+    "nom": "Paul Villaudy",
+    "source_event": "E3204",
+    "citation": "C2296"
+  },
+  {
+    "gramps_id": "I1560",
+    "nom": "Claude Villaudy",
+    "source_event": "E3205",
+    "citation": "C2297"
+  },
+  {
+    "gramps_id": "I2582",
+    "nom": "Antoine Villaudy",
+    "source_event": "E3206",
+    "citation": "C2298"
+  },
+  {
+    "gramps_id": "I1718",
+    "nom": "Marie Mabilat",
+    "source_event": "E3208",
+    "citation": "C2299"
+  },
+  {
+    "gramps_id": "I1561",
+    "nom": "Catherine Jaquier",
+    "source_event": "E3209",
+    "citation": "C2300"
+  },
+  {
+    "gramps_id": "I2583",
+    "nom": "Etienne Villaudy",
+    "source_event": "E3210",
+    "citation": "C2301"
+  },
+  {
+    "gramps_id": "I2588",
+    "nom": "Jacques Villaudy",
+    "source_event": "E3216",
+    "citation": "C2303"
+  },
+  {
+    "gramps_id": "I2385",
+    "nom": "Paul Villaudy",
+    "source_event": "E3188",
+    "citation": "C2279"
+  },
+  {
+    "gramps_id": "I1768",
+    "nom": "Sylvain Dubuisson",
+    "source_event": "E2077",
+    "citation": "C0620"
+  },
+  {
+    "gramps_id": "I1769",
+    "nom": "Marie Cailbin",
+    "source_event": "E2077",
+    "citation": "C0620"
+  },
+  {
+    "gramps_id": "I0889",
+    "nom": "Francoise Dubuisson",
+    "source_event": "E2076",
+    "citation": "C0782"
+  },
+  {
+    "gramps_id": "I2465",
+    "nom": "Gabriel Clavier",
+    "source_event": "E2996",
+    "citation": "C2217"
+  },
+  {
+    "gramps_id": "I1815",
+    "nom": "Anne Villaudy",
+    "source_event": "E2916",
+    "citation": "C1676"
+  },
+  {
+    "gramps_id": "I2498",
+    "nom": "Anne Larpent",
+    "source_event": "E3098",
+    "citation": "C2234"
+  },
+  {
+    "gramps_id": "I0752",
+    "nom": "Jacques Villaudy",
+    "source_event": "E0908",
+    "citation": "C0242"
+  },
+  {
+    "gramps_id": "I0754",
+    "nom": "Jacques Villaudy",
+    "source_event": "E0910",
+    "citation": "C0243"
+  },
+  {
+    "gramps_id": "I0320",
+    "nom": "Marie Berthier",
+    "source_event": "E0940",
+    "citation": "C0252"
+  },
+  {
+    "gramps_id": "I0780",
+    "nom": "Jean Berthier",
+    "source_event": "E0951",
+    "citation": "C0252"
+  },
+  {
+    "gramps_id": "I0782",
+    "nom": "Silvain Foltier",
+    "source_event": "E0954",
+    "citation": "C0252"
+  },
+  {
+    "gramps_id": "I0322",
+    "nom": "Etienne dit Saint Amand Villaudy",
+    "source_event": "E2727",
+    "citation": "C2022"
+  },
+  {
+    "gramps_id": "I1483",
+    "nom": "Marie Villaudy",
+    "source_event": "E1760",
+    "citation": "C0644"
+  },
+  {
+    "gramps_id": "I1484",
+    "nom": "Silvain Villaudy",
+    "source_event": "E1762",
+    "citation": "C0646"
+  },
+  {
+    "gramps_id": "I1487",
+    "nom": "Claude Villaudy",
+    "source_event": "E1764",
+    "citation": "C0649"
+  },
+  {
+    "gramps_id": "I1486",
+    "nom": "Paul Villaudy",
+    "source_event": "E1765",
+    "citation": "C0648"
+  },
+  {
+    "gramps_id": "I1489",
+    "nom": "Etienne Villaudy",
+    "source_event": "E1857",
+    "citation": "C0696"
+  },
+  {
+    "gramps_id": "I1499",
+    "nom": "Jacques Villaudy",
+    "source_event": "E1808",
+    "citation": "C0660"
+  },
+  {
+    "gramps_id": "I1500",
+    "nom": "Marie Cocu",
+    "source_event": "E1788",
+    "citation": "C0658"
+  },
+  {
+    "gramps_id": "I1502",
+    "nom": "Jean Villaudy",
+    "source_event": "E1791",
+    "citation": "C0658"
+  },
+  {
+    "gramps_id": "I1503",
+    "nom": "Marie Massicot",
+    "source_event": "E1794",
+    "citation": "C1658"
+  },
+  {
+    "gramps_id": "I1517",
+    "nom": "Marie Larpent",
+    "source_event": "E1804",
+    "citation": "C2054"
+  },
+  {
+    "gramps_id": "I1516",
+    "nom": "Jacques Villaudy",
+    "source_event": "E1806",
+    "citation": "C2055"
+  },
+  {
+    "gramps_id": "I1518",
+    "nom": "Catherine Leclerc",
+    "source_event": "E1805",
+    "citation": "C2056"
+  },
+  {
+    "gramps_id": "I1521",
+    "nom": "Jacques Villaudy",
+    "source_event": "E1807",
+    "citation": "C2053"
+  },
+  {
+    "gramps_id": "I1564",
+    "nom": "Jacques Villaudy",
+    "source_event": "E1864",
+    "citation": "C0701"
+  },
+  {
+    "gramps_id": "I1594",
+    "nom": "Jeanne Villaudy",
+    "source_event": "E1890",
+    "citation": "C0740"
+  },
+  {
+    "gramps_id": "I1605",
+    "nom": "Sylvain Villaudy",
+    "source_event": "E1898",
+    "citation": "C0750"
+  },
+  {
+    "gramps_id": "I0912",
+    "nom": "Etienne Villaudy",
+    "source_event": "E1914",
+    "citation": "C0799"
+  },
+  {
+    "gramps_id": "I0913",
+    "nom": "Marie Ducloux",
+    "source_event": "E1915",
+    "citation": "C0799"
+  },
+  {
+    "gramps_id": "I1583",
+    "nom": "Anne Villaudy",
+    "source_event": "E2039",
+    "citation": "C1631"
+  },
+  {
+    "gramps_id": "I1506",
+    "nom": "Charles Villaudy",
+    "source_event": "E2736",
+    "citation": "C2029"
+  },
+  {
+    "gramps_id": "I1507",
+    "nom": "Marguerite Jacquier",
+    "source_event": "E2062",
+    "citation": "C1655"
+  },
+  {
+    "gramps_id": "I1688",
+    "nom": "Jean Depigny",
+    "source_event": "E2063",
+    "citation": "C1657"
+  },
+  {
+    "gramps_id": "I1689",
+    "nom": "Marie Jamet",
+    "source_event": "E2063",
+    "citation": "C1657"
+  },
+  {
+    "gramps_id": "I1698",
+    "nom": "Etienne Depigny",
+    "source_event": "E2066",
+    "citation": "C1660"
+  },
+  {
+    "gramps_id": "I1699",
+    "nom": "Madeleine Larpent",
+    "source_event": "E2066",
+    "citation": "C1660"
+  },
+  {
+    "gramps_id": "I1727",
+    "nom": "Jeanne Jacquet",
+    "source_event": "E2067",
+    "citation": "C1661"
+  },
+  {
+    "gramps_id": "I2317",
+    "nom": "Jean Villaudy",
+    "source_event": "E2693",
+    "citation": "C1990"
+  },
+  {
+    "gramps_id": "I2318",
+    "nom": "Claude Villaudy",
+    "source_event": "E2694",
+    "citation": "C1991"
+  },
+  {
+    "gramps_id": "I2319",
+    "nom": "Marie Villaudy",
+    "source_event": "E2695",
+    "citation": "C1992"
+  },
+  {
+    "gramps_id": "I2315",
+    "nom": "Martine Larpent",
+    "source_event": "E2696",
+    "citation": "C1993"
+  },
+  {
+    "gramps_id": "I2316",
+    "nom": "Jacques Villaudy",
+    "source_event": "E2868",
+    "citation": "C2142"
+  },
+  {
+    "gramps_id": "I1490",
+    "nom": "Anne Larpent",
+    "source_event": "E2722",
+    "citation": "C2019"
+  },
+  {
+    "gramps_id": "I2320",
+    "nom": "Louis Paul Villaudy",
+    "source_event": "E2699",
+    "citation": "C1995"
+  },
+  {
+    "gramps_id": "I2321",
+    "nom": "Claude Villaudy",
+    "source_event": "E2701",
+    "citation": "C1997"
+  },
+  {
+    "gramps_id": "I2322",
+    "nom": "Sylvain Villaudy",
+    "source_event": "E2703",
+    "citation": "C1999"
+  },
+  {
+    "gramps_id": "I2323",
+    "nom": "Jacques Villaudy",
+    "source_event": "E2704",
+    "citation": "C2000"
+  },
+  {
+    "gramps_id": "I2324",
+    "nom": "Anne Villaudy",
+    "source_event": "E2706",
+    "citation": "C2002"
+  },
+  {
+    "gramps_id": "I2325",
+    "nom": "Pierre Jacquet",
+    "source_event": "E2707",
+    "citation": "C2003"
+  },
+  {
+    "gramps_id": "I2326",
+    "nom": "Anne Villaudy",
+    "source_event": "E2708",
+    "citation": "C2004"
+  },
+  {
+    "gramps_id": "I2330",
+    "nom": "Claude Villaudy",
+    "source_event": "E2711",
+    "citation": "C2008"
+  },
+  {
+    "gramps_id": "I2327",
+    "nom": "Anne Larpent",
+    "source_event": "E2867",
+    "citation": "C2141"
+  },
+  {
+    "gramps_id": "I2331",
+    "nom": "Paul Villaudy",
+    "source_event": "E2713",
+    "citation": "C2010"
+  },
+  {
+    "gramps_id": "I2332",
+    "nom": "Jeanne Villaudy",
+    "source_event": "E2714",
+    "citation": "C2011"
+  },
+  {
+    "gramps_id": "I2333",
+    "nom": "Etienne Villaudy",
+    "source_event": "E2715",
+    "citation": "C2012"
+  },
+  {
+    "gramps_id": "I2334",
+    "nom": "Anne Villaudy",
+    "source_event": "E2716",
+    "citation": "C2013"
+  },
+  {
+    "gramps_id": "I2335",
+    "nom": "Etienne Villaudy",
+    "source_event": "E2726",
+    "citation": "C2021"
+  },
+  {
+    "gramps_id": "I2336",
+    "nom": "Claude Villaudy",
+    "source_event": "E2871",
+    "citation": "C2145"
+  },
+  {
+    "gramps_id": "I2341",
+    "nom": "Silvain Larpent",
+    "source_event": "E2733",
+    "citation": "C2027"
+  },
+  {
+    "gramps_id": "I1519",
+    "nom": "Etienne Larpent",
+    "source_event": "E2735",
+    "citation": "C2028"
+  },
+  {
+    "gramps_id": "I2346",
+    "nom": "Jean Larpent",
+    "source_event": "E2739",
+    "citation": "C2031"
+  },
+  {
+    "gramps_id": "I2347",
+    "nom": "Etienne Larpent",
+    "source_event": "E2741",
+    "citation": "C2032"
+  },
+  {
+    "gramps_id": "I2348",
+    "nom": "Martine Larpent",
+    "source_event": "E2745",
+    "citation": "C2033"
+  },
+  {
+    "gramps_id": "I2351",
+    "nom": "Jacques Villaudy",
+    "source_event": "E2749",
+    "citation": "C2036"
+  },
+  {
+    "gramps_id": "I2352",
+    "nom": "Catherine Villaudy",
+    "source_event": "E2752",
+    "citation": "C2038"
+  },
+  {
+    "gramps_id": "I2344",
+    "nom": "Etienne Larpent",
+    "source_event": "E2754",
+    "citation": "C2040"
+  },
+  {
+    "gramps_id": "I2345",
+    "nom": "Jeanne Villaudy",
+    "source_event": "E2754",
+    "citation": "C2040"
+  },
+  {
+    "gramps_id": "I2354",
+    "nom": "Marie Sanadot",
+    "source_event": "E2755",
+    "citation": "C2040"
+  },
+  {
+    "gramps_id": "I2314",
+    "nom": "Anne Boulet",
+    "source_event": "E2860",
+    "citation": "C2119"
+  },
+  {
+    "gramps_id": "I2313",
+    "nom": "Etienne Larpent",
+    "source_event": "E2757",
+    "citation": "C2042"
+  },
+  {
+    "gramps_id": "I2329",
+    "nom": "Francoise Massicault",
+    "source_event": "E2759",
+    "citation": "C2044"
+  },
+  {
+    "gramps_id": "I2393",
+    "nom": "Magdelaine Foltier",
+    "source_event": "E2809",
+    "citation": "C2083"
+  },
+  {
+    "gramps_id": "I1520",
+    "nom": "Marguerite Besnard",
+    "source_event": "E2838",
+    "citation": "C2107"
+  },
+  {
+    "gramps_id": "I2362",
+    "nom": "Jacques Villaudy",
+    "source_event": "E2859",
+    "citation": "C2117"
+  },
+  {
+    "gramps_id": "I2424",
+    "nom": "Francois Larpent",
+    "source_event": "E2861",
+    "citation": "C2120"
+  },
+  {
+    "gramps_id": "I2425",
+    "nom": "Sylvain Larpent",
+    "source_event": "E2862",
+    "citation": "C2121"
+  },
+  {
+    "gramps_id": "I2427",
+    "nom": "Philippe Benard",
+    "source_event": "E2863",
+    "citation": "C2122"
+  },
+  {
+    "gramps_id": "I2426",
+    "nom": "Marie Larpent",
+    "source_event": "E2863",
+    "citation": "C2122"
+  },
+  {
+    "gramps_id": "I2428",
+    "nom": "Marie Larpent",
+    "source_event": "E2864",
+    "citation": "C2123"
+  },
+  {
+    "gramps_id": "I2429",
+    "nom": "Jeanne Villaudy",
+    "source_event": "E2865",
+    "citation": "C2087"
+  },
+  {
+    "gramps_id": "I2435",
+    "nom": "Jeanne Jacquier",
+    "source_event": "E2866",
+    "citation": "C2124"
+  },
+  {
+    "gramps_id": "I2432",
+    "nom": "Philippe Larpent",
+    "source_event": "E2866",
+    "citation": "C2124"
+  },
+  {
+    "gramps_id": "I2340",
+    "nom": "Michel Clavier",
+    "source_event": "E2872",
+    "citation": "C2146"
+  },
+  {
+    "gramps_id": "I1485",
+    "nom": "Marie Larpent",
+    "source_event": "E2886",
+    "citation": "C2164"
+  }
+]

@@ -26,7 +26,12 @@ from typing import Any
 from ..client import GrampsWebAPIClient
 from ..models.api_calls import ApiCalls
 from .domain import FamilyFacts, PersonFacts
-from .facts import _LIST_PARAMS, family_from_json, person_from_json
+from .facts import (
+    _FAMILY_LIST_PARAMS,
+    _LIST_PARAMS,
+    family_from_json,
+    person_from_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,7 +165,9 @@ async def collect_tree(
     )
     results: tuple[Any, Any] = await asyncio.gather(
         people_read,
-        _fetch_every_page(client, ApiCalls.GET_FAMILIES, tree_id, dict(_LIST_PARAMS)),
+        _fetch_every_page(
+            client, ApiCalls.GET_FAMILIES, tree_id, dict(_FAMILY_LIST_PARAMS)
+        ),
         return_exceptions=True,
     )
     raw_people_result, raw_families_result = results
