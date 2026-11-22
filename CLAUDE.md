@@ -63,7 +63,9 @@
   `GRAMPS_API_URL` at the local stack and refuses any host outside
   `localhost`, `127.0.0.1`, `::1`, `host.docker.internal`. pytest does not
   read `.env` at all. `scripts/backup_prod.py` is the only thing in the
-  repository that still talks to the live server.
+  repository that still talks to the live server. The exception is `tests/test_server.py`: it talks to the
+  published-image MCP container on :8000, read-only against that container's
+  backend, and fails until the image is republished.
 - **Starting the test environment**, in this order:
   ```bash
   uv run python scripts/backup_prod.py      # once; reads the live tree
