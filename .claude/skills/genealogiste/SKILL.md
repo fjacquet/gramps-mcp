@@ -678,3 +678,43 @@ MCP call.
   not proof the act itself is lost - try the archive's direct viewer
   (archives18.fr or equivalent) before concluding a primary act is
   unrecoverable.
+
+## Tool gotchas moved from CLAUDE.md
+
+- See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
+  research/data-entry workflow (sourcing chain, media attachment, match vs.
+  hypothesis handling, homonym hygiene).
+- **Occupations are events, never attributes.** On 2026-09-01 the tree was
+  converged: all 28 `attribute_list` entries of type `Occupation` became
+  `Occupation` events, leaving 145 events and zero such attributes. An event
+  carries a date, a place and citations; an attribute carries none of the
+  three. Do not reintroduce the attribute form. Store the trade bilingually in
+  `description`, reader's language first: `Charpentier (all. Zimmermann)`,
+  `arystokrata ... (aristocrate ...)`.
+- **Gramps localises nothing you write.** `locale=fr` translates only its own
+  enums via the profile (event type, relationship); free text - occupation
+  descriptions, note bodies, citation `page` - is stored and served verbatim.
+  Bilingual content therefore has to be written into the field itself.
+- **`attribute_list` merges on update and the MCP tools cannot replace it.**
+  A second `create_person` carrying a different `Occupation` appends a
+  duplicate instead of overwriting, `detach_reference` only handles
+  reference-lists (`event_ref_list`, `media_list`, ...), and
+  `create_person`'s schema rejects `replace_lists` outright. The only way to
+  rewrite or empty it is a script calling
+  `make_api_call(ApiCalls.PUT_PERSON, ..., replace_lists=["attribute_list"])`
+  - the parameter is generic (`client.py`, `merge.py`), it is merely absent
+  from that one tool's advertised schema.
+- **`create_sourced_event` always creates a brand-new event** - it never
+  matches an existing one for the person/family. To add a corroborating
+  citation or correct a date on an event that already exists, call
+  `create_event` with that event's real `handle` instead, or you end up
+  with an orphan duplicate event alongside the original. It also does **not**
+  attach the event to anyone: follow it with
+  `create_person(handle=..., event_ref_list=[{ref, role}])`. A `source_title`
+  that already exists is refused, and the error names the handle to reuse via
+  `source_handle`.
+- **`create_family`'s `child_handles`/`father_handle`/`mother_handle` only
+  link the family side.** The child person record's own
+  `parent_family_list` is not set automatically - call `create_person` with
+  `parent_family_list: [<family handle>]` separately, or ancestor lookups
+  from the child fail silently.

@@ -1,6 +1,6 @@
 ---
 name: gramps-rest-recovery
-description: Direct REST access to the Gramps Web API for operations the MCP tools don't cover — auditing broken *_list references, bulk place/hierarchy backfills, and deleting records (people, events, notes) that the MCP layer has no delete_* tool for. Use this when an MCP create_* call has already gone out with a mismatched handle, when the user reports a page giving a 500 error or an empty field that should be populated, or when cleanup requires DELETE.
+description: Direct REST access to the Gramps Web API for operations the MCP tools don't cover — auditing broken *_list references, bulk place/hierarchy backfills, and deleting records (people, events, notes) that the MCP layer has no delete_* tool for. Use this when an MCP create_* call has already gone out with a mismatched handle, when the user reports a page giving a 500 error or an empty field that should be populated, or when cleanup requires DELETE. Also load it before any raw REST call, make_api_call script, bulk lot, backup/export, or when a create_*/PUT params model rejects a field (required fields, extra_forbidden, handle-vs-name errors).
 ---
 
 # Gramps REST Recovery
@@ -194,3 +194,87 @@ Match each event's citation back to its source title (source titles follow
 `"État civil — ..., <Commune>, registre des décès <year>"`), map commune
 name to an existing Place handle via `find_type`, and PUT the `place` field
 across the whole batch in one pass rather than one MCP call per record.
+
+## Gotchas moved from CLAUDE.md
+
+- **`GRAMPS_API_URL` has no `/api` suffix.** The REST base is
+  `${GRAMPS_API_URL%/}/api`; calling it without the suffix returns the app's HTML
+  page with HTTP 200, not an error.
+- **`tree_stats` fails against the live tree** ("Permission denied for this
+  operation"): the account in `.env` has the owner role, and the tool reads
+  `/trees/<id>`, which only an admin may do. Not a regression. The test
+  stack's account is created with the admin role precisely so the tool can
+  be tested, so `tree_stats` passes there and fails in production.
+- **The token endpoint is capped at one request per second.** `AuthManager`
+  retries a 429 up to five times, 1.2 s apart (`auth.py`). Without that,
+  a burst of clients authenticating together - which the suite does - fails
+  with "Authentication failed: HTTP 429", an error about nothing being wrong.
+- **The server now calls third-party hosts, separately from the Gramps Web
+  API above.** `geocode_place` reaches `geo.api.gouv.fr`, `api3.geo.admin.ch`,
+  `query.wikidata.org` and `nominatim.openstreetmap.org`; the Docker
+  container needs egress to them. The two detection tools (`find_duplicates`,
+  `audit_quality`) do not - they keep working when a gazetteer is
+  unreachable. Nominatim's 1 request per second with no burst is an ODbL
+  licence obligation encoded in `genealogy/rate_limit.py`, not a courtesy.
+- **Reading the API directly is fine; a raw `PUT` is not.** For counts, audits and
+  exports, `POST /api/token/` with the `.env` credentials then
+  `Authorization: Bearer <access_token>` - per-category totals come back in the
+  `X-Total-Count` header with `pagesize=1`, no pagination needed. Never write with
+  a raw `PUT`: it bypasses `merge.py` and drops every field the payload omits.
+- **Access tokens expire mid-session**, and a failed `curl -o` leaves its target
+  untouched - so a stale dump passes for a fresh one. Check the token response,
+  and validate a snapshot before `mv`.
+- **`AuthManager.get_token()`** is the accessor for raw REST calls (thumbnail
+  checks, `X-Total-Count` counts) - there is no `get_access_token`.
+- **For a bulk lot, a one-off script calling
+  `GrampsWebAPIClient.make_api_call(ApiCalls.PUT_*)` is the right tool** - it goes
+  through `merge_put_data()`, so semantics match the MCP tools, which do not scale
+  to hundreds of calls. Make it idempotent (source by exact title, media by md5
+  against `checksum`, citation by source+page) or a rerun after a partial failure
+  duplicates everything.
+- **Only `person.media_list` renders on a person page.** Verified 14/09/2026 on
+  I1751 (media shown) against I1201 (scan on an event's citation, nothing
+  shown). Media on citations and places never surface on the person: the tree
+  held 1290 media of which 652 sat on places and 562 on citations, while 63
+  people carried one. An image meant to be seen on a person must be in that
+  person's own `media_list`.
+- **Uploading a media file needs no `docker cp` over REST.**
+  `client.upload_media_file(bytes, mime)` POSTs to `media/` and the server
+  computes the checksum. The `docker cp` note above applies only to the MCP
+  tools' `media_path`, which resolves inside the container.
+- **`ApiCalls` is plural for collections, singular for one record**: `POST_PEOPLE`,
+  `POST_FAMILIES`, `POST_EVENTS`, `POST_CITATIONS`, `POST_SOURCES`, `POST_NOTES`,
+  but `PUT_PERSON`, `PUT_FAMILY`, `PUT_EVENT`, `PUT_NOTE`.
+- **POST/PUT return a *list* of transaction entries** `[{_class, handle, new, old,
+  type}]`, not the record. Select by `_class`, **never by position** -
+  `POST_FAMILIES` returns the father's Person update first.
+- **Parameter models require fields even for a one-field update**:
+  `EventSaveParams` needs `type` and `citation_list` to change only `place`;
+  `PersonData` needs `primary_name` and `gender`; `DateValue` accepts only
+  `dateval`/`modifier`/`quality`/`text` - there is no `year`.
+  `FamilySaveParams` and `PersonData` reject `citation_list` outright
+  (`extra_forbidden`): source a filiation on the `child_ref_list` entry
+  (`{"ref": ..., "citation_list": [...]}`), and a corrected name in a note.
+  `MediaSaveParams` needs `desc` to add a `note_list` or `citation_list`;
+  `CitationData` rejects `confidence` outright and requires `source_handle`
+  even to change only a citation's `page` or `media_list`;
+  `PlaceSaveParams` rejects `title` (the server derives it). `media_list` is declared on
+  `BaseDataModel`, so `PUT_PERSON` accepts it despite `PersonData` not naming
+  it, and `replace_lists=["media_list"]` detaches one.
+- **`create_event`'s `place` is required, and must be a Place handle, not a
+  name** - passing a commune name string is rejected outright
+  (`place must be a place handle, not a name`). `find_type(type='place',
+  ...)` first; if it doesn't exist, `geocode_place` then `create_place`
+  **with `placeref_list` set to the parent** (canton/state, then country)
+  in the same call. `code` on `create_place` is a free-text field (postal
+  code) - it does not link a parent and is not a substitute for
+  `placeref_list`. A place created without one renders as a bare name with
+  no hierarchy, and nothing catches this automatically.
+- **Back up the live tree before any risky change.** The client has no export
+  support, so GET `/api/exporters/gramps/file` with a bearer token from
+  `AuthManager`. Gzipped Gramps XML, lossless, ~600 KB. Media files are *not*
+  included - the XML carries only `<object>` references.
+- **GEDCOM export is extension `ged`, not `gedcom`.** `GET
+  /api/exporters/ged/file` (not `.../exporters/gedcom/...`, which 404s).
+  `GET /api/exporters/` lists every valid extension if in doubt.
+- **The API exposes more than this server uses** (96 of 193 operations; `POST /api/transactions`, `/query`, exporters, `/verify`, `/repair`, `DELETE`). Details: `docs/reference/api-capabilities-notes.md`.
