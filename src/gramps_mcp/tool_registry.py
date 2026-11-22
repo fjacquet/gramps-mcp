@@ -334,9 +334,10 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "Undo one recorded transaction by id, reversing every object "
             "change it made. Use recent_changes to find the id. This is the "
             "recovery path for a delete or merge that went the wrong way. "
-            "force=true is currently required to undo a deletion, because "
-            "of an upstream Gramps Web bug that misreports the object as "
-            "changed; see the force parameter's description for the risk"
+            "On gramps-webapi 3.25.x force=true is required to undo a "
+            "deletion (a server bug misreports the object as changed); "
+            "3.26.0 and later need no force. See the force parameter's "
+            "description for the risk"
         ),
         "schema": UndoChangeParams,
         "handler": undo_change_tool,
