@@ -142,6 +142,9 @@ Now create the life event that was documented in that citation:
 **Process:**
 - **First**: Search for an existing event with
   `find_type(type="event", gql='type.value == EventType.MARRIAGE and "Smith" in description')`
+  (drop the description clause to list every marriage):
+<!-- rows -->
+  `find_type(type="event", gql='type.value == EventType.MARRIAGE')`
 - **If found and complete**: Use existing event as-is
 - **If found but missing info**: Use `create_event` with existing handle to update event
 - **If not found**: Use `create_event` without handle to create new event
@@ -238,6 +241,8 @@ Now create the life event that was documented in that citation:
    → If event has place: find_type(type="place", gql='name.value == "Boston"') first,
      create_place if not found, get place handle
    → find_type(type="event", gql='type.value == EventType.MARRIAGE and "Smith" in description')
+<!-- rows -->
+   → find_type(type="event", gql='type.value == EventType.MARRIAGE')
    → If found and complete: use existing event
    → If found but missing info: create_event with handle (update event)
    → If not found: create_event without handle (create event with type, citation handle, optional date/description/place handle)
@@ -368,7 +373,8 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 
 **Note Process:**
 - **First**: Search for an existing note (if applicable) with
-  `find_anything(query="marriage contract")`. Do **not** use
+  `find_anything(query="marriage contract")` for free text, or filter the
+  note text with
   `find_type(type="note", gql='"marriage" in text.string')`.
 - **If found and complete**: Use existing note as-is
 - **If found but missing info**: Use `create_note` with existing handle to update note

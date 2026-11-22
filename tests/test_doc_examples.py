@@ -27,6 +27,7 @@ ENDPOINT = {
     "repository": ApiCalls.GET_REPOSITORIES,
     "note": ApiCalls.GET_NOTES,
 }
+PLACEHOLDER = re.compile(r"<[a-z]+ [a-z]+>")
 EXAMPLE = re.compile(r"""find_type\(type="(\w+)", gql='(.*?)'\)""")
 
 
@@ -37,7 +38,7 @@ def collect() -> list[tuple[str, str, str, bool]]:
         lines = (RESOURCES / name).read_text(encoding="utf-8").splitlines()
         for i, line in enumerate(lines):
             for obj_type, expr in EXAMPLE.findall(line):
-                if "<" in expr:  # placeholder such as <father handle>
+                if PLACEHOLDER.search(expr):  # such as <father handle>
                     continue
                 rows = i > 0 and lines[i - 1].strip() == "<!-- rows -->"
                 found.append((name, obj_type, expr, rows))
@@ -50,6 +51,7 @@ EXAMPLES = collect()
 def test_docs_carry_examples():
     """Guard against the extractor silently matching nothing."""
     assert len(EXAMPLES) >= 25
+    assert not any(PLACEHOLDER.search(e) for _, _, e, _ in EXAMPLES)
     assert {doc for doc, *_ in EXAMPLES} == set(DOCS)
 
 
