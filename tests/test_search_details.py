@@ -108,9 +108,9 @@ async def test_get_person_tool():
                 assert "Attached notes:" in text, "Should have attached notes"
                 break
         else:
-            pytest.skip("Person I0001 not found in search results")
+            pytest.fail("no result line carries the I0001 handle")
     else:
-        pytest.skip("Person I0001 not found in tree")
+        pytest.fail("Person I0001 not found in tree")
 
 
 @pytest.mark.asyncio
@@ -232,9 +232,9 @@ async def test_get_family_tool():
                 assert "Attached notes:" in text, "Should have attached notes"
                 break
         else:
-            pytest.skip("Family F0001 not found in search results")
+            pytest.fail("no result line carries the F0001 handle")
     else:
-        pytest.skip("Family F0001 not found in tree")
+        pytest.fail("Family F0001 not found in tree")
 
 
 class TestGetPersonToolWithNote:
