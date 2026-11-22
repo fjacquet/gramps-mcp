@@ -38,7 +38,7 @@ def check_file_length(file_path: Path, max_lines: int = 500) -> bool:
         bool: True if file is within limits, False otherwise.
     """
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             lines = f.readlines()
             line_count = len(lines)
 
