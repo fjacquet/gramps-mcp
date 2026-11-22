@@ -69,16 +69,21 @@
   uv run python scripts/backup_prod.py      # once; reads the live tree
   docker compose -f docker-compose.test.yml up -d
   uv run python scripts/seed_test_tree.py   # restores the backup, idempotent
-  uv run pytest                             # 813 passed, 1 skipped
+  uv run pytest                             # full suite, see counts below
   ```
+  The stack image is pinned by `GRAMPSWEB_TAG` (`26.11.2` = gramps-webapi
+  3.25.2, the production version and default; `26.11.3` = 3.26.0). Both must
+  stay green: switch with `--force-recreate`, then re-seed, one version at a
+  time. Check the running one with
+  `docker exec grampsweb_test pip show gramps-webapi | grep Version`.
   `backup/` and `tests/.local-tree-id` are gitignored: the first holds real
   data on living people and this repository is public, the second holds a
   UUID minted when the stack's volumes are created. Re-running the seed
   script also wipes whatever residue a failed teardown left behind - the
   restore replaces the tree's contents rather than adding to them.
 - **Integration tests still carry `pytestmark = pytest.mark.integration`**
-  (32 modules, 157 tests) and still need the stack running.
-  `uv run pytest -m "not integration"` (657 tests) passes with the stack
+  and still need the stack running.
+  `uv run pytest -m "not integration"` passes with the stack
   down, which is what CI runs - `.github/workflows/ci.yml` names the
   `tests/` directory and the marker filter, no allowlist.
 - **Never write to Gramps with a raw `PUT`**: it bypasses `merge.py` and drops every field the payload omits. Use `make_api_call(ApiCalls.PUT_*)` or the MCP tools.
@@ -119,6 +124,10 @@
   steps change.
 
 ### Genealogy Data Entry Workflow
+- **The `gramps_id=` list parameter is not a filter**: it returns the whole
+  collection. Resolve a record with GOQL, via `find_type` or
+  `rules=MatchesQuery` (`gramps_id == "I0001"`). The `gql` parameter no longer
+  exists on gramps-webapi 3.26.0. Syntax: the usage guide.
 Other data-entry gotchas (occupations as events, bilingual text, `attribute_list`, `create_sourced_event`, `create_family` links): see the `genealogiste` skill.
 
 - **Never pass a `gramps_id` string (e.g. `"C0619"`) into a `*_list` field

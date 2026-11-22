@@ -3,7 +3,7 @@
 The API exposes more than this server uses: 96 of 193 operations.
   `docs/reference/gramps-web-api.md` lists every operation against the
   `ApiCalls` member that reaches it, generated from the vendored
-  `docs/reference/openapi.json` (Gramps Web API 3.21.1) by
+  `docs/reference/openapi.json` (Gramps Web API 3.26.0) by
   `uv run python scripts/gen_api_reference.py`. Regenerate it after replacing
   the spec. Every `ApiCalls` entry matches a real spec path, so the client
   invents no endpoint; `AuthManager`'s `POST /token/` (`auth.py:128`) is the
