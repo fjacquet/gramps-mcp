@@ -101,14 +101,14 @@ async def resolve_target_handle(
     plural = TYPE_ENDPOINTS[obj_type].plural
 
     # Reason: escape_gql_literal, not raw interpolation - a gramps_id such as
-    # `X" or gramps_id!="X` would otherwise close the GQL string literal
+    # `X" or gramps_id != "X` would otherwise close the GQL string literal
     # early, match every record, and (with pagesize 1) resolve to an
     # arbitrary record that delete_type would then delete. Same escaping as
     # search_details._resolve_gramps_id, deliberately shared.
     escaped = escape_gql_literal(gramps_id)
     results = await client.make_api_call(
         api_call=plural,
-        params={"gql": f'gramps_id="{escaped}"', "pagesize": 1},
+        params={"gql": f'gramps_id == "{escaped}"', "pagesize": 1},
         tree_id=tree_id,
     )
     if not results:

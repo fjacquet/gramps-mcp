@@ -23,10 +23,14 @@ tests/test_client_merge.py uses - rather than above the client, so the bytes
 that would actually leave for the server are what gets asserted on.
 """
 
+import json
 from unittest.mock import AsyncMock, patch
 
+import pytest
+
 from src.gramps_mcp.client import GrampsWebAPIClient
-from src.gramps_mcp.tools.destructive import delete_type_tool
+from src.gramps_mcp.config import get_settings
+from src.gramps_mcp.tools.destructive import delete_type_tool, resolve_target_handle
 from src.gramps_mcp.utils import escape_gql_literal
 
 
@@ -44,6 +48,36 @@ def test_escape_gql_literal_neutralises_a_literal_break_out():
 def test_escape_gql_literal_escapes_the_backslash_first():
     """A backslash must not survive to escape the quote that follows it."""
     assert escape_gql_literal('a\\"b') == 'a\\\\\\"b'
+
+
+def _expression(params: dict) -> str:
+    """Return the GOQL text inside the MatchesQuery rule the client sent."""
+    return json.loads(params["rules"])["rules"][0]["values"][0]
+
+
+@pytest.mark.integration
+class TestResolveAgainstRealServer:
+    async def test_hostile_id_matches_nothing(self):
+        """An escaped break-out id must raise not-found, never resolve a record."""
+        with pytest.raises(ValueError, match="No person found"):
+            await resolve_target_handle(
+                GrampsWebAPIClient(),
+                get_settings().gramps_tree_id,
+                "person",
+                None,
+                'X" or gramps_id != "X',
+            )
+
+    async def test_missing_id_is_empty_not_error(self):
+        """A well-formed id that does not exist is "no match", not a random record."""
+        with pytest.raises(ValueError, match="No person found"):
+            await resolve_target_handle(
+                GrampsWebAPIClient(),
+                get_settings().gramps_tree_id,
+                "person",
+                None,
+                "I9999999",
+            )
 
 
 class TestGqlInjection:
@@ -69,7 +103,7 @@ class TestGqlInjection:
         # Exactly one request was made - the lookup. Nothing was deleted.
         assert request.call_count == 1
         sent = request.call_args.kwargs["params"]
-        assert sent["gql"] == 'gramps_id="X\\" or gramps_id!=\\"X"'
+        assert _expression(sent) == 'gramps_id == "X\\" or gramps_id!=\\"X"'
         assert request.call_args.kwargs["method"] == "GET"
 
     async def test_an_ordinary_gramps_id_is_still_looked_up_unchanged(self):
@@ -85,7 +119,8 @@ class TestGqlInjection:
             result = await delete_type_tool({"type": "person", "gramps_id": "I0001"})
 
         assert "Deleted" in result[0].text
-        assert request.call_args_list[0].kwargs["params"]["gql"] == 'gramps_id="I0001"'
+        sent = request.call_args_list[0].kwargs["params"]
+        assert _expression(sent) == 'gramps_id == "I0001"'
 
 
 class TestTagGrampsIdRefusal:

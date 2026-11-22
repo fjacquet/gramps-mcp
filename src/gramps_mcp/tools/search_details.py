@@ -122,15 +122,11 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
     settings = get_settings()
     tree_id = settings.gramps_tree_id
 
-    # Reason: BaseGetMultipleParams also has a native gramps_id field, which
-    # was tried live against the API and would sidestep the quoting question
-    # entirely. It was rejected: for a matching id it behaves the same as
-    # the gql filter, but for a missing id the API treats a bare gramps_id
-    # param as a single-record lookup and raises 404 (GrampsAPIError)
-    # instead of returning an empty list - which would turn a normal "not
-    # found" response into a caught error and break the distinction this
-    # function's callers rely on. The gql filter always returns a list, so
-    # it is kept despite the interpolation.
+    # Reason: the plain `gramps_id=` query parameter is not used: it does
+    # not filter (3.26.0 returns unrelated records), so resolving through it
+    # would hand back the wrong handle. The gql expression is translated by
+    # the client into a MatchesQuery rule, which does filter and always
+    # returns a list, empty for a missing id.
     #
     # Reason: the ignore comment below suppresses a mypy false positive -
     # mypy's dataclass_transform support does not recognize
@@ -143,7 +139,7 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
     # escaping behaviour in the codebase.
     escaped = escape_gql_literal(gramps_id)
     params = BaseGetMultipleParams(  # type: ignore[call-arg]
-        gql=f'gramps_id="{escaped}"', pagesize=1
+        gql=f'gramps_id == "{escaped}"', pagesize=1
     )
     results = await client.make_api_call(
         api_call=api_call, params=params, tree_id=tree_id

@@ -91,7 +91,7 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | N
     escaped = escape_gql_literal(gramps_id)
     people = await client.make_api_call(
         api_call=ApiCalls.GET_PEOPLE,
-        params={"gql": f'gramps_id = "{escaped}"', "pagesize": 1, "page": 1},
+        params={"gql": f'gramps_id == "{escaped}"', "pagesize": 1, "page": 1},
         tree_id=tree_id,
     )
     if not people:
