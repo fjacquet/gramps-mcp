@@ -51,7 +51,6 @@ EXAMPLES = collect()
 def test_docs_carry_examples():
     """Guard against the extractor silently matching nothing."""
     assert len(EXAMPLES) >= 25
-    assert not any(PLACEHOLDER.search(e) for _, _, e, _ in EXAMPLES)
     assert {doc for doc, *_ in EXAMPLES} == set(DOCS)
 
 

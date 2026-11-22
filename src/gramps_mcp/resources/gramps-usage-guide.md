@@ -70,7 +70,7 @@ When you have a source document, start with the repository (archive, library, co
 **Repository requires:**
 - **Name** (required): "National Archives", "City Hall Records", "St. Mary's Church"
 - **Type** (required): Archive, Library, Church, etc.
-- **URL** (optional): If present, create with type, path, and description
+- **URL** (optional): If present, create with type, path, and desc (the key is `desc`, not `description`)
 - **Note** (optional): If present, use `create_note` tool first, then link to repository
 
 **Process:**
@@ -253,7 +253,7 @@ Now create the life event that was documented in that citation:
      (John Smith, born ~1850, Boston area)
    → If matches found: Ask user to confirm identity
    → If same person: create_person with handle (update existing person) AND add event with role "groom"
-   → If new person: create_person without handle (create new person with given name, surname, gender, optional notes/media/URLs) AND add event with role "groom"
+   → If new person: create_person without handle (create new person with given name, surname, gender, optional notes/media) AND add event with role "groom"
    
    → If person has notes: create_note first, get note handle  
    → If person has media: create_media first, get media handle

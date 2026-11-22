@@ -95,5 +95,6 @@ class RepositoryData(BaseDataModel):
         ..., description="Repository type (e.g., 'Archive', 'Library', 'Church', etc.)"
     )
     urls: list[dict[str, Any]] | None = Field(
-        None, description="List of URLs associated with the repository"
+        None,
+        description="URLs for the repository (keys: type, path, desc)",
     )

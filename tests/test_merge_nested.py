@@ -14,7 +14,7 @@ class TestNestedAndIdentityRules:
     """Rules governing nested objects and reference-entry identity."""
 
     def test_urls_merge_instead_of_replacing(self):
-        # Reason: urls is a declared writable list on person, family, place
+        # Reason: urls is a declared writable list on person, place
         # and repository, but its name does not end in _list. Dispatching on
         # the name rather than the value replaced it, destroying every URL
         # the caller did not resend.
