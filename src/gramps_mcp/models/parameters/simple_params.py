@@ -48,7 +48,12 @@ class SimpleFindParams(BaseModel):
     """Simplified parameters for type-based search."""
 
     type: EntityType = Field(description="Entity type to search")
-    gql: str = Field(description="Gramps Query Language filter")
+    gql: str = Field(
+        description=(
+            "GOQL filter expression (almost Python), e.g. "
+            'primary_name.first_name == "Jean"'
+        )
+    )
     max_results: int = Field(default=20, description="Maximum results to return")
     page: int | None = Field(
         default=None, description="Page number for paging through results"

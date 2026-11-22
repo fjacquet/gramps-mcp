@@ -107,8 +107,8 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     # Search & Retrieval Tools
     "find_type": {
         "description": (
-            "Search any entity type using GQL - read gql://documentation "
-            "resource first to understand syntax"
+            "Search any entity type using a GOQL expression - read "
+            "gql://documentation resource first to understand syntax"
         ),
         "schema": SimpleFindParams,
         "handler": find_type_tool,

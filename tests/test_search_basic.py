@@ -30,7 +30,7 @@ class TestFindPersonTool:
         result = await find_type_tool(
             {
                 "type": "person",
-                "gql": 'primary_name.first_name ~ "John"',
+                "gql": '"John" in primary_name.first_name',
                 "max_results": 3,
             }
         )

@@ -302,6 +302,20 @@ class GrampsWebAPIClient:
         else:
             summary = f"Request failed with status {status_code}"
 
+        # Reason: a rejected expression is almost always the pre-3.26 dialect
+        # (`=`, `~`, `class = x`), and the server's own text does not say so.
+        # 3.25.2 words the rejection "Rule MatchesQuery could not be evaluated".
+        if status_code == 422 and (
+            "invalid_query" in error.response.text
+            or "unknown field" in error.response.text
+            or "MatchesQuery" in error.response.text
+        ):
+            summary += (
+                " The gql expression is not valid GOQL; read the"
+                " gql://documentation resource (the old `=` and `~` operators"
+                ' are gone: use `==` and `"x" in field`).'
+            )
+
         detail = self._extract_error_detail(error)
         if detail:
             return f"{summary} {detail}"
