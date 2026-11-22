@@ -70,6 +70,7 @@ nav:
       - Tools: reference/tools.md
       - Architecture: reference/architecture.md
       - Gramps Web API coverage: reference/gramps-web-api.md
+      - Unused API capabilities: reference/api-capabilities-notes.md
   - Operations:
       - Security: operations/security.md
       - Troubleshooting: operations/troubleshooting.md

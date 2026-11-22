@@ -82,28 +82,16 @@ class TestUndoOffline:
 
 @pytest.mark.integration
 class TestUndoLive:
-    async def test_undo_requires_force_to_reverse_a_deletion(
-        self, gramps_client, tree_id
-    ):
+    async def test_undo_reverses_a_deletion(self, gramps_client, tree_id):
         """
-        Pins down a confirmed upstream Gramps Web bug rather than hiding it.
+        A plain undo of a deletion restores the record, no force needed.
 
-        gramps_webapi/api/tasks.py:782-791's old_unchanged() treats a
-        missing object as "unchanged" only when the recorded prior state is
-        literally None. For a delete transaction, Change._to_dict()
-        (gramps_webapi/undodb.py:98-113) returns {} instead of None when
-        there is no "new" JSON to report - and reverse_transaction()
-        (gramps_webapi/api/resources/util.py:1584-1596) carries that {}
-        into the reversed "add" item's old_data. old_unchanged() then sees
-        a HandleError (the object really is gone) with old_data={} rather
-        than None, and reports a false "Object has changed" conflict -
-        confirmed by the server's own GET conflict-preflight for the same
-        transaction reporting zero conflicts, and by force=true undoing the
-        exact same transaction successfully every time.
-
-        This test should start FAILING the day Gramps Web fixes that bug -
-        that failure is the signal that undo_change no longer needs force
-        for a plain delete, not a regression in gramps-mcp.
+        gramps-webapi 3.21.1 refused it with a false "Object has changed"
+        conflict (old_unchanged() in gramps_webapi/api/tasks.py saw {} where
+        it expected None) and only force=true restored the record. Both
+        3.25.2 and 3.26.0 restore it without force. The server version is read
+        from /api/metadata so a different server fails here instead of
+        passing silently.
         """
         from src.gramps_mcp.models.api_calls import ApiCalls
         from src.gramps_mcp.models.parameters.note_params import NoteSaveParams
@@ -160,20 +148,19 @@ class TestUndoLive:
             "read - refusing to undo an unrelated transaction."
         )
 
-        refused = await undo_change_tool({"transaction_id": transaction_id})
-        assert "Error" in refused[0].text
-        assert "force" in refused[0].text.lower()
+        # Reason: read the server version so each version's behaviour is
+        # asserted explicitly; a server silently changing fails here.
+        from src.gramps_mcp.config import get_settings
 
-        # The refusal must be real, not cosmetic: the note is still gone.
-        with pytest.raises(Exception):
-            await gramps_client.make_api_call(
-                api_call=ApiCalls.GET_NOTE, tree_id=tree_id, handle=handle
-            )
-
-        forced = await undo_change_tool(
-            {"transaction_id": transaction_id, "force": True}
+        meta = await gramps_client.auth_manager.client.get(
+            f"{str(get_settings().gramps_api_url).rstrip('/')}/api/metadata/",
+            headers=await gramps_client._get_headers(),
         )
-        assert "undone" in forced[0].text
+        version = meta.json()["gramps_webapi"]["version"]
+
+        plain = await undo_change_tool({"transaction_id": transaction_id})
+        assert version.startswith(("3.25.", "3.26.")), f"untested server {version}"
+        assert "undone" in plain[0].text, plain[0].text
 
         # Reason: the Gramps Web resource docstring for this endpoint says
         # "Undo a transaction using background processing", so the record

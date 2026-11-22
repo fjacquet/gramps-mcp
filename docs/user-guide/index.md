@@ -20,7 +20,7 @@ to guess:
 
 - `gramps://usage-guide` - the sourcing workflow the tools expect. Ask the
   assistant to read it before any data entry session.
-- `gql://documentation` - the Gramps Query Language syntax and the full
+- `gql://documentation` - the GOQL (Gramps Object Query Language) syntax and the full
   property list. Required before writing anything but the simplest `find_type`
   filter.
 

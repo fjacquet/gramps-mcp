@@ -42,7 +42,7 @@ class TestCreatePersonTool:
                     {
                         "type": "Web Home",
                         "path": "https://familysearch.org/person/123",
-                        "description": "FamilySearch profile",
+                        "desc": "FamilySearch profile",
                     }
                 ],
             }
@@ -240,7 +240,7 @@ class TestCreatePersonTool:
                     {
                         "type": "Web Home",
                         "path": "https://familysearch.org/person/456",
-                        "description": "FamilySearch profile",
+                        "desc": "FamilySearch profile",
                     }
                 ],
             }
@@ -297,13 +297,6 @@ class TestCreateFamilyTool:
                 "mother_handle": mother_handle,
                 "media_list": [{"ref": media_handle}],
                 "note_list": [note_handle],
-                "urls": [
-                    {
-                        "type": "Web Home",
-                        "path": "https://familysearch.org/family/789",
-                        "description": "FamilySearch family record",
-                    }
-                ],
             }
         )
 
@@ -331,13 +324,6 @@ class TestCreateFamilyTool:
         )
         assert "Attached notes: N" in text, (
             f"Expected linked note reference in output but got: {text}"
-        )
-        # Should show URLs (new format: path - description)
-        assert "https://familysearch.org/family/789" in text, (
-            f"Expected URL path in output but got: {text}"
-        )
-        assert "FamilySearch family record" in text, (
-            f"Expected URL description in output but got: {text}"
         )
 
     @pytest.mark.asyncio

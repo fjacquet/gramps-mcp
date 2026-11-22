@@ -131,8 +131,8 @@ def test_base_get_multiple_params_rejects_query():
 def test_base_get_multiple_params_still_accepts_gql():
     """The rejection above must not be a broken model - a real gql= filter,
     the field query= should have been, still works."""
-    params = BaseGetMultipleParams(gql="first_name = 'Jean'")
-    assert params.gql == "first_name = 'Jean'"
+    params = BaseGetMultipleParams(gql="first_name == 'Jean'")
+    assert params.gql == "first_name == 'Jean'"
 
 
 def test_tag_search_params_rejects_a_filter_it_cannot_honour():

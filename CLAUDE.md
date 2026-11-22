@@ -3,8 +3,7 @@
   - **Commands**: `uv run python` / `uv run <command>`. Run them **from the repo
     root**: a `cd` elsewhere in the same compound command selects another project
     and breaks the venv (`ModuleNotFoundError: httpx`).
-  - **Dependencies**: `uv add <package>` to add, `uv sync` to install. **Pillow is
-    not one of them**: `uv run --with pillow python` to read, crop or convert a scan.
+  - **Pillow is not a dependency**: `uv run --with pillow python` to read, crop or convert a scan.
   - **Git commits**: `uv run git commit`, so pre-commit hooks run correctly
   - **Run the server**: `uv run python -m src.gramps_mcp.server` (HTTP, port 8000)
     or `uv run python -m src.gramps_mcp.server stdio` (stdio transport)
@@ -64,36 +63,33 @@
   `GRAMPS_API_URL` at the local stack and refuses any host outside
   `localhost`, `127.0.0.1`, `::1`, `host.docker.internal`. pytest does not
   read `.env` at all. `scripts/backup_prod.py` is the only thing in the
-  repository that still talks to the live server.
+  repository that still talks to the live server. The exception is `tests/test_server.py`: it talks to the
+  published-image MCP container on :8000, read-only against that container's
+  backend, and fails until the image is republished.
 - **Starting the test environment**, in this order:
   ```bash
   uv run python scripts/backup_prod.py      # once; reads the live tree
   docker compose -f docker-compose.test.yml up -d
   uv run python scripts/seed_test_tree.py   # restores the backup, idempotent
-  uv run pytest                             # 813 passed, 1 skipped
+  uv run pytest                             # full suite, see counts below
   ```
+  The stack image is pinned by `GRAMPSWEB_TAG` (`26.11.2` = gramps-webapi
+  3.25.2, the production version and default; `26.11.3` = 3.26.0). Both must
+  stay green: switch with `--force-recreate`, then re-seed, one version at a
+  time. Check the running one with
+  `docker exec grampsweb_test pip show gramps-webapi | grep Version`.
   `backup/` and `tests/.local-tree-id` are gitignored: the first holds real
   data on living people and this repository is public, the second holds a
   UUID minted when the stack's volumes are created. Re-running the seed
   script also wipes whatever residue a failed teardown left behind - the
   restore replaces the tree's contents rather than adding to them.
 - **Integration tests still carry `pytestmark = pytest.mark.integration`**
-  (32 modules, 157 tests) and still need the stack running.
-  `uv run pytest -m "not integration"` (657 tests) passes with the stack
+  and still need the stack running.
+  `uv run pytest -m "not integration"` passes with the stack
   down, which is what CI runs - `.github/workflows/ci.yml` names the
   `tests/` directory and the marker filter, no allowlist.
-- **`GRAMPS_API_URL` has no `/api` suffix.** The REST base is
-  `${GRAMPS_API_URL%/}/api`; calling it without the suffix returns the app's HTML
-  page with HTTP 200, not an error.
-- **`tree_stats` fails against the live tree** ("Permission denied for this
-  operation"): the account in `.env` has the owner role, and the tool reads
-  `/trees/<id>`, which only an admin may do. Not a regression. The test
-  stack's account is created with the admin role precisely so the tool can
-  be tested, so `tree_stats` passes there and fails in production.
-- **The token endpoint is capped at one request per second.** `AuthManager`
-  retries a 429 up to five times, 1.2 s apart (`auth.py`). Without that,
-  a burst of clients authenticating together - which the suite does - fails
-  with "Authentication failed: HTTP 429", an error about nothing being wrong.
+- **Never write to Gramps with a raw `PUT`**: it bypasses `merge.py` and drops every field the payload omits. Use `make_api_call(ApiCalls.PUT_*)` or the MCP tools.
+- **Raw REST and API-shape gotchas** (no `/api` suffix, token rate limit, raw `PUT` forbidden, POST/PUT return lists, parameter models requiring fields, `create_event` place handle, media on persons, bulk lots, backups, GEDCOM extension, `tree_stats`, third-party hosts): see the `gramps-rest-recovery` skill. Load it before any raw REST call or `make_api_call` script.
 - **The MCP server runs in Docker**, container `gramps-mcp-gramps-mcp-1` on the
   published image `ghcr.io/fjacquet/gramps-mcp:latest`, exposed on
   `http://localhost:8000/mcp` (what `.mcp.json` targets). So it executes the
@@ -101,115 +97,6 @@
   must be staged inside it first
   (`docker cp <file> gramps-mcp-gramps-mcp-1:/tmp/`). The repo's compose files
   describe the old local-backend setup and do not serve the live tree.
-- **The server now calls third-party hosts, separately from the Gramps Web
-  API above.** `geocode_place` reaches `geo.api.gouv.fr`, `api3.geo.admin.ch`,
-  `query.wikidata.org` and `nominatim.openstreetmap.org`; the Docker
-  container needs egress to them. The two detection tools (`find_duplicates`,
-  `audit_quality`) do not - they keep working when a gazetteer is
-  unreachable. Nominatim's 1 request per second with no burst is an ODbL
-  licence obligation encoded in `genealogy/rate_limit.py`, not a courtesy.
-- **Reading the API directly is fine; a raw `PUT` is not.** For counts, audits and
-  exports, `POST /api/token/` with the `.env` credentials then
-  `Authorization: Bearer <access_token>` - per-category totals come back in the
-  `X-Total-Count` header with `pagesize=1`, no pagination needed. Never write with
-  a raw `PUT`: it bypasses `merge.py` and drops every field the payload omits.
-- **Access tokens expire mid-session**, and a failed `curl -o` leaves its target
-  untouched - so a stale dump passes for a fresh one. Check the token response,
-  and validate a snapshot before `mv`.
-- **`AuthManager.get_token()`** is the accessor for raw REST calls (thumbnail
-  checks, `X-Total-Count` counts) - there is no `get_access_token`.
-- **For a bulk lot, a one-off script calling
-  `GrampsWebAPIClient.make_api_call(ApiCalls.PUT_*)` is the right tool** - it goes
-  through `merge_put_data()`, so semantics match the MCP tools, which do not scale
-  to hundreds of calls. Make it idempotent (source by exact title, media by md5
-  against `checksum`, citation by source+page) or a rerun after a partial failure
-  duplicates everything.
-- **Only `person.media_list` renders on a person page.** Verified 14/09/2026 on
-  I1751 (media shown) against I1201 (scan on an event's citation, nothing
-  shown). Media on citations and places never surface on the person: the tree
-  held 1290 media of which 652 sat on places and 562 on citations, while 63
-  people carried one. An image meant to be seen on a person must be in that
-  person's own `media_list`.
-- **Uploading a media file needs no `docker cp` over REST.**
-  `client.upload_media_file(bytes, mime)` POSTs to `media/` and the server
-  computes the checksum. The `docker cp` note above applies only to the MCP
-  tools' `media_path`, which resolves inside the container.
-- **`ApiCalls` is plural for collections, singular for one record**: `POST_PEOPLE`,
-  `POST_FAMILIES`, `POST_EVENTS`, `POST_CITATIONS`, `POST_SOURCES`, `POST_NOTES`,
-  but `PUT_PERSON`, `PUT_FAMILY`, `PUT_EVENT`, `PUT_NOTE`.
-- **POST/PUT return a *list* of transaction entries** `[{_class, handle, new, old,
-  type}]`, not the record. Select by `_class`, **never by position** -
-  `POST_FAMILIES` returns the father's Person update first.
-- **Parameter models require fields even for a one-field update**:
-  `EventSaveParams` needs `type` and `citation_list` to change only `place`;
-  `PersonData` needs `primary_name` and `gender`; `DateValue` accepts only
-  `dateval`/`modifier`/`quality`/`text` - there is no `year`.
-  `FamilySaveParams` and `PersonData` reject `citation_list` outright
-  (`extra_forbidden`): source a filiation on the `child_ref_list` entry
-  (`{"ref": ..., "citation_list": [...]}`), and a corrected name in a note.
-  `MediaSaveParams` needs `desc` to add a `note_list` or `citation_list`;
-  `CitationData` rejects `confidence` outright and requires `source_handle`
-  even to change only a citation's `page` or `media_list`;
-  `PlaceSaveParams` rejects `title` (the server derives it). `media_list` is declared on
-  `BaseDataModel`, so `PUT_PERSON` accepts it despite `PersonData` not naming
-  it, and `replace_lists=["media_list"]` detaches one.
-- **`create_event`'s `place` is required, and must be a Place handle, not a
-  name** - passing a commune name string is rejected outright
-  (`place must be a place handle, not a name`). `find_type(type='place',
-  ...)` first; if it doesn't exist, `geocode_place` then `create_place`
-  **with `placeref_list` set to the parent** (canton/state, then country)
-  in the same call. `code` on `create_place` is a free-text field (postal
-  code) - it does not link a parent and is not a substitute for
-  `placeref_list`. A place created without one renders as a bare name with
-  no hierarchy, and nothing catches this automatically.
-- **Back up the live tree before any risky change.** The client has no export
-  support, so GET `/api/exporters/gramps/file` with a bearer token from
-  `AuthManager`. Gzipped Gramps XML, lossless, ~600 KB. Media files are *not*
-  included - the XML carries only `<object>` references.
-- **GEDCOM export is extension `ged`, not `gedcom`.** `GET
-  /api/exporters/ged/file` (not `.../exporters/gedcom/...`, which 404s).
-  `GET /api/exporters/` lists every valid extension if in doubt.
-- **The API exposes more than this server uses: 96 of 193 operations.**
-  `docs/reference/gramps-web-api.md` lists every operation against the
-  `ApiCalls` member that reaches it, generated from the vendored
-  `docs/reference/openapi.json` (Gramps Web API 3.21.1) by
-  `uv run python scripts/gen_api_reference.py`. Regenerate it after replacing
-  the spec. Every `ApiCalls` entry matches a real spec path, so the client
-  invents no endpoint; `AuthManager`'s `POST /token/` (`auth.py:128`) is the
-  only call that bypasses the enum. Five unused capabilities are worth knowing
-  before writing a workaround:
-  - **`POST /api/transactions`** commits a batch atomically. The bulk-lot advice
-    above predates this knowledge: a one-off script issuing hundreds of `PUT`s
-    is still the tested path, but this endpoint is why "hundreds of calls" need
-    not be the only shape.
-  - **`POST /api/<type>/query`** exists for every record type, but it does
-    **not** take a `gql` or `query` field - both are rejected with HTTP 422,
-    `"Unknown field"`. Read its schema in `docs/reference/openapi.json` before
-    reaching for it. An earlier version of this note suggested it as a
-    workaround for the notes bug below; that was written without trying it.
-  - **The notes GQL bug is fixed upstream** (issue #28). On
-    gramps-webapi 3.21.1 with gramps 6.0.8, all four reproductions from that
-    issue return HTTP 200: `gramps_id="N0216"`, `class = note and private`,
-    `text.string ~ "Nidau"` and the people control. `find_type` on notes works.
-    Verify against the running server before assuming otherwise - the failure
-    was a server-side defect, so it comes and goes with the deployment, not
-    with this repo.
-  - **`GET /api/exporters/<id>/file`** is the export the backup note below calls
-    missing from the client. It is missing from `ApiCalls`, not from the API.
-  - **`POST /api/trees/<id>/verify` and `/repair`** run Check and Repair over
-    the API. Worth reaching for before repairing dead handles by hand - though
-    Check and Repair is itself what materialises some of them.
-  - **`POST /api/media/<handle>/ocr`** exists, and is very likely useless here.
-    Reading the scan directly beats it on this corpus: the registers are
-    handwritten, pre-1950, in French and German hands. Treat the endpoint as
-    unproven on anything older than typescript, and do not route a register
-    through it in place of reading it.
-  - **`DELETE /api/<type>/<handle>`** exists for every entity type
-    (people, events, notes, citations, ...) though nothing in `ApiCalls`
-    wraps it and no MCP tool exposes it. It is the only way to remove a
-    record created by mistake - e.g. a `create_person` fired before checking
-    whether the person already existed. A raw PUT is still forbidden
-    (bypasses `merge.py`); DELETE is not a PUT and carries no such caveat.
 - **Traversal tests must assert on the rendered output, not only on
   `TraversalResult.edges`.** Two defects shipped in #27 because the tests
   checked the graph and never called `format_traversal` on the tree they had
@@ -239,29 +126,12 @@
   steps change.
 
 ### Genealogy Data Entry Workflow
-- See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
-  research/data-entry workflow (sourcing chain, media attachment, match vs.
-  hypothesis handling, homonym hygiene).
-- **Occupations are events, never attributes.** On 2026-09-01 the tree was
-  converged: all 28 `attribute_list` entries of type `Occupation` became
-  `Occupation` events, leaving 145 events and zero such attributes. An event
-  carries a date, a place and citations; an attribute carries none of the
-  three. Do not reintroduce the attribute form. Store the trade bilingually in
-  `description`, reader's language first: `Charpentier (all. Zimmermann)`,
-  `arystokrata ... (aristocrate ...)`.
-- **Gramps localises nothing you write.** `locale=fr` translates only its own
-  enums via the profile (event type, relationship); free text - occupation
-  descriptions, note bodies, citation `page` - is stored and served verbatim.
-  Bilingual content therefore has to be written into the field itself.
-- **`attribute_list` merges on update and the MCP tools cannot replace it.**
-  A second `create_person` carrying a different `Occupation` appends a
-  duplicate instead of overwriting, `detach_reference` only handles
-  reference-lists (`event_ref_list`, `media_list`, ...), and
-  `create_person`'s schema rejects `replace_lists` outright. The only way to
-  rewrite or empty it is a script calling
-  `make_api_call(ApiCalls.PUT_PERSON, ..., replace_lists=["attribute_list"])`
-  - the parameter is generic (`client.py`, `merge.py`), it is merely absent
-  from that one tool's advertised schema.
+- **The `gramps_id=` list parameter is not a filter**: it returns the whole
+  collection. Resolve a record with GOQL, via `find_type` or
+  `rules=MatchesQuery` (`gramps_id == "I0001"`). The `gql` parameter no longer
+  exists on gramps-webapi 3.26.0. Syntax: the usage guide.
+Other data-entry gotchas (occupations as events, bilingual text, `attribute_list`, `create_sourced_event`, `create_family` links): see the `genealogiste` skill.
+
 - **Never pass a `gramps_id` string (e.g. `"C0619"`) into a `*_list` field
   (`citation_list`, `note_list`, etc.).** The API stores it literally as a
   broken pseudo-handle, invisible until GEDCOM export crashes with
@@ -275,20 +145,6 @@
   (`source_handle`, `father_handle`, `mother_handle`, `place`) checking
   each ref against the right handle set - `0 broken references found` is
   the target. Packaged as the `gramps-rest-recovery` skill.
-- **`create_sourced_event` always creates a brand-new event** - it never
-  matches an existing one for the person/family. To add a corroborating
-  citation or correct a date on an event that already exists, call
-  `create_event` with that event's real `handle` instead, or you end up
-  with an orphan duplicate event alongside the original. It also does **not**
-  attach the event to anyone: follow it with
-  `create_person(handle=..., event_ref_list=[{ref, role}])`. A `source_title`
-  that already exists is refused, and the error names the handle to reuse via
-  `source_handle`.
-- **`create_family`'s `child_handles`/`father_handle`/`mother_handle` only
-  link the family side.** The child person record's own
-  `parent_family_list` is not set automatically - call `create_person` with
-  `parent_family_list: [<family handle>]` separately, or ancestor lookups
-  from the child fail silently.
 
 ### AI Behavior Rules
 - **Never use `git stash` or `git reset --hard`.** Both have destroyed

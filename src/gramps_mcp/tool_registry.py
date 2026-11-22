@@ -107,8 +107,8 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
     # Search & Retrieval Tools
     "find_type": {
         "description": (
-            "Search any entity type using GQL - read gql://documentation "
-            "resource first to understand syntax"
+            "Search any entity type using a GOQL expression - read "
+            "gql://documentation resource first to understand syntax"
         ),
         "schema": SimpleFindParams,
         "handler": find_type_tool,
@@ -334,9 +334,10 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "Undo one recorded transaction by id, reversing every object "
             "change it made. Use recent_changes to find the id. This is the "
             "recovery path for a delete or merge that went the wrong way. "
-            "force=true is currently required to undo a deletion, because "
-            "of an upstream Gramps Web bug that misreports the object as "
-            "changed; see the force parameter's description for the risk"
+            "On older gramps-webapi (seen on 3.21.1) force=true was required "
+            "to undo a deletion (a server bug misreports the object as "
+            "changed); 3.25.2 and 3.26.0 need no force. See the force parameter's "
+            "description for the risk"
         ),
         "schema": UndoChangeParams,
         "handler": undo_change_tool,

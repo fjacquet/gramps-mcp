@@ -58,9 +58,6 @@ class FamilySaveParams(StrictModel):
         None, description="List of event references"
     )
     note_list: list[str] | None = Field(None, description="List of note handles")
-    urls: list[dict] | None = Field(
-        None, description="List of URLs associated with the family"
-    )
     media_list: list[dict] | None = Field(None, description="List of media references")
 
 

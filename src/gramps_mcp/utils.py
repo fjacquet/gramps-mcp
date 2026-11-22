@@ -173,12 +173,12 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | N
     # in search_details.py (see its `escaped = ...` comment around lines
     # 140-147). Safe here only because both callers - relationship_tools.py
     # _resolve_person/_resolve_family - gate gramps_id against the anchored
-    # GRAMPS_ID_PATTERN (^[A-Z]+[0-9]+$) before reaching this function. A
+    # GRAMPS_ID_PATTERN ([A-Z]+[0-9]+, fullmatch) before reaching this function. A
     # future caller that skips that gate would reopen GQL filter injection
     # (e.g. a crafted value closing the quoted literal early).
     result = await client.make_api_call(
         api_call=ApiCalls.GET_PEOPLE,
-        params={"gql": f'gramps_id="{gramps_id}"', "pagesize": 1},
+        params={"gql": f'gramps_id == "{gramps_id}"', "pagesize": 1},
         tree_id=tree_id,
     )
     if result and isinstance(result, list) and len(result) > 0:
@@ -208,7 +208,7 @@ async def resolve_source_handles_by_title(
     escaped = title.replace("\\", "\\\\").replace('"', '\\"')
     results = await client.make_api_call(
         api_call=ApiCalls.GET_SOURCES,
-        params={"gql": f'title="{escaped}"', "pagesize": 10},
+        params={"gql": f'title == "{escaped}"', "pagesize": 10},
         tree_id=tree_id,
     )
     if not results or not isinstance(results, list):
@@ -232,12 +232,12 @@ async def resolve_family_handle(client, tree_id: str, gramps_id: str) -> str | N
     # in search_details.py (see its `escaped = ...` comment around lines
     # 140-147). Safe here only because both callers - relationship_tools.py
     # _resolve_person/_resolve_family - gate gramps_id against the anchored
-    # GRAMPS_ID_PATTERN (^[A-Z]+[0-9]+$) before reaching this function. A
+    # GRAMPS_ID_PATTERN ([A-Z]+[0-9]+, fullmatch) before reaching this function. A
     # future caller that skips that gate would reopen GQL filter injection
     # (e.g. a crafted value closing the quoted literal early).
     result = await client.make_api_call(
         api_call=ApiCalls.GET_FAMILIES,
-        params={"gql": f'gramps_id="{gramps_id}"', "pagesize": 1},
+        params={"gql": f'gramps_id == "{gramps_id}"', "pagesize": 1},
         tree_id=tree_id,
     )
     if result and isinstance(result, list) and len(result) > 0:

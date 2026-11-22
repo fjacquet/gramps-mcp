@@ -22,7 +22,7 @@ class TestSearchTotals:
         and only differed in how they parsed the same response text.
         """
         result = await find_type_tool(
-            {"type": "person", "gql": 'gramps_id!=""', "max_results": 5}
+            {"type": "person", "gql": 'gramps_id != ""', "max_results": 5}
         )
         text = result[0].text
 
@@ -52,7 +52,7 @@ class TestSearchTotals:
         result = await find_type_tool(
             {
                 "type": "person",
-                "gql": 'gramps_id!=""',
+                "gql": 'gramps_id != ""',
                 "max_results": 5,
                 "page": 1,
             }

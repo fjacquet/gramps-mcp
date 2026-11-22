@@ -172,7 +172,12 @@ class BaseGetMultipleParams(BaseModel):
         None, description="Comma delimited list of keys to sort the result set by"
     )
     gql: str | None = Field(
-        None, description="A Gramps QL query string that is used to filter the objects"
+        None,
+        description=(
+            "A GOQL expression (Gramps Object Query Language, almost Python) "
+            'used to filter the objects, e.g. gramps_id == "I0001" or '
+            '"Nidau" in text.string. See gql://documentation'
+        ),
     )
     backlinks: bool | None = Field(
         None, description="Include handles to objects referring to the object"
@@ -194,7 +199,7 @@ class BaseGetMultipleParams(BaseModel):
         None,
         description=(
             "Not a supported parameter - present only so it can be rejected. "
-            "Use gql= for an exact structured filter, or find_anything_tool "
+            "Use gql= for an exact structured GOQL filter, or find_anything_tool "
             "for free-text search."
         ),
     )
@@ -207,7 +212,7 @@ class BaseGetMultipleParams(BaseModel):
                 "'query' is not a supported parameter here and was previously "
                 "silently ignored (extra='ignore'), so any prior call using it "
                 "ran unfiltered rather than doing what it looked like it did. "
-                "Use gql= for an exact structured GQL filter, or "
+                "Use gql= for an exact structured GOQL filter, or "
                 "find_anything_tool (find_anything) for genuine free-text "
                 "search - that is the only search surface that honours 'query'."
             )

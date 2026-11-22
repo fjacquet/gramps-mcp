@@ -21,7 +21,7 @@ Read-only. Nothing here writes to the tree.
 
 | Tool | What it does |
 |---|---|
-| `find_type` | Searches any entity type using Gramps Query Language (GQL). Read the `gql://` documentation resource first - the syntax is not guessable. |
+| `find_type` | Searches any entity type using GOQL (Gramps Object Query Language). Read the `gql://` documentation resource first - the syntax is not guessable. |
 | `find_anything` | Text search across all record types. Matches literal text within records; it does not evaluate logical combinations of terms. |
 | `get_type` | Gets full details for a person or family by handle or `gramps_id`. |
 
@@ -88,4 +88,4 @@ separate tool.
 | `delete_type` | Deletes one record (person, family, event, place, source, citation, repository, media, note, tag). Refuses while other records still reference it, and lists them; pass `force=true` to delete anyway and sever those references. Reversible with `undo_change`. |
 | `detach_reference` | Removes one element from a record's list (`event_ref_list`, `child_ref_list`, `media_list`, `note_list`, `citation_list`, `tag_list`). Only the named list is rewritten - every other list keeps its normal merge-on-update behaviour. Refuses if the element is not in the list. |
 | `merge_type` | Merges two records of the same type: the "phoenix" survives, the "titanic" is absorbed, and every reference to the titanic is repointed to the phoenix. Returns a preview and changes nothing unless `confirm=true`. Tags cannot be merged. |
-| `undo_change` | Undoes one recorded transaction by id, reversing every object change it made. Use `recent_changes` to find the id. This is the recovery path for a `delete_type` or `merge_type` that went the wrong way. `force=true` is currently required to undo a deletion, because of an upstream Gramps Web bug that misreports the object as changed - see the tool's `force` parameter for the risk this carries. |
+| `undo_change` | Undoes one recorded transaction by id, reversing every object change it made. Use `recent_changes` to find the id. This is the recovery path for a `delete_type` or `merge_type` that went the wrong way. On older gramps-webapi (seen on 3.21.1) `force=true` was required to undo a deletion (a server bug misreports the object as changed); 3.25.2 and 3.26.0 need no force. See the tool's `force` parameter for the risk this carries. |

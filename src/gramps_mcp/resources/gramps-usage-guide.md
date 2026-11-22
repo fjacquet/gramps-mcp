@@ -12,9 +12,11 @@ Gramps is fundamentally **source-focused** and **event-focused**. All genealogic
 There are exactly two search tools:
 
 - `find_type(type=..., gql=..., max_results=20, page=None)` searches ONE record
-  type with a GQL filter. `type` accepts `person`, `family`, `event`, `place`,
+  type with a GOQL filter (Python-like: `==`, `in`, `and`; the argument keeps
+  the name `gql`). `type` accepts `person`, `family`, `event`, `place`,
   `source`, `citation`, `media`, `repository`, `note`. Read the
-  `gql://documentation` resource for the filter syntax and the full property list.
+  `gql://documentation` resource for the GOQL syntax, working forms and
+  the common fields.
 - `find_anything(query=..., max_results=20, page=None)` is a plain full-text
   search across every record type. It matches literal text inside records, not
   logical combinations, so give it one distinctive string.
@@ -25,25 +27,15 @@ find tool - every type-scoped search goes through `find_type`.
 To read one record in full, use `get_type(type=..., handle=...)` or
 `get_type(type=..., gramps_id=...)`. `get_type` supports `person` and `family`
 only; for the other types use `find_type` with a filter on `gramps_id` or
-`handle`.
+`handle`:
 
-**Notes cannot be filtered with GQL.** `find_type(type="note", gql=...)`
-returns HTTP 500 for *every* filter, whatever the left-hand side - including
-`gramps_id = "N0216"`. This is a server-side bug in `gramps-ql` 0.4.0, which
-converts an object to a dict only for `PrimaryObject` subclasses; `Note` is
-the one primary record type in Gramps that is not one, so a raw `Note`
-reaches a matcher expecting a dict and raises. It is fixed upstream in
-`gramps-ql` 0.5.0, but no published `grampsweb` image ships that version yet,
-so the failure stands on this server.
+<!-- rows -->
+`find_type(type="person", gql='gramps_id == "I0001"')`
 
-Until then, to find a note:
-- `find_anything(query="...")` - works, but truncates note text at 500
-  characters, so use it to locate the note, not to read it.
-- `get_type` does not accept `note`, so once you have the handle, read the
-  note through `find_type(type="note")` **without** a `gql` argument and page
-  through the results, or ask the user to query the REST API directly.
+**Notes filter on `text.string`.** Search a note by its text:
 
-Every other record type filters normally; notes are the sole exception.
+<!-- rows -->
+`find_type(type="note", gql='"a" in text.string')`
 
 - If entity exists and **already contains all the new info**: Use the existing entity as-is (no update needed)
 - If entity exists but **missing some of the new info**: Use `create_X` with the existing handle to **update** it
@@ -78,12 +70,12 @@ When you have a source document, start with the repository (archive, library, co
 **Repository requires:**
 - **Name** (required): "National Archives", "City Hall Records", "St. Mary's Church"
 - **Type** (required): Archive, Library, Church, etc.
-- **URL** (optional): If present, create with type, path, and description
+- **URL** (optional): If present, create with type, path, and desc (the key is `desc`, not `description`)
 - **Note** (optional): If present, use `create_note` tool first, then link to repository
 
 **Process:**
 - **First**: Search for an existing repository with
-  `find_type(type="repository", gql='class = repository and name ~ "St. Mary"')`
+  `find_type(type="repository", gql='"St. Mary" in name')`
 - **If found and complete**: Use existing repository as-is
 - **If found but missing info**: Use `create_repository` with existing handle to update repository
 - **If not found**: Use `create_repository` without handle to create new repository
@@ -107,7 +99,7 @@ Create the actual source document within the repository:
 
 **Process:**
 - **First**: Search for an existing source document with
-  `find_type(type="source", gql='class = source and title ~ "Marriage Register"')`
+  `find_type(type="source", gql='"Marriage Register" in title')`
 - **If found and complete**: Use existing source as-is
 - **If found but missing info**: Use `create_source` with existing handle to update source
 - **If not found**: Use `create_source` without handle to create new source
@@ -130,7 +122,7 @@ Create a citation that references the specific page/entry in the source:
 
 **Process:**
 - **First**: Search for an existing citation with
-  `find_type(type="citation", gql='class = citation and source_handle = "<source handle>" and page ~ "Page 67"')`
+  `find_type(type="citation", gql='source_handle == "<source handle>" and "Page 67" in page')`
 - **If found and complete**: Use existing citation as-is
 - **If found but missing info**: Use `create_citation` with existing handle to update citation
 - **If not found**: Use `create_citation` without handle to create new citation
@@ -144,12 +136,15 @@ Now create the life event that was documented in that citation:
 - **Date** (optional): Date when the event occurred
 - **Description** (optional): Additional details about the event
 - **Place** (optional): If present, search with
-  `find_type(type="place", gql='class = place and name.value = "Boston"')` first,
+  `find_type(type="place", gql='name.value == "Boston"')` first,
   then `create_place` if not found
 
 **Process:**
 - **First**: Search for an existing event with
-  `find_type(type="event", gql='class = event and type.string = "Marriage" and description ~ "Smith"')`
+  `find_type(type="event", gql='type.value == EventType.MARRIAGE and "Smith" in description')`
+  (drop the description clause to list every marriage):
+<!-- rows -->
+  `find_type(type="event", gql='type.value == EventType.MARRIAGE')`
 - **If found and complete**: Use existing event as-is
 - **If found but missing info**: Use `create_event` with existing handle to update event
 - **If not found**: Use `create_event` without handle to create new event
@@ -164,12 +159,12 @@ Now create the life event that was documented in that citation:
 - **Gender** (required): Female, Male, or Unknown
 - **Notes** (optional): If present, use `create_note` tool first, then link to person
 - **Media** (optional): If present, use `create_media` tool first, then link to person
-- **URLs** (optional): Web links with type, path, and description
+- **URLs** (optional): Web links with `type`, `path` and `desc` (the description key is `desc`, not `description`)
 - **Birth/Death info**: Should be added as separate birth/death events, NOT directly to person
 
 #### For Each Person Involved:
 - **First**: Search for existing records with
-  `find_type(type="person", gql='class = person and primary_name.surname_list.any.surname = "Smith"')`
+  `find_type(type="person", gql='any(s.surname == "Smith" for s in primary_name.surname_list)')`
   (or `find_anything(query="John Smith")` for a loose text sweep)
 - Search by name, approximate dates, and locations - never on a name alone
 - **Always notify the user** if potential matches are found
@@ -201,7 +196,6 @@ Now create the life event that was documented in that citation:
 - **Children handles** (optional): List of handles of child persons
 - **Notes** (optional): If present, use `create_note` tool first, then link to family
 - **Media** (optional): If present, use `create_media` tool first, then link to family
-- **URLs** (optional): Web links with type, path, and description
 - **Family events**: Marriage, divorce events are added to the family unit
 - **All relationships must be supported by sourced events**
 
@@ -211,7 +205,7 @@ Now create the life event that was documented in that citation:
 
 #### Process:
 - **First**: Search for an existing family unit with
-  `find_type(type="family", gql='class = family and father_handle = "<father handle>" and mother_handle = "<mother handle>"')`
+  `find_type(type="family", gql='father_handle == "<father handle>" and mother_handle == "<mother handle>"')`
 - **If found and complete**: Use existing family as-is
 - **If found but missing info**: Use `create_family` with existing handle to update family
 - **If not found**: Use `create_family` without handle to create new family
@@ -221,7 +215,7 @@ Now create the life event that was documented in that citation:
 ```
 1. Repository: "St. Mary's Catholic Church, Boston"
    → If repository has note: create_note first, get note handle
-   → find_type(type="repository", gql='class = repository and name ~ "St. Mary"')
+   → find_type(type="repository", gql='"St. Mary" in name')
    → If found and complete: use existing repository
    → If found but missing info: create_repository with handle (update repository)
    → If not found: create_repository without handle (create repository with name, type, optional URL, optional note handle)
@@ -229,7 +223,7 @@ Now create the life event that was documented in that citation:
 2. Source: "Marriage Register 1875-1880"  
    → If source has media: create_media first, get media handle
    → If source has note: create_note first, get note handle
-   → find_type(type="source", gql='class = source and title ~ "Marriage Register"')
+   → find_type(type="source", gql='"Marriage Register" in title')
    → If found and complete: use existing source
    → If found but missing info: create_source with handle (update source)
    → If not found: create_source without handle (create source with title, repo link, optional author/pubinfo/abbrev/media/note handles)
@@ -237,15 +231,17 @@ Now create the life event that was documented in that citation:
 3. Citation: "Page 67, Entry 15, Marriage of John Smith and Mary Jones, June 15, 1878"
    → If citation has media: create_media first, get media handle
    → If citation has notes: create_note first, get note handle
-   → find_type(type="citation", gql='class = citation and source_handle = "<source handle>" and page ~ "Page 67"')
+   → find_type(type="citation", gql='source_handle == "<source handle>" and "Page 67" in page')
    → If found and complete: use existing citation
    → If found but missing info: create_citation with handle (update citation)
    → If not found: create_citation without handle (create citation with source link, optional page/date/media/notes)
 
 4. Event: Marriage event on June 15, 1878
-   → If event has place: find_type(type="place", gql='class = place and name.value = "Boston"') first,
+   → If event has place: find_type(type="place", gql='name.value == "Boston"') first,
      create_place if not found, get place handle
-   → find_type(type="event", gql='class = event and type.string = "Marriage" and description ~ "Smith"')
+   → find_type(type="event", gql='type.value == EventType.MARRIAGE and "Smith" in description')
+<!-- rows -->
+   → find_type(type="event", gql='type.value == EventType.MARRIAGE')
    → If found and complete: use existing event
    → If found but missing info: create_event with handle (update event)
    → If not found: create_event without handle (create event with type, citation handle, optional date/description/place handle)
@@ -253,7 +249,7 @@ Now create the life event that was documented in that citation:
 5. Link People to Event:
    → If person has notes: create_note first, get note handle
    → If person has media: create_media first, get media handle
-   → find_type(type="person", gql='class = person and primary_name.surname_list.any.surname = "Smith" and primary_name.first_name = "John"')
+   → find_type(type="person", gql='any(s.surname == "Smith" for s in primary_name.surname_list) and primary_name.first_name == "John"')
      (John Smith, born ~1850, Boston area)
    → If matches found: Ask user to confirm identity
    → If same person: create_person with handle (update existing person) AND add event with role "groom"
@@ -261,7 +257,7 @@ Now create the life event that was documented in that citation:
    
    → If person has notes: create_note first, get note handle  
    → If person has media: create_media first, get media handle
-   → find_type(type="person", gql='class = person and primary_name.surname_list.any.surname = "Jones" and primary_name.first_name = "Mary"')
+   → find_type(type="person", gql='any(s.surname == "Jones" for s in primary_name.surname_list) and primary_name.first_name == "Mary"')
      (Mary Jones, born ~1855, Boston area)
    → If matches found: Ask user to confirm identity
    → If same person: create_person with handle (update existing person) AND add event with role "bride"
@@ -270,11 +266,11 @@ Now create the life event that was documented in that citation:
 6. Create Family Units (when applicable):
    → If family has notes: create_note first, get note handle
    → If family has media: create_media first, get media handle
-   → If creating family relationships: find_type(type="family", gql='class = family and father_handle = "<father handle>"')
+   → If creating family relationships: find_type(type="family", gql='father_handle == "<father handle>"')
      first to check for existing family
    → If family exists and complete: use existing family
    → If family exists but missing info: create_family with handle (update family) AND add family events
-   → If family doesn't exist: create_family without handle (create with father/mother/children handles, optional notes/media/URLs) AND add family events
+   → If family doesn't exist: create_family without handle (create with father/mother/children handles, optional notes/media) AND add family events
    
    → Family events (marriage, divorce) are added to the family, not individual people
    → Individual events (birth, death) are added to people
@@ -352,11 +348,11 @@ error names the colliding handles so you can retry with `source_handle`.
 - **Enclosed by** (required): Handle of the higher-level place that contains this place
   - Example hierarchy: Church → City → County → State → Country
   - Continue until you reach Country type (top level)
-- **URLs** (optional): Web links with type, path, and description
+- **URLs** (optional): Web links with `type`, `path` and `desc` (the description key is `desc`, not `description`)
 
 **Place Process:**
 - **First**: Search for an existing place with
-  `find_type(type="place", gql='class = place and name.value = "Boston"')`
+  `find_type(type="place", gql='name.value == "Boston"')`
 - **If found and complete**: Use existing place as-is
 - **If found but missing info**: Use `create_place` with existing handle to update place
 - **If not found**: Use `create_place` without handle to create new place
@@ -376,9 +372,9 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 
 **Note Process:**
 - **First**: Search for an existing note (if applicable) with
-  `find_anything(query="marriage contract")`. Do **not** use
-  `find_type(type="note", gql=...)` - see the note-search limitation below;
-  every GQL filter on notes fails.
+  `find_anything(query="marriage contract")` for free text, or filter the
+  note text with
+  `find_type(type="note", gql='"marriage" in text.string')`.
 - **If found and complete**: Use existing note as-is
 - **If found but missing info**: Use `create_note` with existing handle to update note
 - **If not found**: Use `create_note` without handle to create new note
@@ -393,7 +389,7 @@ Church: "St. Mary's Catholic Church" (type: Church, enclosed by: Boston handle)
 
 **Media Process:**
 - **First**: Search for existing media with
-  `find_type(type="media", gql='class = media and desc ~ "marriage 1878"')`
+  `find_type(type="media", gql='"marriage 1878" in desc')`
 - **If found and complete**: Use existing media as-is
 - **If found but missing info**: Use `create_media` with existing handle to update media
 - **If not found**: Use `create_media` without handle to create new media
@@ -734,8 +730,7 @@ confirm what actually happened.
 - `force=true` deletes anyway and severs those references, the same
   behaviour the Gramps Web UI has when it deletes a referenced record. Use it
   deliberately, having read what it says it will sever.
-- Recoverable with `undo_change`, subject to the `force` requirement
-  described there.
+- Recoverable with `undo_change`.
 
 ### `merge_type` - merge two records of the same type
 
@@ -762,7 +757,7 @@ titanic_handle=... or titanic_gramps_id=..., confirm=False)`.
   parent first with `create_family(father_handle=...)`.
 - There is no backlink guard here - both records are legitimately referenced
   right up to the merge, so `confirm` is the only checkpoint. Recoverable
-  with `undo_change`, subject to the `force` requirement described there.
+  with `undo_change`.
 
 ### `detach_reference` - remove one element from one list
 
@@ -810,8 +805,11 @@ ref_handle=...)`.
 
 - `transaction_id` comes from `recent_changes`.
 - Undoing reverses every object change that transaction made.
-- **`force=true` is currently required to undo a deletion.** This is an
-  upstream Gramps Web defect, not a gramps-mcp choice: the server records the
+- **On older gramps-webapi (seen on 3.21.1), `force=true` was required to
+  undo a deletion; 3.25.2 and 3.26.0 (the tested versions) restore the record
+  with a plain undo.** Try a plain undo first: a refusal naming `force` means
+  an older server. The older-server requirement is
+  an upstream Gramps Web defect, not a gramps-mcp choice: the server records the
   deleted side of a delete/add change as `{}` rather than `None`, and its
   own conflict check treats `{}` as "the object has changed", so it refuses
   every non-forced undo of a deletion with a false "Object has changed"

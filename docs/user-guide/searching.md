@@ -17,23 +17,25 @@ distinctive string rather than a sentence:
 find_anything(query="Vilpellet", max_results=20)
 ```
 
-`find_type` searches one record type with a GQL filter, which is what you want
-as soon as the question has structure - a surname plus an era, people with no
-media, events in a given place:
+`find_type` searches one record type with a GOQL filter (Python-like
+expressions, `==` and `in`), which is what you want
+as soon as the question has structure - a surname plus an era, events in a given
+place:
 
 ```
 find_type(type="person",
-          gql='class = person and primary_name.surname_list.any.surname = "Pagan"',
+          gql='any(s.surname == "Pagan" for s in primary_name.surname_list)',
           max_results=20)
 
 find_type(type="event",
-          gql='class = event and place.get_place.name.value ~ Verrens',
+          gql='"Verrens" in place.name.value',
           max_results=20)
 ```
 
 `type` accepts `person`, `family`, `event`, `place`, `source`, `citation`,
 `media`, `repository` and `note`. Both tools take `max_results` (default 20)
-and `page` for walking through a large result set.
+and `page` for walking through a large result set. The `gql://documentation`
+resource lists the working GOQL forms and the ones the server rejects.
 
 Search on name plus era plus place, never name alone. In a small village the
 same given name and surname recur across generations, and merging two people

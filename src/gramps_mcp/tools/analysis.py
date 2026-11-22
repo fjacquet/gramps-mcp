@@ -81,7 +81,13 @@ async def _format_recent_changes(
         user_name = user.get("name", "Unknown") if user else "Unknown"
 
         # Changes in this transaction
-        changes = transaction.get("changes", [])
+        # Reason: the server also lists reference-index entries whose
+        # obj_class is a bare number ("7"), not an object; skip them.
+        changes = [
+            c
+            for c in transaction.get("changes", [])
+            if not str(c.get("obj_class", "")).isdigit()
+        ]
         change_count = len(changes)
 
         result += f"• **{description}**\n"

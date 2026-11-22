@@ -25,8 +25,8 @@ pace, not a checkpoint every time.
 
 ### 1. Search the existing tree first
 
-Use `find_anything` (free text) or `find_type` (GQL, e.g. `class = person and
-primary_name.surname_list.any.surname = "Pagan"`) before creating anything.
+Use `find_anything` (free text) or `find_type` (GOQL, e.g.
+`any(s.surname == "Pagan" for s in primary_name.surname_list)`) before creating anything.
 Match on name + era + place, not name alone — the same given name and
 surname recurs across centuries in small villages, and merging two different
 people is worse than leaving them unlinked.
@@ -374,7 +374,7 @@ an empty location on a rendered page.
 
 - Before creating an event, `find_type(type='place', ...)` for the commune
   the citation names, and reuse that handle. Most communes already exist in
-  the tree from earlier acts — check before creating a duplicate. The GQL
+  the tree from earlier acts — check before creating a duplicate. The GOQL
   property is `name.value`, not `name` or `title` — both return "no places
   found" even when the place exists.
 - If it doesn't exist yet, `geocode_place` then `create_place` — and in that
@@ -570,7 +570,7 @@ record.** The upload and the metadata PUT are two calls: the file is
 uploaded first, and only then is `desc`/`citation_list` attached. Any
 error raised after the upload leaves a media record behind. Before
 retrying, look for it:
-`find_type(type="media", gql='checksum = "<md5 of the local file>"')`.
+`find_type(type="media", gql='checksum == "<md5 of the local file>"')`.
 One clean upload yields exactly one match; a blind retry yields two or
 more with identical checksums - `DELETE /api/media/<extra-handle>` the
 duplicates via REST, keep one. Then attach `desc` and `citation_list`
@@ -616,8 +616,9 @@ MCP call.
   the person's birth year, not the year of the trade. Promote these one at a
   time, reading the page, never in a lot.
 - **Reading the tree over REST: `?page=1` is the first page** (`page=0` returns
-  HTTP 422), and `?gql=` silently returns 0 for any `attribute_list.any.*`
-  filter - page through and filter in Python instead. An audit scoped to an ID
+  HTTP 422), and the `?gql=` parameter no longer exists (HTTP 422 on gramps-webapi
+  3.26; send `rules` with a `MatchesQuery` GOQL rule). Filtering on
+  `attribute_list` is not verified - page through and filter in Python. An audit scoped to an ID
   range or a hand-picked sample will miss records; scope it to the whole tree
   or say plainly that it did not.
 - **A citation reused across events it does not cover is invisible to a
@@ -678,3 +679,40 @@ MCP call.
   not proof the act itself is lost - try the archive's direct viewer
   (archives18.fr or equivalent) before concluding a primary act is
   unrecoverable.
+
+## Tool gotchas moved from CLAUDE.md
+
+- **Occupations are events, never attributes.** On 2026-09-01 the tree was
+  converged: all 28 `attribute_list` entries of type `Occupation` became
+  `Occupation` events, leaving 145 events and zero such attributes. An event
+  carries a date, a place and citations; an attribute carries none of the
+  three. Do not reintroduce the attribute form. Store the trade bilingually in
+  `description`, reader's language first: `Charpentier (all. Zimmermann)`,
+  `arystokrata ... (aristocrate ...)`.
+- **Gramps localises nothing you write.** `locale=fr` translates only its own
+  enums via the profile (event type, relationship); free text - occupation
+  descriptions, note bodies, citation `page` - is stored and served verbatim.
+  Bilingual content therefore has to be written into the field itself.
+- **`attribute_list` merges on update and the MCP tools cannot replace it.**
+  A second `create_person` carrying a different `Occupation` appends a
+  duplicate instead of overwriting, `detach_reference` only handles
+  reference-lists (`event_ref_list`, `media_list`, ...), and
+  `create_person`'s schema rejects `replace_lists` outright. The only way to
+  rewrite or empty it is a script calling
+  `make_api_call(ApiCalls.PUT_PERSON, ..., replace_lists=["attribute_list"])`
+  - the parameter is generic (`client.py`, `merge.py`), it is merely absent
+  from that one tool's advertised schema.
+- **`create_sourced_event` always creates a brand-new event** - it never
+  matches an existing one for the person/family. To add a corroborating
+  citation or correct a date on an event that already exists, call
+  `create_event` with that event's real `handle` instead, or you end up
+  with an orphan duplicate event alongside the original. It also does **not**
+  attach the event to anyone: follow it with
+  `create_person(handle=..., event_ref_list=[{ref, role}])`. A `source_title`
+  that already exists is refused, and the error names the handle to reuse via
+  `source_handle`.
+- **`create_family`'s `child_handles`/`father_handle`/`mother_handle` only
+  link the family side.** The child person record's own
+  `parent_family_list` is not set automatically - call `create_person` with
+  `parent_family_list: [<family handle>]` separately, or ancestor lookups
+  from the child fail silently.

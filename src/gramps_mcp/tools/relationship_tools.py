@@ -46,7 +46,7 @@ from .search_basic import with_client
 
 logger = logging.getLogger(__name__)
 
-GRAMPS_ID_PATTERN = re.compile(r"^[A-Z]+[0-9]+$")
+GRAMPS_ID_PATTERN = re.compile(r"[A-Z]+[0-9]+")
 
 
 class _RelationsQueryParams(BaseModel):
@@ -190,7 +190,7 @@ async def _resolve_person(client, tree_id: str, value: str) -> str:
         ValueError: If value looks like a gramps_id but no matching person
             is found
     """
-    if GRAMPS_ID_PATTERN.match(value):
+    if GRAMPS_ID_PATTERN.fullmatch(value):
         handle = await resolve_person_handle(client, tree_id, value)
         if not handle:
             raise ValueError(f"No person found with gramps_id '{value}'")
@@ -217,7 +217,7 @@ async def _resolve_family(client, tree_id: str, value: str) -> str:
         ValueError: If value looks like a gramps_id but no matching family
             is found
     """
-    if GRAMPS_ID_PATTERN.match(value):
+    if GRAMPS_ID_PATTERN.fullmatch(value):
         handle = await resolve_family_handle(client, tree_id, value)
         if not handle:
             raise ValueError(f"No family found with gramps_id '{value}'")

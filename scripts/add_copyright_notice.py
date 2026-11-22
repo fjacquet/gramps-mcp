@@ -10,7 +10,6 @@ import argparse
 import datetime
 import sys
 from pathlib import Path
-from typing import List
 
 # Copyright notice template (as comments, not docstring)
 COPYRIGHT_TEMPLATE = """# gramps-mcp - AI-Powered Genealogy Research & Management
@@ -62,7 +61,7 @@ def add_copyright_to_file(filepath: Path, check_only: bool = False) -> bool:
         bool: True if file was modified or needs modification.
     """
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             content = f.read()
 
         # Skip if already has copyright
@@ -97,7 +96,7 @@ def add_copyright_to_file(filepath: Path, check_only: bool = False) -> bool:
         return False
 
 
-def find_python_files(paths: List[str], exclude_dirs: List[str]) -> List[Path]:
+def find_python_files(paths: list[str], exclude_dirs: list[str]) -> list[Path]:
     """
     Find all Python files in given paths.
 

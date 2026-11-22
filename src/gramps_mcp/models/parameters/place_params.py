@@ -75,7 +75,9 @@ class PlaceSaveParams(StrictModel):
     )
     lat: str | None = Field(None, description="Latitude coordinate")
     long: str | None = Field(None, description="Longitude coordinate")
-    urls: list[dict] | None = Field(None, description="Associated URLs")
+    urls: list[dict] | None = Field(
+        None, description="Associated URLs (keys: type, path, desc)"
+    )
     media_list: list[dict[str, Any]] | None = Field(
         None,
         description="Media references as objects, for example [{'ref': '<handle>'}]",

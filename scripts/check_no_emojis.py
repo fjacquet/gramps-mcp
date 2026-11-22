@@ -73,7 +73,7 @@ def check_file_for_emojis(file_path: Path) -> tuple[bool, list[tuple[int, str]]]
         Tuple of (has_emojis, list of (line_number, line_content) with emojis)
     """
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             lines = f.readlines()
     except (UnicodeDecodeError, PermissionError):
         # Skip binary files or files we can't read

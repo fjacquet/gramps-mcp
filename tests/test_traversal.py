@@ -6,6 +6,7 @@ synthetic tree and need no server. Assertions read the returned
 TraversalResult, never the patch's call arguments.
 """
 
+import json
 from unittest.mock import patch
 
 from src.gramps_mcp.client import GrampsWebAPIClient
@@ -113,7 +114,7 @@ class TestResolvePersonHandle:
         captured = {}
 
         async def _request(self, method=None, url=None, params=None, **kwargs):
-            captured["gql"] = params["gql"]
+            captured["rules"] = params["rules"]
             return []
 
         crafted_id = 'x" or gramps_id!="'
@@ -125,9 +126,10 @@ class TestResolvePersonHandle:
         assert handle is None
         # Reason: the quote must be escaped, not passed through raw -
         # otherwise the literal closes early and the filter becomes
-        # `gramps_id = "x" or gramps_id!=""`, matching every record. Only
+        # `gramps_id == "x" or gramps_id!=""`, matching every record. Only
         # the two literal-delimiter quotes should be unescaped.
-        assert captured["gql"] == 'gramps_id = "x\\" or gramps_id!=\\""'
+        expr = json.loads(captured["rules"])["rules"][0]["values"][0]
+        assert expr == 'gramps_id == "x\\" or gramps_id!=\\""'
 
 
 class TestWalkAncestors:

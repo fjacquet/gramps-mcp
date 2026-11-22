@@ -60,7 +60,8 @@ class PersonData(BaseDataModel):
         None, description="List of handles for families of the person's parents"
     )
     urls: list[dict[str, Any]] | None = Field(
-        None, description="List of URLs associated with the person"
+        None,
+        description="List of URLs associated with the person (keys: type, path, desc)",
     )
 
 

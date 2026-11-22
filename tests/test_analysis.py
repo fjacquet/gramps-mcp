@@ -58,83 +58,84 @@ class TestGetDescendantsTool:
     pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
-    async def test_get_descendants_real_api(self):
+    async def test_get_descendants_real_api(self, gramps_client, tree_id):
         """Test get_descendants_tool with real API."""
+        from src.gramps_mcp.models.api_calls import ApiCalls
 
-        # First search for a person with children to get a valid handle for descendants test
-        from src.gramps_mcp.tools.search_basic import find_person_tool
+        # Reason: find_person_tool's first hit is a leaf (I0000), which has no
+        # descendants. Take a father from a seeded family that has children.
+        families = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_FAMILIES, tree_id=tree_id, params={"pagesize": 200}
+        )
+        father_handle = next(
+            f["father_handle"]
+            for f in families
+            if f.get("father_handle") and f.get("child_ref_list")
+        )
+        father = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_PERSON, tree_id=tree_id, handle=father_handle
+        )
+        gramps_id = father["gramps_id"]
 
-        search_result = await find_person_tool({"pagesize": TEST_PAGESIZE})
+        # Test with explicit max_generations
+        result_explicit = await get_descendants_tool(
+            {"gramps_id": gramps_id, "max_generations": TEST_MAX_GENERATIONS}
+        )
 
-        # If we found a person, extract their gramps_id and use it directly
-        if "[" in search_result[0].text and "]" in search_result[0].text:
-            gramps_id = extract_gramps_id_from_search(search_result[0].text)
+        # Test with default max_generations (should be 5)
+        result_default = await get_descendants_tool({"gramps_id": gramps_id})
 
-            if gramps_id:
-                # Test with explicit max_generations
-                result_explicit = await get_descendants_tool(
-                    {"gramps_id": gramps_id, "max_generations": TEST_MAX_GENERATIONS}
-                )
+        # Test explicit result
+        assert isinstance(result_explicit, list)
+        assert len(result_explicit) == 1
+        assert isinstance(result_explicit[0], TextContent)
 
-                # Test with default max_generations (should be 5)
-                result_default = await get_descendants_tool({"gramps_id": gramps_id})
+        text_explicit = result_explicit[0].text
+        print("\n=== DESCENDANTS TEST OUTPUT (EXPLICIT) ===")
+        print(f"Person gramps_id used: {gramps_id}")
+        print(f"Max generations: {TEST_MAX_GENERATIONS}")
+        print(f"Total lines: {len(text_explicit.splitlines())}")
 
-                # Test explicit result
-                assert isinstance(result_explicit, list)
-                assert len(result_explicit) == 1
-                assert isinstance(result_explicit[0], TextContent)
+        # Test default result
+        assert isinstance(result_default, list)
+        assert len(result_default) == 1
+        assert isinstance(result_default[0], TextContent)
 
-                text_explicit = result_explicit[0].text
-                print("\n=== DESCENDANTS TEST OUTPUT (EXPLICIT) ===")
-                print(f"Person gramps_id used: {gramps_id}")
-                print(f"Max generations: {TEST_MAX_GENERATIONS}")
-                print(f"Total lines: {len(text_explicit.splitlines())}")
+        text_default = result_default[0].text
+        print("\n=== DESCENDANTS TEST OUTPUT (DEFAULT) ===")
+        print(f"Person gramps_id used: {gramps_id}")
+        print("Max generations: DEFAULT (should be 5)")
+        print(f"Total lines: {len(text_default.splitlines())}")
+        print("=" * 50)
 
-                # Test default result
-                assert isinstance(result_default, list)
-                assert len(result_default) == 1
-                assert isinstance(result_default[0], TextContent)
-
-                text_default = result_default[0].text
-                print("\n=== DESCENDANTS TEST OUTPUT (DEFAULT) ===")
-                print(f"Person gramps_id used: {gramps_id}")
-                print("Max generations: DEFAULT (should be 5)")
-                print(f"Total lines: {len(text_default.splitlines())}")
-                print("=" * 50)
-
-                # Both should contain actual descendants data
-                for text in [text_explicit, text_default]:
-                    assert isinstance(text, str)
-                    assert len(text) > 0
-                    assert len(text.strip()) > 50  # Should be substantial content
-                    assert "report generated successfully" not in text.lower()
-                    # Report should contain genealogy-related content
-                    assert any(
-                        keyword in text.lower()
-                        for keyword in [
-                            "person",
-                            "name",
-                            "birth",
-                            "death",
-                            "descendant",
-                            "child",
-                            "family",
-                        ]
-                    )
-                    # Reason: the substring/keyword checks above pass on
-                    # coincidental wording alone - they would not catch a
-                    # broken format_traversal. These assert on the BFS
-                    # output's actual structure: the heading, its
-                    # generation/people count, and at least one indented
-                    # child line carrying a gramps_id.
-                    assert text.startswith("# Descendants of ")
-                    assert re.search(r"\d+ generations?, \d+ people", text)
-                    assert re.search(r"\n {2,}- .*\([A-Z]\d{4}\)", text)
-        else:
-            # If no people found in a populated tree, this is a test failure
-            pytest.fail(
-                "No people found for descendants test - tree should be populated"
+        # Both should contain actual descendants data
+        for text in [text_explicit, text_default]:
+            assert isinstance(text, str)
+            assert len(text) > 0
+            assert len(text.strip()) > 50  # Should be substantial content
+            assert "report generated successfully" not in text.lower()
+            # Report should contain genealogy-related content
+            assert any(
+                keyword in text.lower()
+                for keyword in [
+                    "person",
+                    "name",
+                    "birth",
+                    "death",
+                    "descendant",
+                    "child",
+                    "family",
+                ]
             )
+            # Reason: the substring/keyword checks above pass on
+            # coincidental wording alone - they would not catch a
+            # broken format_traversal. These assert on the BFS
+            # output's actual structure: the heading, its
+            # generation/people count, and at least one indented
+            # child line carrying a gramps_id.
+            assert text.startswith("# Descendants of ")
+            assert re.search(r"\d+ generations?, \d+ people", text)
+            assert re.search(r"\n {2,}- .*\([A-Z]\d{4}\)", text)
 
     @pytest.mark.asyncio
     async def test_get_descendants_invalid_gramps_id(self):
@@ -224,8 +225,32 @@ class TestGetRecentChangesTool:
     pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
-    async def test_get_recent_changes_real_api(self):
+    async def test_get_recent_changes_real_api(self, gramps_client, tree_id):
         """Test get_recent_changes_tool with real API."""
+        from src.gramps_mcp.models.api_calls import ApiCalls
+        from src.gramps_mcp.models.parameters.people_params import PersonData
+        from tests.conftest import create_entity, delete_entity
+        from tests.constants import PREFIX
+
+        # Reason: the newest transactions depend on test order; make one
+        # whose gramps_id is known so the assertion cannot be vacuous.
+        handle = await create_entity(
+            gramps_client,
+            tree_id,
+            ApiCalls.POST_PEOPLE,
+            PersonData(
+                primary_name={
+                    "first_name": PREFIX,
+                    "surname_list": [{"surname": "Recent"}],
+                },
+                gender=1,
+            ),
+            "person",
+        )
+        person = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_PERSON, tree_id=tree_id, handle=handle
+        )
+        new_id = person["gramps_id"]
 
         result = await get_recent_changes_tool({"page": 1, "pagesize": 10})
 
@@ -248,14 +273,11 @@ class TestGetRecentChangesTool:
             f"Expected 1-10 transactions but got {transaction_count}"
         )
 
-        # Should show gramps_id instead of handle
-        if "Objects changed:" in text:
-            # Gramps IDs follow pattern: Letter + 4 digits (e.g., I0001, F0002, O0506)
-            import re
+        # Should show gramps_id instead of handle, and no bare-number class
+        assert f"Person: {new_id}" in text, text
+        assert not re.search(r"^\s+- \d+:", text, re.M), text
 
-            assert re.search(r"[A-Z]\d{4}", text), (
-                "Should show gramps IDs (letter + 4 digits)"
-            )
+        await delete_entity(gramps_client, tree_id, ApiCalls.DELETE_PERSON, handle)
 
 
 class TestGetTreeInfoTool:

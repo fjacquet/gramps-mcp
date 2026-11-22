@@ -183,26 +183,55 @@ class TestMediaFileUpload:
             await client.close()
 
     @pytest.mark.asyncio
-    async def test_upload_media_file_failure_raises_gramps_api_error(self) -> None:
-        """A failed upload must raise GrampsAPIError with the formatted message,
-        not a raw httpx.HTTPStatusError.
+    @pytest.mark.parametrize(
+        "mime_type",
+        ["image/png", "image/jpeg", "application/pdf", "audio/mpeg"],
+    )
+    async def test_upload_media_file_accepts_legitimate_types(
+        self, mime_type: str
+    ) -> None:
+        """The content types the MCP sends (mimetypes.guess_type) must upload.
 
-        An empty file body combined with a bogus mime type and a nonexistent
-        tree causes the live Gramps Web server to respond with a 500, which
-        is enough to exercise the failure path without a mock.
+        Guards the 415 below: a server that started refusing real types would
+        make the failure test pass for the wrong reason.
         """
         client = GrampsWebAPIClient()
+        settings = get_settings()
+        try:
+            result = await client.upload_media_file(
+                file_content=("legit " + mime_type).encode(),
+                mime_type=mime_type,
+                tree_id=settings.gramps_tree_id,
+            )
+            assert result[0]["new"]["mime"] == mime_type
+        finally:
+            await client.close()
+
+    @pytest.mark.asyncio
+    async def test_upload_media_file_failure_raises_gramps_api_error(self) -> None:
+        """A failed upload must raise GrampsAPIError carrying the server's
+        status and message, not a raw httpx.HTTPStatusError.
+
+        A bogus mime type on the real tree makes the live server refuse the
+        upload. Both gramps-webapi 3.25.2 and 3.26.0 answer 415 "Media type not
+        supported". The test used to also point at a nonexistent tree, which
+        3.25.2 reported as a 500 but 3.26.0 checks the media type first and
+        answers 415; the nonexistent tree is dropped so the outcome no longer
+        depends on the server's validation order.
+        """
+        client = GrampsWebAPIClient()
+        settings = get_settings()
 
         try:
             with pytest.raises(GrampsAPIError) as exc_info:
                 await client.upload_media_file(
                     file_content=b"",
                     mime_type="application/x-bogus-mime",
-                    tree_id="no-such-tree",
+                    tree_id=settings.gramps_tree_id,
                 )
-            # The GrampsAPIError message must carry the formatted "Error"
-            # shape produced by _format_http_error, not httpx's own message.
-            assert "Server error" in str(exc_info.value)
+            msg = str(exc_info.value)
+            assert "Request failed with status 415" in msg
+            assert "Media type not supported" in msg
         finally:
             await client.close()
 

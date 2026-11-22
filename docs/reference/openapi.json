@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "Gramps Web API",
-    "version": "3.21.1",
+    "version": "3.26.0",
     "description": "The Gramps Web API is a REST API that provides access to family tree databases generated and maintained with Gramps, a popular Open Source genealogical research software package.",
     "license": {
       "name": "GNU Affero General Public License v3.0",
@@ -147,6 +147,76 @@
         ],
         "additionalProperties": false
       },
+      "EditOperation": {
+        "type": "object",
+        "properties": {
+          "op": {
+            "type": "string",
+            "enum": [
+              "add_tag",
+              "remove_tag",
+              "set_private"
+            ],
+            "description": "Operation: 'add_tag' or 'remove_tag' (require 'handle'), or 'set_private' (requires 'value')."
+          },
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Handle of the tag to add or remove."
+          },
+          "value": {
+            "type": "boolean",
+            "description": "Privacy to set. Only the primary object's privacy is changed, not that of its secondary objects (e.g. references)."
+          }
+        },
+        "required": [
+          "op"
+        ],
+        "additionalProperties": false
+      },
+      "EditObjectsByHandleArgs": {
+        "type": "object",
+        "properties": {
+          "namespace": {
+            "type": "string",
+            "enum": [
+              "people",
+              "families",
+              "events",
+              "places",
+              "citations",
+              "sources",
+              "repositories",
+              "media",
+              "notes"
+            ],
+            "description": "Object type of the objects to edit (e.g. 'people')."
+          },
+          "handles": {
+            "type": "array",
+            "minItems": 1,
+            "description": "List of handles of the objects to edit. Handles of objects that do not exist are skipped.",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "operations": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Operations to apply to each object, in order, in a single transaction.",
+            "items": {
+              "$ref": "#/components/schemas/EditOperation"
+            }
+          }
+        },
+        "required": [
+          "handles",
+          "namespace",
+          "operations"
+        ],
+        "additionalProperties": false
+      },
       "UndoTransaction": {
         "type": "object",
         "properties": {
@@ -177,6 +247,50 @@
             "type": "array",
             "description": "List of individual object changes.",
             "items": {}
+          }
+        },
+        "additionalProperties": true
+      },
+      "ObjectChange": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Change ID (unique only within its connection)."
+          },
+          "connection": {
+            "description": "Internal connection object."
+          },
+          "transaction_id": {
+            "type": "integer",
+            "description": "ID of the transaction this change was part of, if known.",
+            "nullable": true
+          },
+          "obj_class": {
+            "type": "string",
+            "description": "Object class name (e.g. 'Person', 'Event')."
+          },
+          "obj_handle": {
+            "type": "string",
+            "description": "Handle of the changed object."
+          },
+          "ref_handle": {
+            "type": "string",
+            "description": "Handle of a referenced object, if this change is a reference update."
+          },
+          "trans_type": {
+            "type": "integer",
+            "description": "Change type: 0 (add), 1 (update), or 2 (delete)."
+          },
+          "timestamp": {
+            "type": "number",
+            "description": "Unix timestamp when the change was committed."
+          },
+          "old_data": {
+            "description": "Object state before the change (only included if requested)."
+          },
+          "new_data": {
+            "description": "Object state after the change (only included if requested)."
           }
         },
         "additionalProperties": true
@@ -230,6 +344,21 @@
         },
         "required": [
           "access_token"
+        ],
+        "additionalProperties": false
+      },
+      "TokenSync": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "writeOnly": true,
+            "minLength": 1,
+            "description": "A persistent access token with the sync scope."
+          }
+        },
+        "required": [
+          "token"
         ],
         "additionalProperties": false
       },
@@ -294,6 +423,11 @@
           "code": {
             "type": "string",
             "description": "Single-use code from the fragment of the OIDC login redirect."
+          },
+          "code_verifier": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._~-]{43,128}$",
+            "description": "PKCE code verifier (RFC 7636), required for a code issued to a native app redirect URI."
           }
         },
         "required": [
@@ -330,6 +464,52 @@
             "type": "string",
             "description": "URL to redirect to in order to end the session at the provider, or null if the provider does not support it.",
             "nullable": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "OIDCLink": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "ID of the OIDC provider to link, e.g. 'custom'."
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "additionalProperties": true
+      },
+      "OIDCLinkTicket": {
+        "type": "object",
+        "properties": {
+          "ticket": {
+            "type": "string",
+            "description": "Short-lived, single-use ticket to pass as `link` to /oidc/login/."
+          }
+        },
+        "additionalProperties": true
+      },
+      "OIDCLinkComplete": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Single-use `link_code` from the fragment of the redirect after linking at the provider."
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "additionalProperties": true
+      },
+      "OIDCLinked": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "description": "ID of the OIDC provider that was linked."
           }
         },
         "additionalProperties": true
@@ -553,6 +733,16 @@
         "properties": {},
         "additionalProperties": false
       },
+      "AddressProfile": {
+        "type": "object",
+        "properties": {
+          "date_str": {
+            "type": "string",
+            "description": "Date of the address as a formatted string."
+          }
+        },
+        "additionalProperties": true
+      },
       "FamilyProfile": {
         "type": "object",
         "properties": {
@@ -629,6 +819,13 @@
       "PersonProfile": {
         "type": "object",
         "properties": {
+          "addresses": {
+            "type": "array",
+            "description": "Addresses with formatted dates, parallel to address_list.",
+            "items": {
+              "$ref": "#/components/schemas/AddressProfile"
+            }
+          },
           "birth": {
             "description": "Birth event profile (or best available fallback).",
             "allOf": [
@@ -755,6 +952,11 @@
             "type": "string",
             "description": "Estimated relationship to the matching person."
           },
+          "distance": {
+            "type": "integer",
+            "description": "Number of generations from the closest common ancestor to the person plus the number to the matching person, or null if they are unrelated or no relationship could be computed, e.g. because the calculation aborted on a relationship loop.",
+            "nullable": true
+          },
           "ancestor_handles": {
             "type": "array",
             "description": "Handles of latest common ancestors.",
@@ -766,10 +968,7 @@
             "type": "array",
             "description": "Profiles of latest common ancestors.",
             "items": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/PersonProfile"
-              }
+              "$ref": "#/components/schemas/PersonProfile"
             }
           },
           "segments": {
@@ -880,88 +1079,34 @@
         },
         "additionalProperties": true
       },
-      "QueryWhereConditionArgs": {
-        "type": "object",
-        "properties": {
-          "column": {
-            "description": "Column to compare: either a plain column name (e.g. 'gramps_id'), or {'json_path': [...]} for a path, e.g. {'json_path': ['primary_name', 'first_name']}. A path may cross a relationship (Family->Person, Person->Event, Event->Place, ...), e.g. {'json_path': ['father', 'surname']} or {'json_path': ['birth', 'date', 'sortval']}."
-          },
-          "op": {
-            "type": "string",
-            "enum": [
-              "lt",
-              "ne",
-              "contains",
-              "eq",
-              "like",
-              "lte",
-              "gte",
-              "in",
-              "gt",
-              "regex"
-            ],
-            "description": "Comparison operator: eq, ne, lt, lte, gt, gte, like, regex, contains, or in."
-          },
-          "value": {
-            "description": "Value to compare against. Must be a list when op is 'in'. Mutually exclusive with 'value_column'; exactly one is required."
-          },
-          "value_column": {
-            "description": "Alternative to 'value': compare 'column' against another column/path instead of a literal, e.g. families where the mother died before the father -- column: {'json_path': ['mother', 'death', 'date', 'sortval']}, op: 'lt', value_column: {'json_path': ['father', 'death', 'date', 'sortval']}. Same shape as 'column' (plain name or {'json_path': [...]}). Not supported for 'in'/'like'/'regex'."
-          }
-        },
-        "required": [
-          "column",
-          "op"
-        ],
-        "additionalProperties": false
-      },
-      "QueryOrderByArgs": {
-        "type": "object",
-        "properties": {
-          "column": {
-            "type": "string",
-            "description": "Column to sort by."
-          },
-          "direction": {
-            "type": "string",
-            "default": "asc",
-            "enum": [
-              "asc",
-              "desc"
-            ],
-            "description": "Sort direction: 'asc' or 'desc'."
-          }
-        },
-        "required": [
-          "column"
-        ],
-        "additionalProperties": false
-      },
       "QueryBodyArgs": {
         "type": "object",
         "properties": {
           "select": {
             "type": "array",
-            "description": "Columns to return. Defaults to all available columns. Each entry is either a plain column name, or {'json_path': [...], 'as': '<key>'} to select a path, e.g. {'json_path': ['primary_name', 'surname_list', 0, 'surname']}. 'as' is optional; if omitted, the response key is a derived dotted/bracket string, e.g. 'primary_name.surname_list[0].surname'. A path may cross a relationship (Family->Person via 'father'/'mother', Person->Event via 'birth'/'death', Event->Place via 'place'), e.g. {'json_path': ['father', 'surname']} or {'json_path': ['birth', 'date']} (the full Date struct -- format/calendar/modifier/quality/dateval/text/sortval -- of the referenced event, or null if none is recorded). Not usable in 'order_by'.",
-            "items": {}
-          },
-          "where": {
-            "type": "array",
-            "description": "Leaf conditions, implicitly combined with AND.",
+            "description": "Columns to return. Defaults to all available columns. Each entry is a column name ('gramps_id'), a path ('primary_name.surname_list[0].surname'), or count(relationship[, condition]) ('count(events)'), each optionally followed by 'as <key>' to name it in the response, e.g. 'birth.place.title as birthplace' or 'count(events) as n_events'. Without 'as', the response key is the expression's own text. A path may cross a relationship (Family->Person via 'father'/'mother', Person->Event via 'birth'/'death', Event->Place via 'place', Citation->Source via 'source', Place->Place via 'enclosed_by'), e.g. 'father.surname' or 'birth.date' (the full Date struct -- format/calendar/modifier/quality/dateval/text/sortval -- of the referenced event, or null if none is recorded). Every path is checked against Gramps' own schema for the type: an unknown field is a 422 naming the fields that exist, not a column of nulls. The same paths work in 'order_by' -- see there for the cost.",
             "items": {
-              "$ref": "#/components/schemas/QueryWhereConditionArgs"
+              "type": "string"
             }
           },
           "where_expr": {
             "type": "string",
-            "description": "Alternative to `where`: an \"almost Python\" expression, e.g. \"gender == 1 and primary_name.surname_list[0].surname == 'Smith'\". See `query_lang.py`. Mutually exclusive with `where` -- a request setting both is rejected.",
+            "description": "Which rows to return: an \"almost Python\" expression, e.g. \"gender == Person.MALE and surname == 'Smith'\". The grammar is gramps-object-query-language's; see its docs/where_expr.md. Omitted, every row is returned.",
+            "nullable": true
+          },
+          "env": {
+            "type": "object",
+            "description": "Values for `Env.NAME` references in `where_expr`, and in `count(...)`/`len(...)` conditions in `select` and `order_by`, e.g. {'HOME_PERSON': '<handle>', 'BOOKMARKS': ['<handle>', ...]} for \"handle == Env.HOME_PERSON or handle in Env.BOOKMARKS\". Each value is a string, number, boolean, null, or a list of those (used with `in`). The names are up to the client: the server defines none of its own, and passes these through unchanged. An `Env.NAME` with no value here is rejected, and so is a value of the wrong type for the field it's compared with. Without `where_expr`, `env` must be used by `select` or `order_by`: otherwise it would be ignored and every row returned.",
+            "additionalProperties": {
+              "nullable": true
+            },
             "nullable": true
           },
           "order_by": {
             "type": "array",
-            "description": "Sort order, most significant column first.",
+            "description": "Sort order, most significant first. Each entry is a column written as in 'select' -- a column name ('surname'), a path ('birth.date.sortval'), or count(...)/len(...) -- sorted ascending, or descending with a leading '-', e.g. ['surname', '-birth.date.sortval']. Note the cost: flat columns like 'surname' and 'given_name' are indexed, while nothing indexes inside a record, so sorting by a path reads and parses every row in the tree, and a relationship path ('birth.date.sortval') adds a lookup per row on top. That work repeats for every page. Fine for a result set 'where_expr' has already narrowed; slow as the default order of a large tree.",
             "items": {
-              "$ref": "#/components/schemas/QueryOrderByArgs"
+              "type": "string"
             }
           },
           "limit": {
@@ -987,7 +1132,7 @@
           "count": {
             "type": "boolean",
             "default": false,
-            "description": "If true, also compute the total number of rows matching `where` (and privacy), independent of `limit`/`after`, and return it in the `X-Total-Count` response header (the same convention used elsewhere in this API). Costs a second query, so it's opt-in."
+            "description": "If true, also compute the total number of rows matching `where_expr` (and privacy), independent of `limit`/`after`, and return it in the `X-Total-Count` response header (the same convention used elsewhere in this API). Costs a second query, so it's opt-in."
           }
         },
         "additionalProperties": false
@@ -1046,6 +1191,30 @@
           "span": {
             "type": "string",
             "description": "Human-readable description of the elapsed time."
+          }
+        },
+        "additionalProperties": true
+      },
+      "PlaceCoordinates": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "description": "Unique identifier of the place."
+          },
+          "name": {
+            "type": "string",
+            "description": "Place name."
+          },
+          "lat": {
+            "type": "number",
+            "description": "Latitude in decimal degrees, or null if missing or invalid.",
+            "nullable": true
+          },
+          "long": {
+            "type": "number",
+            "description": "Longitude in decimal degrees, or null if missing or invalid.",
+            "nullable": true
           }
         },
         "additionalProperties": true
@@ -1276,6 +1445,74 @@
         },
         "additionalProperties": true
       },
+      "FilterRuleParamOption": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "Value to pass in the rule's values."
+          },
+          "label": {
+            "type": "string",
+            "description": "Display label of the value, in the requested locale."
+          }
+        },
+        "additionalProperties": true
+      },
+      "FilterRuleParamType": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "boolean",
+              "integer",
+              "date",
+              "datetime",
+              "id",
+              "filter",
+              "tag",
+              "select",
+              "gramps_type",
+              "goql"
+            ],
+            "description": "Kind of value: 'text'; 'boolean' ('1' or '0'); 'integer'; 'date' (a Gramps date string); 'datetime' ('YYYY-MM-DD HH:MM:SS', time optional); 'id' (Gramps ID of an object in 'namespace'); 'filter' (name of a custom filter in 'namespace'); 'tag' (tag name); 'select' (one of 'options'); 'gramps_type' (a type from 'default_types' or 'custom_types'); 'goql' (a GOQL expression for the rule's namespace)."
+          },
+          "namespace": {
+            "type": "string",
+            "description": "Object namespace for types 'id' and 'filter'."
+          },
+          "min": {
+            "type": "integer",
+            "description": "Minimum value for type 'integer'."
+          },
+          "max": {
+            "type": "integer",
+            "description": "Maximum value for type 'integer', if any."
+          },
+          "options": {
+            "type": "array",
+            "description": "Allowed values for type 'select'.",
+            "items": {
+              "$ref": "#/components/schemas/FilterRuleParamOption"
+            }
+          },
+          "custom": {
+            "type": "boolean",
+            "description": "True if the rule defines its own input for this parameter in the Gramps filter editor and the format of its value is unknown. Absent otherwise."
+          },
+          "default_types": {
+            "type": "string",
+            "description": "For type 'gramps_type': datatype of the /types/default/{datatype} endpoint listing the standard values."
+          },
+          "custom_types": {
+            "type": "string",
+            "description": "For type 'gramps_type': datatype of the /types/custom/{datatype} endpoint listing the custom values."
+          }
+        },
+        "additionalProperties": true
+      },
       "FilterRuleDescription": {
         "type": "object",
         "properties": {
@@ -1301,6 +1538,13 @@
           "rule": {
             "type": "string",
             "description": "Internal rule class name."
+          },
+          "types": {
+            "type": "array",
+            "description": "Types of the rule's parameters, one per label.",
+            "items": {
+              "$ref": "#/components/schemas/FilterRuleParamType"
+            }
           }
         },
         "additionalProperties": true
@@ -1501,6 +1745,46 @@
             "description": "Handles of common ancestors.",
             "items": {
               "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RelationshipPathStep": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "description": "Handle of the person."
+          },
+          "link": {
+            "type": "string",
+            "enum": [
+              "parent",
+              "child",
+              "spouse",
+              "sibling",
+              null
+            ],
+            "description": "How the person is linked to the person before them (null for the first person).",
+            "nullable": true
+          },
+          "relationship_string": {
+            "type": "string",
+            "description": "Relationship to the first person, or null when it has no name.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "RelationshipPath": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "array",
+            "description": "The people on the path, starting with person 1.",
+            "items": {
+              "$ref": "#/components/schemas/RelationshipPathStep"
             }
           }
         },
@@ -2010,6 +2294,7 @@
             }
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this person, grouped by type.",
             "allOf": [
               {
@@ -2044,6 +2329,7 @@
             }
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "family_list": {
@@ -2113,6 +2399,7 @@
             "description": "Private object indicator."
           },
           "profile": {
+            "readOnly": true,
             "description": "Optional summary of key biographical information.",
             "allOf": [
               {
@@ -2277,6 +2564,31 @@
         },
         "additionalProperties": true
       },
+      "ExportResult": {
+        "type": "object",
+        "properties": {
+          "file_name": {
+            "type": "string",
+            "description": "Name of the exported file on the server."
+          },
+          "file_type": {
+            "type": "string",
+            "description": "Extension of the exported file, e.g. `.ged`."
+          },
+          "url": {
+            "type": "string",
+            "description": "URL to download the exported file from."
+          },
+          "messages": {
+            "type": "array",
+            "description": "What the exporter left out, one line each, e.g. attributes the GEDCOM 7 export has no place for. Empty for exporters that report nothing, which is all but GEDCOM 7. A long report is truncated, with a final line stating how much was omitted.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
       "Exporter": {
         "type": "object",
         "properties": {
@@ -2291,6 +2603,360 @@
           "module": {
             "type": "string",
             "description": "Plugin module name."
+          }
+        },
+        "additionalProperties": true
+      },
+      "ImportResult": {
+        "type": "object",
+        "properties": {
+          "citations": {
+            "type": "number",
+            "description": "Number of citations."
+          },
+          "events": {
+            "type": "number",
+            "description": "Number of events."
+          },
+          "families": {
+            "type": "number",
+            "description": "Number of families."
+          },
+          "media": {
+            "type": "number",
+            "description": "Number of media objects."
+          },
+          "notes": {
+            "type": "number",
+            "description": "Number of notes."
+          },
+          "people": {
+            "type": "number",
+            "description": "Number of people."
+          },
+          "places": {
+            "type": "number",
+            "description": "Number of places."
+          },
+          "repositories": {
+            "type": "number",
+            "description": "Number of repositories."
+          },
+          "sources": {
+            "type": "number",
+            "description": "Number of sources."
+          },
+          "tags": {
+            "type": "number",
+            "description": "Number of tags."
+          },
+          "messages": {
+            "type": "array",
+            "description": "Diagnostic messages emitted by the importer, e.g. the GEDCOM import report listing lines that could not be parsed. Empty for importers that emit no diagnostics. Also returned for a dry run, where it describes what a real import would report. A long report is truncated, with a final line stating how much was omitted.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "index_tasks": {
+            "type": "array",
+            "description": "Background tasks updating the search indices after the import. The import is complete when this result is returned; search results may be incomplete until these tasks have finished. Empty when the server runs without a task queue, in which case the indices were already updated. Absent for a dry run.",
+            "items": {
+              "$ref": "#/components/schemas/TaskReference"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "RestoreSummary": {
+        "type": "object",
+        "properties": {
+          "to_add": {
+            "type": "object",
+            "description": "Number of objects, by type, present in the backup but not in the tree, which would be added.",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "to_update": {
+            "type": "object",
+            "description": "Number of objects, by type, present in both but differing, which would be overwritten with the backup version.",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "to_delete": {
+            "type": "object",
+            "description": "Number of objects, by type, present in the tree but not in the backup, which would be deleted.",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "unchanged": {
+            "type": "object",
+            "description": "Number of objects, by type, present in both the tree and the backup with identical content, which would be left as is.",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "index_tasks": {
+            "type": "array",
+            "description": "Background tasks updating the search indices after the restore. The restore is complete when this result is returned; search results may be incomplete until these tasks have finished. Empty when the server runs without a task queue, in which case the indices were already updated. Absent for a dry run.",
+            "items": {
+              "$ref": "#/components/schemas/TaskReference"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "Importer": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Description of the import format and its use."
+          },
+          "extension": {
+            "type": "string",
+            "description": "File extension this importer handles."
+          },
+          "module": {
+            "type": "string",
+            "description": "Plugin module name."
+          }
+        },
+        "additionalProperties": true
+      },
+      "Backup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "ID of the backup."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Size of the archive in bytes."
+          },
+          "restorable": {
+            "type": "boolean",
+            "description": "Whether this server can restore the backup. False e.g. for a backup made with a newer database schema, after a downgrade."
+          },
+          "manifest": {
+            "type": "object",
+            "description": "The backup's manifest: when and from which tree it was made, the versions, object counts and number of media files.",
+            "additionalProperties": {}
+          }
+        },
+        "additionalProperties": true
+      },
+      "TreeSettingsRestore": {
+        "type": "object",
+        "properties": {
+          "changed": {
+            "type": "boolean",
+            "description": "Whether the backup's tree settings differ from the current ones."
+          }
+        },
+        "additionalProperties": true
+      },
+      "UsersRestore": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "array",
+            "description": "Names of the users added to the tree, with a random password and a role of at most owner. They log in after resetting their password.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "skipped": {
+            "type": "array",
+            "description": "Names of the users not added because a user with that name already exists on the server, in any tree. Existing users are never changed.",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "BackupRestoreResult": {
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "type": "object",
+            "description": "The backup's manifest: when and from which tree it was made, the versions, object counts and media totals.",
+            "additionalProperties": {}
+          },
+          "data": {
+            "description": "Changeset of the family tree data. Absent if not selected.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RestoreSummary"
+              }
+            ]
+          },
+          "missing_media": {
+            "type": "array",
+            "description": "Gramps IDs of the backup's media objects whose files don't exist on the server. Media files are not part of the backup. Absent if the data was not selected.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tree_settings": {
+            "description": "Absent if not selected.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/TreeSettingsRestore"
+              }
+            ]
+          },
+          "users": {
+            "description": "Absent if not selected.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UsersRestore"
+              }
+            ]
+          },
+          "index_tasks": {
+            "type": "array",
+            "description": "Background tasks updating the search indices after the data was restored, see the restore endpoint. Absent for a dry run or if the data was not selected.",
+            "items": {
+              "$ref": "#/components/schemas/TaskReference"
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "Deprecation": {
+        "type": "object",
+        "properties": {
+          "option": {
+            "type": "string",
+            "description": "Name of the deprecated configuration option."
+          },
+          "replacement": {
+            "type": "string",
+            "description": "Name of the option to use instead."
+          },
+          "message": {
+            "type": "string",
+            "description": "Human-readable description of the deprecation."
+          },
+          "removed_in": {
+            "type": "string",
+            "description": "Version of Gramps Web API in which the option will stop working."
+          }
+        },
+        "additionalProperties": true
+      },
+      "ThumbnailSupport": {
+        "type": "object",
+        "properties": {
+          "pdf": {
+            "type": "boolean",
+            "description": "Whether thumbnails can be generated for PDF files (requires pdf2image and Poppler)."
+          },
+          "video": {
+            "type": "boolean",
+            "description": "Whether thumbnails can be generated for video files (requires ffmpeg-python and the ffmpeg binary)."
+          }
+        },
+        "additionalProperties": true
+      },
+      "RateLimit": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "description": "Number of requests allowed per time window."
+          },
+          "window_seconds": {
+            "type": "integer",
+            "description": "Length of the time window in seconds."
+          }
+        },
+        "additionalProperties": true
+      },
+      "Server": {
+        "type": "object",
+        "properties": {
+          "multi_tree": {
+            "type": "boolean",
+            "description": "Whether the server hosts multiple family trees."
+          },
+          "task_queue": {
+            "type": "boolean",
+            "description": "Whether a task queue is available, so that long-running operations return a task rather than a result."
+          },
+          "ocr": {
+            "type": "boolean",
+            "description": "Whether OCR of images is available."
+          },
+          "ocr_languages": {
+            "type": "array",
+            "description": "Language codes available for OCR.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "semantic_search": {
+            "type": "boolean",
+            "description": "Always false: semantic search was removed in version 3.25.0."
+          },
+          "chat": {
+            "type": "boolean",
+            "description": "Whether the AI chat endpoint is available."
+          },
+          "chat_vision": {
+            "type": "boolean",
+            "description": "Whether images can be attached to AI chat queries."
+          },
+          "face_detection": {
+            "type": "boolean",
+            "description": "Whether face detection in images is available (requires OpenCV and NumPy)."
+          },
+          "thumbnails": {
+            "description": "Availability of thumbnailing for file types needing extra dependencies.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ThumbnailSupport"
+              }
+            ]
+          },
+          "email": {
+            "type": "boolean",
+            "description": "Whether the server is configured to send e-mails. If false, flows relying on e-mail (such as enabling new users) will not work."
+          },
+          "max_media_archive_upload_bytes": {
+            "type": "integer",
+            "description": "Configured maximum size of an uploaded media archive in bytes. Absent if no limit is configured. Note that uploads are additionally limited by the free disk space available to the server, so an upload smaller than this value can still be rejected."
+          },
+          "max_thumbnail_file_bytes": {
+            "type": "integer",
+            "description": "Maximum size in bytes of a media file for which thumbnails will be generated. Larger files are rejected by the thumbnail endpoints."
+          },
+          "backups": {
+            "type": "boolean",
+            "description": "Whether a backup directory is configured. If false, backups can't be created or stored, only restored from an upload."
+          },
+          "rate_limit_media_archive": {
+            "type": "array",
+            "description": "Rate limits, per user, for creating a media archive for download. All of the limits apply simultaneously.",
+            "items": {
+              "$ref": "#/components/schemas/RateLimit"
+            }
+          },
+          "backup_keep": {
+            "type": "integer",
+            "description": "Number of stored backups kept per tree. Creating a backup deletes the oldest ones beyond this number. Absent if backups are not configured."
+          },
+          "rate_limit_backup": {
+            "type": "array",
+            "description": "Rate limits, per tree, for creating a backup. All of the limits apply simultaneously. Absent if backups are not configured.",
+            "items": {
+              "$ref": "#/components/schemas/RateLimit"
+            }
           }
         },
         "additionalProperties": true
@@ -2337,58 +3003,6 @@
           "tags": {
             "type": "number",
             "description": "Number of tags."
-          }
-        },
-        "additionalProperties": true
-      },
-      "RestoreSummary": {
-        "type": "object",
-        "properties": {
-          "to_add": {
-            "type": "object",
-            "description": "Number of objects, by type, present in the backup but not in the tree, which would be added.",
-            "additionalProperties": {
-              "type": "integer"
-            }
-          },
-          "to_update": {
-            "type": "object",
-            "description": "Number of objects, by type, present in both but differing, which would be overwritten with the backup version.",
-            "additionalProperties": {
-              "type": "integer"
-            }
-          },
-          "to_delete": {
-            "type": "object",
-            "description": "Number of objects, by type, present in the tree but not in the backup, which would be deleted.",
-            "additionalProperties": {
-              "type": "integer"
-            }
-          },
-          "unchanged": {
-            "type": "object",
-            "description": "Number of objects, by type, present in both the tree and the backup with identical content, which would be left as is.",
-            "additionalProperties": {
-              "type": "integer"
-            }
-          }
-        },
-        "additionalProperties": true
-      },
-      "Importer": {
-        "type": "object",
-        "properties": {
-          "description": {
-            "type": "string",
-            "description": "Description of the import format and its use."
-          },
-          "extension": {
-            "type": "string",
-            "description": "File extension this importer handles."
-          },
-          "module": {
-            "type": "string",
-            "description": "Plugin module name."
           }
         },
         "additionalProperties": true
@@ -2446,14 +3060,12 @@
       "Metadata": {
         "type": "object",
         "properties": {
-          "database": {
-            "type": "object",
-            "description": "Information about the active database.",
-            "additionalProperties": {}
-          },
-          "default_person": {
-            "type": "string",
-            "description": "Handle of the default person."
+          "deprecations": {
+            "type": "array",
+            "description": "Deprecated configuration options in use. Only returned for users with permission to view settings, and for tree owners in single-tree deployments.",
+            "items": {
+              "$ref": "#/components/schemas/Deprecation"
+            }
           },
           "gramps": {
             "type": "object",
@@ -2465,20 +3077,37 @@
             "description": "Information about the Gramps Web API version.",
             "additionalProperties": {}
           },
-          "gramps_ql": {
+          "gramps_object_query_language": {
             "type": "object",
-            "description": "Information about the Gramps QL library.",
+            "description": "Information about the Gramps Object Query Language library.",
             "additionalProperties": {}
           },
-          "object_ql": {
+          "yclade": {
             "type": "object",
-            "description": "Information about the Object QL library.",
+            "description": "Information about the yclade library.",
             "additionalProperties": {}
           },
           "locale": {
             "type": "object",
             "description": "Information about the active locale.",
             "additionalProperties": {}
+          },
+          "server": {
+            "description": "Information about server capabilities.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Server"
+              }
+            ]
+          },
+          "database": {
+            "type": "object",
+            "description": "Information about the active database.",
+            "additionalProperties": {}
+          },
+          "default_person": {
+            "type": "string",
+            "description": "Handle of the default person."
           },
           "object_counts": {
             "description": "Counts of primary object types.",
@@ -2499,11 +3128,6 @@
           "search": {
             "type": "object",
             "description": "Information about search-related libraries.",
-            "additionalProperties": {}
-          },
-          "server": {
-            "type": "object",
-            "description": "Information about server capabilities.",
             "additionalProperties": {}
           },
           "surnames": {
@@ -2566,6 +3190,125 @@
         },
         "additionalProperties": false
       },
+      "MetadataServer": {
+        "type": "object",
+        "properties": {
+          "deprecations": {
+            "type": "array",
+            "description": "Deprecated configuration options in use. Only returned for users with permission to view settings, and for tree owners in single-tree deployments.",
+            "items": {
+              "$ref": "#/components/schemas/Deprecation"
+            }
+          },
+          "gramps": {
+            "type": "object",
+            "description": "Information about the active Gramps installation.",
+            "additionalProperties": {}
+          },
+          "gramps_webapi": {
+            "type": "object",
+            "description": "Information about the Gramps Web API version.",
+            "additionalProperties": {}
+          },
+          "gramps_object_query_language": {
+            "type": "object",
+            "description": "Information about the Gramps Object Query Language library.",
+            "additionalProperties": {}
+          },
+          "yclade": {
+            "type": "object",
+            "description": "Information about the yclade library.",
+            "additionalProperties": {}
+          },
+          "locale": {
+            "type": "object",
+            "description": "Information about the active locale.",
+            "additionalProperties": {}
+          },
+          "server": {
+            "description": "Information about server capabilities.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Server"
+              }
+            ]
+          }
+        },
+        "additionalProperties": true
+      },
+      "UserOIDCAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the link, used to unlink the account."
+          },
+          "provider_id": {
+            "type": "string",
+            "description": "ID of the OIDC provider."
+          },
+          "subject_id": {
+            "type": "string",
+            "description": "Subject identifier of the user at the provider."
+          },
+          "email": {
+            "type": "string",
+            "description": "E-mail address reported by the provider.",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time the account was linked."
+          }
+        },
+        "additionalProperties": true
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "User name."
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the user."
+          },
+          "email": {
+            "type": "string",
+            "description": "E-mail address of the user.",
+            "nullable": true
+          },
+          "full_name": {
+            "type": "string",
+            "description": "Full name of the user.",
+            "nullable": true
+          },
+          "role": {
+            "type": "integer",
+            "description": "Integer role ID: 5 admin, 4 owner, 3 editor, 2 contributor, 1 member, 0 guest, -1 disabled, -2 unconfirmed."
+          },
+          "tree": {
+            "type": "string",
+            "description": "ID of the tree the user belongs to; empty for treeless site admins.",
+            "nullable": true
+          },
+          "oidc_accounts": {
+            "type": "array",
+            "description": "OIDC accounts linked to the user. Only present if OIDC is enabled and, for a single user, if the caller may view other users.",
+            "items": {
+              "$ref": "#/components/schemas/UserOIDCAccount"
+            }
+          },
+          "account_source": {
+            "type": "string",
+            "description": "Where the account comes from: `Local` or the OIDC provider's display name. Only present in the user list if OIDC is enabled."
+          }
+        },
+        "additionalProperties": true
+      },
       "UserPostBodyArgs": {
         "type": "object",
         "properties": {
@@ -2620,8 +3363,81 @@
           "tree": {
             "type": "string",
             "description": "Tree ID the user belongs to."
+          },
+          "password": {
+            "type": "string",
+            "description": "A new password for another user, set without their old one. Only for a user with a strictly lower role than yours, and not for your own user (use the password change endpoint). Ends all of the user's sessions."
           }
         },
+        "additionalProperties": false
+      },
+      "PushSubscriptionConfig": {
+        "type": "object",
+        "properties": {
+          "public_key": {
+            "type": "string",
+            "description": "VAPID public key, or null when Web Push is not configured.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "public_key"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionKeys": {
+        "type": "object",
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "description": "P-256 ECDH public key for payload encryption."
+          },
+          "auth": {
+            "type": "string",
+            "description": "Authentication secret for payload encryption."
+          }
+        },
+        "required": [
+          "auth",
+          "p256dh"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionBody": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "description": "HTTPS endpoint assigned by the push service."
+          },
+          "keys": {
+            "description": "Encryption keys assigned to this subscription.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PushSubscriptionKeys"
+              }
+            ]
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ],
+        "additionalProperties": false
+      },
+      "PushSubscriptionDelete": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "description": "Endpoint of the subscription to delete."
+          }
+        },
+        "required": [
+          "endpoint"
+        ],
         "additionalProperties": false
       },
       "AccessTokenStatus": {
@@ -2655,6 +3471,100 @@
         ],
         "additionalProperties": false
       },
+      "AccessTokenInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the token, used to revoke it."
+          },
+          "label": {
+            "type": "string",
+            "description": "Name of the device or client using the token."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the token was created (UTC)."
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the token was last used (UTC), if ever.",
+            "nullable": true
+          }
+        },
+        "required": [
+          "created_at",
+          "id",
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "AccessTokenLabel": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Name of the device or client using the token, unique among the user's tokens of this scope."
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "AccessTokenInfoCreate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "ID of the token, used to revoke it."
+          },
+          "label": {
+            "type": "string",
+            "description": "Name of the device or client using the token."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the token was created (UTC)."
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the token was last used (UTC), if ever.",
+            "nullable": true
+          },
+          "token": {
+            "type": "string",
+            "description": "The token value. It is only returned once and can't be retrieved later."
+          }
+        },
+        "required": [
+          "created_at",
+          "id",
+          "label",
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "UserMerge": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name of the user to merge into the user in the path. This user is deleted."
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "additionalProperties": true
+      },
       "UserRegisterBodyArgs": {
         "type": "object",
         "properties": {
@@ -2681,6 +3591,16 @@
           "password"
         ],
         "additionalProperties": false
+      },
+      "RegistrationConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether new users can register."
+          }
+        },
+        "additionalProperties": true
       },
       "UserCreateOwnerBodyArgs": {
         "type": "object",
@@ -2727,6 +3647,20 @@
         ],
         "additionalProperties": false
       },
+      "UserChangePasswordResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "A new JWT access token. Only present when users change their own password."
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "A new JWT refresh token. Only present when users change their own password."
+          }
+        },
+        "additionalProperties": false
+      },
       "UserResetPasswordBodyArgs": {
         "type": "object",
         "properties": {
@@ -2739,6 +3673,18 @@
           "new_password"
         ],
         "additionalProperties": false
+      },
+      "UserOIDCUnlink": {
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": "string",
+            "default": null,
+            "description": "The user's current password. Required to unlink their last OIDC account.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": true
       },
       "SearchResult": {
         "type": "object",
@@ -2799,12 +3745,54 @@
             "maxLength": 1000000,
             "description": "Serialized message history from a previous response's message_history_raw field. Preserves full tool call context across turns. Takes precedence over history when both are provided.",
             "nullable": true
+          },
+          "previous_proposal": {
+            "type": "string",
+            "default": null,
+            "enum": [
+              "applied",
+              "not_applied",
+              null
+            ],
+            "description": "'applied' if, since the last prompt, the user applied changes the assistant proposed in any earlier response. 'not_applied' if nothing was applied since the last prompt and the assistant's immediately preceding response had a proposal. Omit it otherwise.",
+            "nullable": true
+          },
+          "images": {
+            "type": "array",
+            "default": null,
+            "maxItems": 4,
+            "description": "Up to 4 JPEG, PNG, WebP or GIF images attached to the query, base64 encoded, optionally as data URLs. Only allowed if the server metadata reports chat_vision. Images are not kept in the returned message_history_raw.",
+            "items": {
+              "type": "string",
+              "maxLength": 13981113
+            },
+            "nullable": true
           }
         },
         "required": [
           "query"
         ],
         "additionalProperties": false
+      },
+      "ChatProposal": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "array",
+            "description": "Plain-language description of each change.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "transaction": {
+            "type": "array",
+            "description": "Dry run of all changes. Nothing has been written; to apply the changes, POST this to /transactions/, which rejects them if any object has been modified in the meantime.",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          }
+        },
+        "additionalProperties": true
       },
       "ChatResponse": {
         "type": "object",
@@ -2821,6 +3809,14 @@
           "message_history_raw": {
             "type": "string",
             "description": "Serialized full message history for multi-turn conversations. Pass back in subsequent requests as message_history_raw to preserve tool call context."
+          },
+          "proposal": {
+            "description": "Changes the assistant proposes, if any. Only present if the server allows write proposals and the user may add, edit and delete objects.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ChatProposal"
+              }
+            ]
           }
         },
         "additionalProperties": true
@@ -2848,6 +3844,10 @@
           "name": {
             "type": "string",
             "description": "Celery task function name, e.g. 'import_file'."
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle status: 'queued', 'running', 'succeeded', 'failed', 'lost' (abandoned after it stopped responding), or 'unknown' for tasks recorded before the status was tracked."
           },
           "created_at": {
             "type": "string",
@@ -2894,6 +3894,10 @@
           "name": {
             "type": "string",
             "description": "Celery task function name, e.g. 'import_file'."
+          },
+          "status": {
+            "type": "string",
+            "description": "Lifecycle status: 'queued', 'running', 'succeeded', 'failed', 'lost' (abandoned after it stopped responding), or 'unknown' for tasks recorded before the status was tracked."
           },
           "created_at": {
             "type": "string",
@@ -2984,6 +3988,7 @@
             }
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this citation, grouped by type.",
             "allOf": [
               {
@@ -3008,6 +4013,7 @@
             ]
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "gramps_id": {
@@ -3041,6 +4047,7 @@
             "description": "Private object indicator."
           },
           "profile": {
+            "readOnly": true,
             "description": "Optional summary of citation information.",
             "allOf": [
               {
@@ -3077,6 +4084,7 @@
             }
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this event, grouped by type.",
             "allOf": [
               {
@@ -3108,6 +4116,7 @@
             "description": "Description of the event."
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "gramps_id": {
@@ -3141,6 +4150,7 @@
             "description": "Private object indicator."
           },
           "profile": {
+            "readOnly": true,
             "description": "Optional summary of event information.",
             "allOf": [
               {
@@ -3213,6 +4223,7 @@
             }
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this family, grouped by type.",
             "allOf": [
               {
@@ -3246,6 +4257,7 @@
             }
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "father_handle": {
@@ -3290,6 +4302,7 @@
             "description": "Private object indicator."
           },
           "profile": {
+            "readOnly": true,
             "description": "Optional summary of family information.",
             "allOf": [
               {
@@ -3345,6 +4358,7 @@
             }
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this media item, grouped by type.",
             "allOf": [
               {
@@ -3380,6 +4394,7 @@
             "description": "Description of the media object content."
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "gramps_id": {
@@ -3410,6 +4425,7 @@
             "description": "Private object indicator."
           },
           "profile": {
+            "readOnly": true,
             "description": "Optional summary of media information.",
             "allOf": [
               {
@@ -3475,6 +4491,7 @@
             "description": "Object class name; must be 'Note'."
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this note, grouped by type.",
             "allOf": [
               {
@@ -3487,6 +4504,7 @@
             "description": "Unix timestamp of the last modification."
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "format": {
@@ -3631,6 +4649,7 @@
             }
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this place, grouped by type.",
             "allOf": [
               {
@@ -3654,6 +4673,7 @@
             "description": "Place code (e.g. postal code)."
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "gramps_id": {
@@ -3710,6 +4730,7 @@
             "description": "Private object indicator."
           },
           "profile": {
+            "readOnly": true,
             "description": "Optional summary of place information.",
             "allOf": [
               {
@@ -3738,6 +4759,40 @@
         },
         "additionalProperties": true
       },
+      "RepositoryProfile": {
+        "type": "object",
+        "properties": {
+          "addresses": {
+            "type": "array",
+            "description": "Addresses with formatted dates, parallel to address_list.",
+            "items": {
+              "$ref": "#/components/schemas/AddressProfile"
+            }
+          },
+          "gramps_id": {
+            "type": "string",
+            "description": "Alternate user-managed identifier for the repository."
+          },
+          "handle": {
+            "type": "string",
+            "description": "Unique handle for the repository."
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the repository."
+          },
+          "references": {
+            "type": "object",
+            "description": "References to this repository from other objects.",
+            "additionalProperties": {}
+          },
+          "type": {
+            "type": "string",
+            "description": "Localized type of repository."
+          }
+        },
+        "additionalProperties": true
+      },
       "Repository": {
         "type": "object",
         "properties": {
@@ -3753,6 +4808,7 @@
             }
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this repository, grouped by type.",
             "allOf": [
               {
@@ -3765,6 +4821,7 @@
             "description": "Unix timestamp of the last modification."
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "gramps_id": {
@@ -3789,6 +4846,14 @@
           "private": {
             "type": "boolean",
             "description": "Private object indicator."
+          },
+          "profile": {
+            "description": "Optional summary of repository information.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/RepositoryProfile"
+              }
+            ]
           },
           "tag_list": {
             "type": "array",
@@ -3863,6 +4928,7 @@
             "description": "Author of the source."
           },
           "backlinks": {
+            "readOnly": true,
             "description": "Objects referring to this source, grouped by type.",
             "allOf": [
               {
@@ -3875,6 +4941,7 @@
             "description": "Unix timestamp of the last modification."
           },
           "extended": {
+            "readOnly": true,
             "description": "Optional extended section with full referenced records."
           },
           "gramps_id": {
@@ -3904,6 +4971,7 @@
             "description": "Private object indicator."
           },
           "profile": {
+            "readOnly": true,
             "description": "Optional summary of source information.",
             "allOf": [
               {
@@ -4019,7 +5087,8 @@
         "summary": "Post the objects.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "post_objects"
       }
     },
     "/api/objects/delete/": {
@@ -4074,11 +5143,24 @@
         "summary": "Delete the objects.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "post_delete_objects"
       }
     },
     "/api/objects/delete-by-handle/": {
       "post": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "background",
+            "description": "If true and Celery is configured, delete the objects in the background and return HTTP 202. Use this for anything but a few objects.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          }
+        ],
         "responses": {
           "422": {
             "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
@@ -4113,7 +5195,61 @@
         "summary": "Delete the objects.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "post_delete_objects_by_handle"
+      }
+    },
+    "/api/objects/edit-by-handle/": {
+      "post": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "background",
+            "description": "If true and Celery is configured, edit the objects in the background and return HTTP 202. Use this for anything but a few objects.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditObjectsByHandleArgs"
+              }
+            }
+          }
+        },
+        "summary": "Edit the objects.",
+        "description": "Only objects that actually change are committed, so the returned\ntransaction lists the changed objects only.",
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "post_edit_objects_by_handle"
       }
     },
     "/api/transactions/": {
@@ -4152,7 +5288,7 @@
           {
             "in": "query",
             "name": "background",
-            "description": "If true, apply the transactions in the background and return HTTP 202.",
+            "description": "If true and Celery is configured, apply the transactions in the background and return HTTP 202. Use this for anything but a few objects.",
             "schema": {
               "type": "boolean",
               "default": false
@@ -4181,10 +5317,12 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post the transaction.",
+        "summary": "Replay a raw database transaction.",
+        "description": "Low-level endpoint for replaying transactions that are already\ninternally consistent: those recorded by Gramps itself (e.g. when\nsynchronizing a desktop database) or returned by this API (e.g. to undo\na change). Objects are written as given: they are not validated against\nthe schema, references between objects are not maintained (e.g. a\nfamily's members are not updated), and derived data such as a person's\nbirth and death indices is not recomputed. A malformed or inconsistent\ntransaction can therefore corrupt the tree.\n\nTo create, modify, or delete individual records, use the object\nendpoints (e.g. `POST /people/`) instead. Unless `force` is set, the\ntransaction is rejected if any object's `old` state no longer matches\nthe database. Set `background` for anything but a few objects.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "post_transactions"
       }
     },
     "/api/transactions/history/": {
@@ -4313,7 +5451,8 @@
         "summary": "Return a list of transactions.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "get_transactions_history"
       }
     },
     "/api/transactions/history/{transaction_id}": {
@@ -4361,7 +5500,8 @@
         "summary": "Return a single transaction.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "get_transaction_history"
       },
       "parameters": [
         {
@@ -4385,7 +5525,8 @@
         "summary": "Check if a transaction can be undone without conflicts.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "get_transaction_undo"
       },
       "post": {
         "parameters": [
@@ -4422,7 +5563,8 @@
         "summary": "Undo a transaction using background processing.",
         "tags": [
           "Transactions"
-        ]
+        ],
+        "operationId": "post_transaction_undo"
       },
       "parameters": [
         {
@@ -4432,6 +5574,132 @@
           "schema": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      ]
+    },
+    "/api/transactions/history/objects/{obj_class}/{obj_handle}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "old",
+            "description": "If true, include the raw object data before the change.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "new",
+            "description": "If true, include the raw object data after the change.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page number of the result subset to return. If omitted, all results are returned.",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "minimum": 1
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "pagesize",
+            "description": "Number of items per page when pagination is active.",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "description": "Sort order for changes. Use 'id' for ascending or '-id' for descending (by timestamp).",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "description": "Unix timestamp; if provided, return only changes committed before this time.",
+            "schema": {
+              "type": "number",
+              "default": null,
+              "nullable": true
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "description": "Unix timestamp; if provided, return only changes committed after this time.",
+            "schema": {
+              "type": "number",
+              "default": null,
+              "nullable": true
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ObjectChange"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Return the change history of a single object as a flat list of changes.",
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "get_object_history"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "obj_class",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "in": "path",
+          "name": "obj_handle",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
           }
         }
       ]
@@ -4469,7 +5737,8 @@
         "summary": "Post username and password to fetch a token.",
         "tags": [
           "Token"
-        ]
+        ],
+        "operationId": "post_token"
       }
     },
     "/api/token/refresh/": {
@@ -4492,7 +5761,46 @@
         "summary": "Fetch a new token.",
         "tags": [
           "Token"
-        ]
+        ],
+        "operationId": "post_token_refresh"
+      }
+    },
+    "/api/token/sync/": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenSync"
+              }
+            }
+          }
+        },
+        "summary": "Exchange a persistent sync token for a short-lived access token.",
+        "description": "Only an access token is returned, never a refresh token: clients\nexchange the sync token again when the access token expires. This\nworks even when local authentication is disabled, since only an\nauthenticated user can create a sync token.",
+        "tags": [
+          "Token"
+        ],
+        "operationId": "post_token_sync"
       }
     },
     "/api/token/create_owner/": {
@@ -4515,7 +5823,8 @@
         "summary": "Get a token.",
         "tags": [
           "Token"
-        ]
+        ],
+        "operationId": "get_token_create_owner"
       },
       "post": {
         "responses": {
@@ -4549,7 +5858,8 @@
         "summary": "Get a token.",
         "tags": [
           "Token"
-        ]
+        ],
+        "operationId": "post_token_create_owner"
       }
     },
     "/api/oidc/login/": {
@@ -4567,9 +5877,46 @@
           {
             "in": "query",
             "name": "tree",
-            "description": "ID of the tree to associate with the OIDC login. Required for multi-tree installations, optional in single-tree ones.",
+            "description": "ID of the tree to associate with the OIDC login. In multi-tree installations, required to create a new account, but not to log into an existing one. Optional in single-tree ones. Ignored when linking.",
             "schema": {
               "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "link",
+            "description": "Ticket from /oidc/link/. If given, the callback returns a code for linking the identity instead of logging in.",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "redirect_uri",
+            "description": "For native apps: an https URI (claimed link) where to send the login result instead of the frontend. Must exactly match an entry of OIDC_ALLOWED_REDIRECT_URIS and requires code_challenge. Ignored when linking.",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "code_challenge",
+            "description": "PKCE code challenge (RFC 7636) of the app. The exchange code is then only redeemed with the matching code_verifier.",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "code_challenge_method",
+            "description": "PKCE code challenge method; only S256.",
+            "schema": {
+              "type": "string",
+              "default": "S256"
             },
             "required": false
           }
@@ -4585,7 +5932,8 @@
         "summary": "Redirect to OIDC provider for authentication.",
         "tags": [
           "OIDC"
-        ]
+        ],
+        "operationId": "get_oidcloginresource"
       }
     },
     "/api/oidc/callback/": {
@@ -4667,7 +6015,8 @@
         "description": "Args:\nargs: Query parameters\nprovider_id: Provider ID from path parameter (if using path-based route)",
         "tags": [
           "OIDC"
-        ]
+        ],
+        "operationId": "get_oidccallbackresource"
       }
     },
     "/api/oidc/callback/{provider_id}": {
@@ -4749,7 +6098,8 @@
         "description": "Args:\nargs: Query parameters\nprovider_id: Provider ID from path parameter (if using path-based route)",
         "tags": [
           "OIDC"
-        ]
+        ],
+        "operationId": "get_oidccallbackresource_provider"
       },
       "parameters": [
         {
@@ -4783,7 +6133,8 @@
         "summary": "Get OIDC configuration for frontend.",
         "tags": [
           "OIDC"
-        ]
+        ],
+        "operationId": "get_oidcconfigresource"
       }
     },
     "/api/oidc/tokens/": {
@@ -4819,7 +6170,8 @@
         "summary": "Exchange the code from the login redirect for tokens.",
         "tags": [
           "OIDC"
-        ]
+        ],
+        "operationId": "post_oidctokenexchangeresource"
       }
     },
     "/api/oidc/logout/": {
@@ -4875,12 +6227,101 @@
         "description": "Returns the end_session_endpoint URL from the provider's OIDC discovery document.\nIf the provider doesn't support logout, returns None for graceful degradation.",
         "tags": [
           "OIDC"
-        ]
+        ],
+        "operationId": "get_oidclogoutresource"
+      }
+    },
+    "/api/oidc/link/": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OIDCLinkTicket"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OIDCLink"
+              }
+            }
+          }
+        },
+        "summary": "Return a ticket for linking a provider identity to the current user.",
+        "description": "Requires a fresh login. The client then navigates to\n/oidc/login/?provider=...&link=<ticket>. After the provider, the\ncallback redirects to the frontend's /oidc/complete page with\n`link_code=<code>` in the fragment, or `error=link_failed`; the client\npasses the code to /oidc/link/complete/ to make the link.",
+        "tags": [
+          "OIDC"
+        ],
+        "operationId": "post_oidclinkresource"
+      }
+    },
+    "/api/oidc/link/complete/": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OIDCLinked"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OIDCLinkComplete"
+              }
+            }
+          }
+        },
+        "summary": "Link the identity from the callback to the current user.",
+        "description": "Only the user the link ticket was issued to can complete it, so a ticket\nused in someone else's browser links nothing.",
+        "tags": [
+          "OIDC"
+        ],
+        "operationId": "post_oidclinkcompleteresource"
       }
     },
     "/api/people/{handle}/timeline": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "ancestors",
@@ -5196,7 +6637,8 @@
         "summary": "Get list of events in timeline for a person.",
         "tags": [
           "Timeline"
-        ]
+        ],
+        "operationId": "get_person_timeline"
       },
       "parameters": [
         {
@@ -5213,6 +6655,18 @@
     "/api/people/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -5423,10 +6877,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Person record",
         "tags": [
           "People"
-        ]
+        ],
+        "operationId": "get_person"
       },
       "put": {
         "responses": {
@@ -5434,10 +6889,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Person record",
         "tags": [
           "People"
-        ]
+        ],
+        "operationId": "put_person",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Person"
+              }
+            }
+          },
+          "description": "The Person object to store. The `_class` field is optional; if present it must be `Person`."
+        }
       },
       "delete": {
         "responses": {
@@ -5445,10 +6912,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Person record",
         "tags": [
           "People"
-        ]
+        ],
+        "operationId": "delete_person"
       },
       "parameters": [
         {
@@ -5513,7 +6981,8 @@
         "summary": "Get the DNA match data.",
         "tags": [
           "DNA"
-        ]
+        ],
+        "operationId": "get_person_dna_matches"
       },
       "parameters": [
         {
@@ -5576,7 +7045,8 @@
         "description": "The raw data is expected to be in a person attribute of type 'Y-DNA'\nin a format the yclade library understands.",
         "tags": [
           "DNA"
-        ]
+        ],
+        "operationId": "get_person_ydna"
       },
       "parameters": [
         {
@@ -5593,6 +7063,18 @@
     "/api/people/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -5679,26 +7161,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -5930,10 +7392,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps people with filters",
         "tags": [
           "People"
-        ]
+        ],
+        "operationId": "get_people"
       },
       "post": {
         "responses": {
@@ -5954,10 +7417,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Person record",
         "tags": [
           "People"
-        ]
+        ],
+        "operationId": "post_people",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Person"
+              }
+            }
+          },
+          "description": "The Person object to store. The `_class` field is optional; if present it must be `Person`."
+        }
       }
     },
     "/api/people/query/": {
@@ -5993,7 +7468,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "People"
-        ]
+        ],
+        "operationId": "post_people_query"
       }
     },
     "/api/people/{phoenix_handle}/merge/{titanic_handle}": {
@@ -6029,7 +7505,8 @@
         "summary": "Merge two people. Phoenix survives; titanic is deleted.",
         "tags": [
           "People"
-        ]
+        ],
+        "operationId": "post_merge_person"
       },
       "parameters": [
         {
@@ -6055,6 +7532,18 @@
     "/api/families/{handle}/timeline": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "dates",
@@ -6237,7 +7726,8 @@
         "summary": "Get list of events in timeline for a family.",
         "tags": [
           "Timeline"
-        ]
+        ],
+        "operationId": "get_family_timeline"
       },
       "parameters": [
         {
@@ -6254,6 +7744,18 @@
     "/api/families/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -6464,10 +7966,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Family record",
         "tags": [
           "Families"
-        ]
+        ],
+        "operationId": "get_family"
       },
       "put": {
         "responses": {
@@ -6475,10 +7978,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Family record",
         "tags": [
           "Families"
-        ]
+        ],
+        "operationId": "put_family",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Family"
+              }
+            }
+          },
+          "description": "The Family object to store. The `_class` field is optional; if present it must be `Family`."
+        }
       },
       "delete": {
         "responses": {
@@ -6486,10 +8001,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Family record",
         "tags": [
           "Families"
-        ]
+        ],
+        "operationId": "delete_family"
       },
       "parameters": [
         {
@@ -6506,6 +8022,18 @@
     "/api/families/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -6592,26 +8120,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -6843,10 +8351,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps families with filters",
         "tags": [
           "Families"
-        ]
+        ],
+        "operationId": "get_families"
       },
       "post": {
         "responses": {
@@ -6854,11 +8363,23 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Family record",
         "description": "The parent class's method is overridden since creating a Family object\nmodifies the family members' Person objects as well, so `PERM_EDIT_OBJ`\nis required.",
         "tags": [
           "Families"
-        ]
+        ],
+        "operationId": "post_families",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Family"
+              }
+            }
+          },
+          "description": "The Family object to store. The `_class` field is optional; if present it must be `Family`."
+        }
       }
     },
     "/api/families/query/": {
@@ -6894,7 +8415,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Families"
-        ]
+        ],
+        "operationId": "post_families_query"
       }
     },
     "/api/families/{phoenix_handle}/merge/{titanic_handle}": {
@@ -6930,7 +8452,8 @@
         "summary": "Merge two families. Phoenix survives; titanic is deleted.",
         "tags": [
           "Families"
-        ]
+        ],
+        "operationId": "post_merge_family"
       },
       "parameters": [
         {
@@ -7013,7 +8536,8 @@
         "summary": "Get the time span between two event dates.",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "get_event_span"
       },
       "parameters": [
         {
@@ -7039,6 +8563,18 @@
     "/api/events/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -7249,10 +8785,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Event record",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "get_event"
       },
       "put": {
         "responses": {
@@ -7260,10 +8797,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Event record",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "put_event",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              }
+            }
+          },
+          "description": "The Event object to store. The `_class` field is optional; if present it must be `Event`."
+        }
       },
       "delete": {
         "responses": {
@@ -7271,10 +8820,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Event record",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "delete_event"
       },
       "parameters": [
         {
@@ -7291,6 +8841,18 @@
     "/api/events/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -7377,26 +8939,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -7628,10 +9170,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps events with filters",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "get_events"
       },
       "post": {
         "responses": {
@@ -7652,10 +9195,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Event record",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "post_events",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              }
+            }
+          },
+          "description": "The Event object to store. The `_class` field is optional; if present it must be `Event`."
+        }
       }
     },
     "/api/events/query/": {
@@ -7691,7 +9246,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "post_events_query"
       }
     },
     "/api/events/{phoenix_handle}/merge/{titanic_handle}": {
@@ -7714,7 +9270,8 @@
         "summary": "Merge two objects. Phoenix survives; titanic is deleted.",
         "tags": [
           "Events"
-        ]
+        ],
+        "operationId": "post_merge_event"
       },
       "parameters": [
         {
@@ -7740,6 +9297,18 @@
     "/api/timelines/people/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "anchor",
@@ -8001,12 +9570,25 @@
         "summary": "Get consolidated list of events in timeline for a list of people.",
         "tags": [
           "Timeline"
-        ]
+        ],
+        "operationId": "get_timeline_people"
       }
     },
     "/api/timelines/families/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "dates",
@@ -8216,12 +9798,25 @@
         "summary": "Get consolidated list of events in timeline for a list of families.",
         "tags": [
           "Timeline"
-        ]
+        ],
+        "operationId": "get_timeline_families"
       }
     },
     "/api/places/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -8432,10 +10027,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Place record",
         "tags": [
           "Places"
-        ]
+        ],
+        "operationId": "get_place"
       },
       "put": {
         "responses": {
@@ -8443,10 +10039,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Place record",
         "tags": [
           "Places"
-        ]
+        ],
+        "operationId": "put_place",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Place"
+              }
+            }
+          },
+          "description": "The Place object to store. The `_class` field is optional; if present it must be `Place`."
+        }
       },
       "delete": {
         "responses": {
@@ -8454,10 +10062,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Place record",
         "tags": [
           "Places"
-        ]
+        ],
+        "operationId": "delete_place"
       },
       "parameters": [
         {
@@ -8474,6 +10083,18 @@
     "/api/places/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -8560,26 +10181,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -8811,10 +10412,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps places with filters",
         "tags": [
           "Places"
-        ]
+        ],
+        "operationId": "get_places"
       },
       "post": {
         "responses": {
@@ -8835,10 +10437,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Place record",
         "tags": [
           "Places"
-        ]
+        ],
+        "operationId": "post_places",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Place"
+              }
+            }
+          },
+          "description": "The Place object to store. The `_class` field is optional; if present it must be `Place`."
+        }
       }
     },
     "/api/places/query/": {
@@ -8874,7 +10488,35 @@
         "summary": "Run a structured query.",
         "tags": [
           "Places"
-        ]
+        ],
+        "operationId": "post_places_query"
+      }
+    },
+    "/api/places/coordinates/": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaceCoordinates"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Get the name and coordinates of all places, in no particular order.",
+        "tags": [
+          "Places"
+        ],
+        "operationId": "get_places_coordinates"
       }
     },
     "/api/places/{phoenix_handle}/merge/{titanic_handle}": {
@@ -8897,7 +10539,8 @@
         "summary": "Merge two objects. Phoenix survives; titanic is deleted.",
         "tags": [
           "Places"
-        ]
+        ],
+        "operationId": "post_merge_place"
       },
       "parameters": [
         {
@@ -8923,6 +10566,18 @@
     "/api/citations/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -9133,10 +10788,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Citation record",
         "tags": [
           "Citations"
-        ]
+        ],
+        "operationId": "get_citation"
       },
       "put": {
         "responses": {
@@ -9144,10 +10800,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Citation record",
         "tags": [
           "Citations"
-        ]
+        ],
+        "operationId": "put_citation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Citation"
+              }
+            }
+          },
+          "description": "The Citation object to store. The `_class` field is optional; if present it must be `Citation`."
+        }
       },
       "delete": {
         "responses": {
@@ -9155,10 +10823,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Citation record",
         "tags": [
           "Citations"
-        ]
+        ],
+        "operationId": "delete_citation"
       },
       "parameters": [
         {
@@ -9175,6 +10844,18 @@
     "/api/citations/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -9261,26 +10942,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -9512,10 +11173,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps citations with filters",
         "tags": [
           "Citations"
-        ]
+        ],
+        "operationId": "get_citations"
       },
       "post": {
         "responses": {
@@ -9536,10 +11198,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Citation record",
         "tags": [
           "Citations"
-        ]
+        ],
+        "operationId": "post_citations",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Citation"
+              }
+            }
+          },
+          "description": "The Citation object to store. The `_class` field is optional; if present it must be `Citation`."
+        }
       }
     },
     "/api/citations/query/": {
@@ -9575,7 +11249,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Citations"
-        ]
+        ],
+        "operationId": "post_citations_query"
       }
     },
     "/api/citations/{phoenix_handle}/merge/{titanic_handle}": {
@@ -9598,7 +11273,8 @@
         "summary": "Merge two objects. Phoenix survives; titanic is deleted.",
         "tags": [
           "Citations"
-        ]
+        ],
+        "operationId": "post_merge_citation"
       },
       "parameters": [
         {
@@ -9624,6 +11300,18 @@
     "/api/sources/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -9834,10 +11522,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Source record",
         "tags": [
           "Sources"
-        ]
+        ],
+        "operationId": "get_source"
       },
       "put": {
         "responses": {
@@ -9845,10 +11534,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Source record",
         "tags": [
           "Sources"
-        ]
+        ],
+        "operationId": "put_source",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Source"
+              }
+            }
+          },
+          "description": "The Source object to store. The `_class` field is optional; if present it must be `Source`."
+        }
       },
       "delete": {
         "responses": {
@@ -9856,10 +11557,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Source record",
         "tags": [
           "Sources"
-        ]
+        ],
+        "operationId": "delete_source"
       },
       "parameters": [
         {
@@ -9876,6 +11578,18 @@
     "/api/sources/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -9962,26 +11676,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -10213,10 +11907,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps sources with filters",
         "tags": [
           "Sources"
-        ]
+        ],
+        "operationId": "get_sources"
       },
       "post": {
         "responses": {
@@ -10237,10 +11932,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Source record",
         "tags": [
           "Sources"
-        ]
+        ],
+        "operationId": "post_sources",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Source"
+              }
+            }
+          },
+          "description": "The Source object to store. The `_class` field is optional; if present it must be `Source`."
+        }
       }
     },
     "/api/sources/query/": {
@@ -10276,7 +11983,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Sources"
-        ]
+        ],
+        "operationId": "post_sources_query"
       }
     },
     "/api/sources/{phoenix_handle}/merge/{titanic_handle}": {
@@ -10299,7 +12007,8 @@
         "summary": "Merge two objects. Phoenix survives; titanic is deleted.",
         "tags": [
           "Sources"
-        ]
+        ],
+        "operationId": "post_merge_source"
       },
       "parameters": [
         {
@@ -10325,6 +12034,18 @@
     "/api/repositories/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -10535,10 +12256,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Repository record",
         "tags": [
           "Repositories"
-        ]
+        ],
+        "operationId": "get_repository"
       },
       "put": {
         "responses": {
@@ -10546,10 +12268,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Repository record",
         "tags": [
           "Repositories"
-        ]
+        ],
+        "operationId": "put_repository",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Repository"
+              }
+            }
+          },
+          "description": "The Repository object to store. The `_class` field is optional; if present it must be `Repository`."
+        }
       },
       "delete": {
         "responses": {
@@ -10557,10 +12291,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Repository record",
         "tags": [
           "Repositories"
-        ]
+        ],
+        "operationId": "delete_repository"
       },
       "parameters": [
         {
@@ -10577,6 +12312,18 @@
     "/api/repositories/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -10663,26 +12410,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -10914,10 +12641,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps repositories with filters",
         "tags": [
           "Repositories"
-        ]
+        ],
+        "operationId": "get_repositories"
       },
       "post": {
         "responses": {
@@ -10938,10 +12666,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Repository record",
         "tags": [
           "Repositories"
-        ]
+        ],
+        "operationId": "post_repositories",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Repository"
+              }
+            }
+          },
+          "description": "The Repository object to store. The `_class` field is optional; if present it must be `Repository`."
+        }
       }
     },
     "/api/repositories/query/": {
@@ -10977,7 +12717,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Repositories"
-        ]
+        ],
+        "operationId": "post_repositories_query"
       }
     },
     "/api/repositories/{phoenix_handle}/merge/{titanic_handle}": {
@@ -11000,7 +12741,8 @@
         "summary": "Merge two objects. Phoenix survives; titanic is deleted.",
         "tags": [
           "Repositories"
-        ]
+        ],
+        "operationId": "post_merge_repository"
       },
       "parameters": [
         {
@@ -11026,6 +12768,18 @@
     "/api/media/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -11236,10 +12990,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Media record",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "get_media_object"
       },
       "put": {
         "responses": {
@@ -11247,10 +13002,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Media record",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "put_media_object",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Media"
+              }
+            }
+          },
+          "description": "The Media object to store. The `_class` field is optional; if present it must be `Media`."
+        }
       },
       "delete": {
         "responses": {
@@ -11258,10 +13025,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Media record",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "delete_media_object"
       },
       "parameters": [
         {
@@ -11278,6 +13046,18 @@
     "/api/media/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -11364,26 +13144,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -11615,10 +13375,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps media objects with filters",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "get_media_objects"
       },
       "post": {
         "responses": {
@@ -11626,10 +13387,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Media record",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "post_media_objects"
       }
     },
     "/api/media/query/": {
@@ -11665,7 +13427,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "post_media_query"
       }
     },
     "/api/media/{phoenix_handle}/merge/{titanic_handle}": {
@@ -11688,7 +13451,8 @@
         "summary": "Merge two objects. Phoenix survives; titanic is deleted.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "post_merge_media"
       },
       "parameters": [
         {
@@ -11714,6 +13478,18 @@
     "/api/notes/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -11924,10 +13700,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Note record",
         "tags": [
           "Notes"
-        ]
+        ],
+        "operationId": "get_note"
       },
       "put": {
         "responses": {
@@ -11935,10 +13712,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Note record",
         "tags": [
           "Notes"
-        ]
+        ],
+        "operationId": "put_note",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Note"
+              }
+            }
+          },
+          "description": "The Note object to store. The `_class` field is optional; if present it must be `Note`."
+        }
       },
       "delete": {
         "responses": {
@@ -11946,10 +13735,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Note record",
         "tags": [
           "Notes"
-        ]
+        ],
+        "operationId": "delete_note"
       },
       "parameters": [
         {
@@ -11966,6 +13756,18 @@
     "/api/notes/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -12052,26 +13854,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -12303,10 +14085,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps notes with filters",
         "tags": [
           "Notes"
-        ]
+        ],
+        "operationId": "get_notes"
       },
       "post": {
         "responses": {
@@ -12327,10 +14110,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Note record",
         "tags": [
           "Notes"
-        ]
+        ],
+        "operationId": "post_notes",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Note"
+              }
+            }
+          },
+          "description": "The Note object to store. The `_class` field is optional; if present it must be `Note`."
+        }
       }
     },
     "/api/notes/query/": {
@@ -12366,7 +14161,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Notes"
-        ]
+        ],
+        "operationId": "post_notes_query"
       }
     },
     "/api/notes/{phoenix_handle}/merge/{titanic_handle}": {
@@ -12389,7 +14185,8 @@
         "summary": "Merge two objects. Phoenix survives; titanic is deleted.",
         "tags": [
           "Notes"
-        ]
+        ],
+        "operationId": "post_merge_note"
       },
       "parameters": [
         {
@@ -12415,6 +14212,18 @@
     "/api/tags/{handle}": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -12625,10 +14434,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get the object.",
+        "summary": "Get a Gramps Tag record",
         "tags": [
           "Tags"
-        ]
+        ],
+        "operationId": "get_tag"
       },
       "put": {
         "responses": {
@@ -12636,10 +14446,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Modify an existing object.",
+        "summary": "Update a Gramps Tag record",
         "tags": [
           "Tags"
-        ]
+        ],
+        "operationId": "put_tag",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Tag"
+              }
+            }
+          },
+          "description": "The Tag object to store. The `_class` field is optional; if present it must be `Tag`."
+        }
       },
       "delete": {
         "responses": {
@@ -12647,10 +14469,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Delete the object.",
+        "summary": "Delete a Gramps Tag record",
         "tags": [
           "Tags"
-        ]
+        ],
+        "operationId": "delete_tag"
       },
       "parameters": [
         {
@@ -12667,6 +14490,18 @@
     "/api/tags/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "backlinks",
@@ -12753,26 +14588,6 @@
             "in": "query",
             "name": "format_options",
             "description": "Options for media format processing.",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "gql",
-            "description": "A Gramps QL query string used to filter the objects (e.g. 'media_list.length >= 10').",
-            "schema": {
-              "type": "string",
-              "minLength": 1
-            },
-            "required": false
-          },
-          {
-            "in": "query",
-            "name": "oql",
-            "description": "An Object QL query string used to filter the objects.",
             "schema": {
               "type": "string",
               "minLength": 1
@@ -13004,10 +14819,11 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Get all objects.",
+        "summary": "List Gramps tags with filters",
         "tags": [
           "Tags"
-        ]
+        ],
+        "operationId": "get_tags"
       },
       "post": {
         "responses": {
@@ -13028,10 +14844,22 @@
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Post a new object.",
+        "summary": "Create a Gramps Tag record",
         "tags": [
           "Tags"
-        ]
+        ],
+        "operationId": "post_tags",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Tag"
+              }
+            }
+          },
+          "description": "The Tag object to store. The `_class` field is optional; if present it must be `Tag`."
+        }
       }
     },
     "/api/tags/query/": {
@@ -13067,7 +14895,8 @@
         "summary": "Run a structured query.",
         "tags": [
           "Tags"
-        ]
+        ],
+        "operationId": "post_tags_query"
       }
     },
     "/api/trees/{tree_id}": {
@@ -13090,7 +14919,8 @@
         "summary": "Get info about a tree.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "get_tree"
       },
       "put": {
         "responses": {
@@ -13114,7 +14944,8 @@
         "summary": "Modify a tree.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "put_tree"
       },
       "parameters": [
         {
@@ -13151,7 +14982,8 @@
         "summary": "Get info about all trees.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "get_trees"
       },
       "post": {
         "responses": {
@@ -13185,7 +15017,8 @@
         "summary": "Create a new tree.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "post_trees"
       }
     },
     "/api/trees/{tree_id}/disable": {
@@ -13198,7 +15031,8 @@
         "summary": "Disable a tree.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "post_disable_tree"
       },
       "parameters": [
         {
@@ -13222,7 +15056,8 @@
         "summary": "Disable a tree.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "post_enable_tree"
       },
       "parameters": [
         {
@@ -13246,7 +15081,8 @@
         "summary": "Check & repair a Gramps database (tree).",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "post_repair_tree"
       },
       "parameters": [
         {
@@ -13270,7 +15106,8 @@
         "summary": "Upgrade the schema of a Gramps database (tree).",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "post_migrate_tree"
       },
       "parameters": [
         {
@@ -13304,7 +15141,8 @@
         "summary": "Get the per-tree configuration blob.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "get_tree_config"
       },
       "put": {
         "responses": {
@@ -13338,7 +15176,8 @@
         "summary": "Replace the per-tree configuration blob.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "put_tree_config"
       },
       "parameters": [
         {
@@ -13366,7 +15205,8 @@
         "summary": "Return list of values for the custom type.",
         "tags": [
           "Types"
-        ]
+        ],
+        "operationId": "get_custom_type"
       },
       "parameters": [
         {
@@ -13404,7 +15244,8 @@
         "summary": "Return a list of available custom types.",
         "tags": [
           "Types"
-        ]
+        ],
+        "operationId": "get_custom_types"
       }
     },
     "/api/types/default/{datatype}/map": {
@@ -13431,7 +15272,8 @@
         "summary": "Return the map for a default type.",
         "tags": [
           "Types"
-        ]
+        ],
+        "operationId": "get_default_type_map"
       },
       "parameters": [
         {
@@ -13470,7 +15312,8 @@
         "summary": "Return a list of values for a default type.",
         "tags": [
           "Types"
-        ]
+        ],
+        "operationId": "get_default_type"
       },
       "parameters": [
         {
@@ -13519,7 +15362,8 @@
         "summary": "Return a list of available default types.",
         "tags": [
           "Types"
-        ]
+        ],
+        "operationId": "get_default_types"
       }
     },
     "/api/types/": {
@@ -13557,7 +15401,8 @@
         "summary": "Return list of values for the custom type.",
         "tags": [
           "Types"
-        ]
+        ],
+        "operationId": "get_types"
       }
     },
     "/api/name-formats/": {
@@ -13583,7 +15428,8 @@
         "summary": "Get list of name formats.",
         "tags": [
           "Name Formats"
-        ]
+        ],
+        "operationId": "get_name_formats"
       }
     },
     "/api/name-groups/{surname}/{group}": {
@@ -13609,7 +15455,8 @@
         "summary": "Get list of name group mappings.",
         "tags": [
           "Name Groups"
-        ]
+        ],
+        "operationId": "get_set_name_group"
       },
       "post": {
         "responses": {
@@ -13630,7 +15477,8 @@
         "summary": "Set a name group mapping.",
         "tags": [
           "Name Groups"
-        ]
+        ],
+        "operationId": "post_set_name_group"
       },
       "parameters": [
         {
@@ -13676,7 +15524,8 @@
         "summary": "Get list of name group mappings.",
         "tags": [
           "Name Groups"
-        ]
+        ],
+        "operationId": "get_get_name_group"
       },
       "post": {
         "responses": {
@@ -13697,7 +15546,8 @@
         "summary": "Set a name group mapping.",
         "tags": [
           "Name Groups"
-        ]
+        ],
+        "operationId": "post_get_name_group"
       },
       "parameters": [
         {
@@ -13734,7 +15584,8 @@
         "summary": "Get list of name group mappings.",
         "tags": [
           "Name Groups"
-        ]
+        ],
+        "operationId": "get_name_groups"
       },
       "post": {
         "responses": {
@@ -13755,7 +15606,8 @@
         "summary": "Set a name group mapping.",
         "tags": [
           "Name Groups"
-        ]
+        ],
+        "operationId": "post_name_groups"
       }
     },
     "/api/bookmarks/{namespace}": {
@@ -13785,7 +15637,8 @@
         "summary": "Get list of bookmarks by namespace.",
         "tags": [
           "Bookmarks"
-        ]
+        ],
+        "operationId": "get_bookmark"
       },
       "parameters": [
         {
@@ -13823,7 +15676,8 @@
         "summary": "Get the list of bookmark types.",
         "tags": [
           "Bookmarks"
-        ]
+        ],
+        "operationId": "get_bookmarks"
       }
     },
     "/api/bookmarks/{namespace}/{handle}": {
@@ -13836,7 +15690,8 @@
         "summary": "Create a bookmark.",
         "tags": [
           "Bookmarks"
-        ]
+        ],
+        "operationId": "put_bookmark_edit"
       },
       "delete": {
         "responses": {
@@ -13846,7 +15701,8 @@
         },
         "tags": [
           "Bookmarks"
-        ]
+        ],
+        "operationId": "delete_bookmark_edit"
       },
       "parameters": [
         {
@@ -13889,7 +15745,8 @@
         "summary": "Get a custom filter.",
         "tags": [
           "Filters"
-        ]
+        ],
+        "operationId": "get_filter"
       },
       "delete": {
         "parameters": [
@@ -13916,7 +15773,8 @@
         "summary": "Delete a custom filter.",
         "tags": [
           "Filters"
-        ]
+        ],
+        "operationId": "delete_filter"
       },
       "parameters": [
         {
@@ -13971,6 +15829,19 @@
             "required": false,
             "explode": false,
             "style": "form"
+          },
+          {
+            "in": "query",
+            "name": "locale",
+            "description": "Language code of the locale to use for the names, descriptions, categories, labels and option labels of rules. Unknown or omitted codes fall back to English.",
+            "schema": {
+              "type": "string",
+              "default": null,
+              "minLength": 1,
+              "maxLength": 5,
+              "nullable": true
+            },
+            "required": false
           }
         ],
         "responses": {
@@ -13994,7 +15865,8 @@
         "summary": "Get available custom filters and rules.",
         "tags": [
           "Filters"
-        ]
+        ],
+        "operationId": "get_filters_namespace"
       },
       "post": {
         "responses": {
@@ -14018,7 +15890,8 @@
         "summary": "Create a custom filter.",
         "tags": [
           "Filters"
-        ]
+        ],
+        "operationId": "post_filters_namespace"
       },
       "put": {
         "responses": {
@@ -14042,7 +15915,8 @@
         "summary": "Update a custom filter.",
         "tags": [
           "Filters"
-        ]
+        ],
+        "operationId": "put_filters_namespace"
       },
       "parameters": [
         {
@@ -14058,7 +15932,21 @@
     },
     "/api/filters/": {
       "get": {
-        "parameters": [],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "locale",
+            "description": "Language code of the locale to use for the names, descriptions, categories, labels and option labels of rules. Unknown or omitted codes fall back to English.",
+            "schema": {
+              "type": "string",
+              "default": null,
+              "minLength": 1,
+              "maxLength": 5,
+              "nullable": true
+            },
+            "required": false
+          }
+        ],
         "responses": {
           "422": {
             "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
@@ -14080,7 +15968,8 @@
         "summary": "Get available custom filters and rules.",
         "tags": [
           "Filters"
-        ]
+        ],
+        "operationId": "get_filters"
       }
     },
     "/api/translations/{language}": {
@@ -14120,7 +16009,8 @@
         "summary": "Get translation.",
         "tags": [
           "Translations"
-        ]
+        ],
+        "operationId": "get_translation"
       },
       "post": {
         "responses": {
@@ -14157,7 +16047,8 @@
         "summary": "Get translation for posted strings.",
         "tags": [
           "Translations"
-        ]
+        ],
+        "operationId": "post_translation"
       },
       "parameters": [
         {
@@ -14227,7 +16118,8 @@
         "summary": "Get available translations.",
         "tags": [
           "Translations"
-        ]
+        ],
+        "operationId": "get_translations"
       }
     },
     "/api/parsers/dna-match": {
@@ -14266,7 +16158,8 @@
         "summary": "Parse DNA match string.",
         "tags": [
           "DNA"
-        ]
+        ],
+        "operationId": "post_dna_match_parser"
       }
     },
     "/api/relations/{handle1}/{handle2}": {
@@ -14318,7 +16211,8 @@
         "summary": "Get the most direct relationship between two people.",
         "tags": [
           "Relations"
-        ]
+        ],
+        "operationId": "get_relation"
       },
       "parameters": [
         {
@@ -14393,7 +16287,108 @@
         "summary": "Get all possible relationships between two people.",
         "tags": [
           "Relations"
-        ]
+        ],
+        "operationId": "get_relations"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "handle1",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "in": "path",
+          "name": "handle2",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/api/relations/{handle1}/{handle2}/paths": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "depth",
+            "description": "Maximum number of links in a path (default 10, at most 15).",
+            "schema": {
+              "type": "integer",
+              "default": 10,
+              "minimum": 1,
+              "maximum": 15
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "max",
+            "description": "Maximum number of paths to return (default 5, at most 50).",
+            "schema": {
+              "type": "integer",
+              "default": 5,
+              "minimum": 1,
+              "maximum": 50
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "blood_only",
+            "description": "Only return paths that go up to a common ancestor and down again (default false).",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "locale",
+            "description": "Language code of the locale to use where applicable. Must be a valid code from the available translations.",
+            "schema": {
+              "type": "string",
+              "default": null,
+              "minLength": 1,
+              "maxLength": 5,
+              "nullable": true
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RelationshipPath"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Get the chains of family links between two people, shortest first.",
+        "description": "Each step of a path is a person, how they are linked to the person\nbefore them, and their relationship to the first person, which is\nnull when it has no name, for example through two marriages.",
+        "tags": [
+          "Relations"
+        ],
+        "operationId": "get_relation_paths"
       },
       "parameters": [
         {
@@ -14419,6 +16414,18 @@
     "/api/living/{handle}/dates": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "average_generation_gap",
@@ -14490,7 +16497,8 @@
         "summary": "Determine estimated birth and death dates.",
         "tags": [
           "Living"
-        ]
+        ],
+        "operationId": "get_living_dates"
       },
       "parameters": [
         {
@@ -14565,7 +16573,8 @@
         "summary": "Determine if person alive.",
         "tags": [
           "Living"
-        ]
+        ],
+        "operationId": "get_living"
       },
       "parameters": [
         {
@@ -14626,7 +16635,8 @@
         "summary": "Get specific report attributes.",
         "tags": [
           "Reports"
-        ]
+        ],
+        "operationId": "get_report_file"
       },
       "post": {
         "parameters": [
@@ -14674,7 +16684,8 @@
         "summary": "Create the report.",
         "tags": [
           "Reports"
-        ]
+        ],
+        "operationId": "post_report_file"
       },
       "parameters": [
         {
@@ -14723,7 +16734,8 @@
         "summary": "Get specific report attributes.",
         "tags": [
           "Reports"
-        ]
+        ],
+        "operationId": "get_report"
       },
       "parameters": [
         {
@@ -14775,7 +16787,8 @@
         "summary": "Get all available report attributes.",
         "tags": [
           "Reports"
-        ]
+        ],
+        "operationId": "get_reports"
       }
     },
     "/api/reports/{report_id}/file/processed/{filename}": {
@@ -14788,7 +16801,8 @@
         "summary": "Get the processed file.",
         "tags": [
           "Reports"
-        ]
+        ],
+        "operationId": "get_report_file_result"
       },
       "parameters": [
         {
@@ -14926,7 +16940,8 @@
         "summary": "Get statistics from records.",
         "tags": [
           "Facts"
-        ]
+        ],
+        "operationId": "get_facts"
       }
     },
     "/api/exporters/{extension}/file": {
@@ -15167,7 +17182,8 @@
         "summary": "Get export file.",
         "tags": [
           "Exporters"
-        ]
+        ],
+        "operationId": "get_exporter_file"
       },
       "post": {
         "parameters": [
@@ -15399,6 +17415,16 @@
           "422": {
             "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
           },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportResult"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
@@ -15406,7 +17432,8 @@
         "summary": "Create the export.",
         "tags": [
           "Exporters"
-        ]
+        ],
+        "operationId": "post_exporter_file"
       },
       "parameters": [
         {
@@ -15430,7 +17457,8 @@
         "summary": "Get the processed file.",
         "tags": [
           "Exporters"
-        ]
+        ],
+        "operationId": "get_exporter_file_result"
       },
       "parameters": [
         {
@@ -15477,7 +17505,8 @@
         "summary": "Get specific report attributes.",
         "tags": [
           "Exporters"
-        ]
+        ],
+        "operationId": "get_exporter"
       },
       "parameters": [
         {
@@ -15518,7 +17547,8 @@
         "summary": "Get all available exporter attributes.",
         "tags": [
           "Exporters"
-        ]
+        ],
+        "operationId": "get_exporters"
       }
     },
     "/api/importers/{extension}/file": {
@@ -15549,11 +17579,21 @@
             "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
           },
           "200": {
-            "description": "OK",
+            "description": "Dry run result.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ObjectCounts"
+                  "$ref": "#/components/schemas/ImportResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResult"
                 }
               }
             }
@@ -15565,7 +17605,8 @@
         "summary": "Import file.",
         "tags": [
           "Importers"
-        ]
+        ],
+        "operationId": "post_importer_file"
       },
       "parameters": [
         {
@@ -15623,7 +17664,8 @@
         "summary": "Reset the tree to match an uploaded backup, replacing its contents.",
         "tags": [
           "Importers"
-        ]
+        ],
+        "operationId": "post_restore_file"
       },
       "parameters": [
         {
@@ -15661,7 +17703,8 @@
         "summary": "Get specific report attributes.",
         "tags": [
           "Importers"
-        ]
+        ],
+        "operationId": "get_importer"
       },
       "parameters": [
         {
@@ -15702,8 +17745,271 @@
         "summary": "Get all available importer attributes.",
         "tags": [
           "Importers"
-        ]
+        ],
+        "operationId": "get_importers"
       }
+    },
+    "/api/backups/": {
+      "get": {
+        "parameters": [],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Backup"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "List the tree's stored backups, newest first.",
+        "tags": [
+          "Backups"
+        ],
+        "operationId": "get_backups"
+      },
+      "post": {
+        "parameters": [],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backup"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Create a stored backup of the tree.",
+        "description": "The oldest backups beyond the number the server keeps per tree are\ndeleted.",
+        "tags": [
+          "Backups"
+        ],
+        "operationId": "post_backups"
+      }
+    },
+    "/api/backups/restore": {
+      "post": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "jwt",
+            "description": "JWT token for upload authentication.",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "dry_run",
+            "description": "If true, return what the restore would change without changing anything.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "data",
+            "description": "If true (default), reset the family tree data to the backup's.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "tree_settings",
+            "description": "If true (default), replace the tree settings with the backup's.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "users",
+            "description": "If true (default), add the backup's users that don't exist yet.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupRestoreResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Restore the selected parts of the tree from an uploaded backup archive.",
+        "tags": [
+          "Backups"
+        ],
+        "operationId": "post_backup_upload_restore"
+      }
+    },
+    "/api/backups/{backup_id}": {
+      "get": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Download a stored backup archive.",
+        "tags": [
+          "Backups"
+        ],
+        "operationId": "get_backup"
+      },
+      "delete": {
+        "responses": {
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Delete a stored backup.",
+        "tags": [
+          "Backups"
+        ],
+        "operationId": "delete_backup"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "backup_id",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/api/backups/{backup_id}/restore": {
+      "post": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "jwt",
+            "description": "JWT token for upload authentication.",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "dry_run",
+            "description": "If true, return what the restore would change without changing anything.",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "data",
+            "description": "If true (default), reset the family tree data to the backup's.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "tree_settings",
+            "description": "If true (default), replace the tree settings with the backup's.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "users",
+            "description": "If true (default), add the backup's users that don't exist yet.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupRestoreResult"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Restore the selected parts of the tree from a stored backup.",
+        "tags": [
+          "Backups"
+        ],
+        "operationId": "post_backup_restore"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "backup_id",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
     },
     "/api/holidays/{country}/{year}/{month}/{day}": {
       "get": {
@@ -15732,7 +18038,8 @@
         "summary": "If the given day is a holiday return the name or names.",
         "tags": [
           "Holidays"
-        ]
+        ],
+        "operationId": "get_holiday"
       },
       "parameters": [
         {
@@ -15800,7 +18107,8 @@
         "summary": "Get list of countries that have holiday calendars.",
         "tags": [
           "Holidays"
-        ]
+        ],
+        "operationId": "get_holidays"
       }
     },
     "/api/metadata/": {
@@ -15838,7 +18146,8 @@
         "summary": "Get active database and application related metadata information.",
         "tags": [
           "Metadata"
-        ]
+        ],
+        "operationId": "get_metadata"
       }
     },
     "/api/metadata/researcher/": {
@@ -15861,7 +18170,8 @@
         "summary": "Get the researcher information.",
         "tags": [
           "Metadata"
-        ]
+        ],
+        "operationId": "get_metadata_researcher"
       },
       "put": {
         "responses": {
@@ -15895,12 +18205,50 @@
         "summary": "Update the researcher information.",
         "tags": [
           "Metadata"
-        ]
+        ],
+        "operationId": "put_metadata_researcher"
+      }
+    },
+    "/api/metadata/server/": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataServer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Get application related metadata that does not depend on a tree.",
+        "description": "Unlike /metadata/, this also works for a token without a tree, e.g.\nfor a site admin who is not tied to a tree.",
+        "tags": [
+          "Metadata"
+        ],
+        "operationId": "get_metadata_server"
       }
     },
     "/api/anniversaries.ics": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "token",
@@ -15914,9 +18262,10 @@
           {
             "in": "query",
             "name": "event_types",
-            "description": "Comma-delimited event type names to include.",
+            "description": "Comma-delimited event type names, matched case-insensitively against Gramps names and translations for the requested locale. Use 'all' by itself to include every event type.",
             "schema": {
               "type": "array",
+              "minItems": 1,
               "items": {
                 "type": "string",
                 "minLength": 1
@@ -15925,6 +18274,26 @@
             "required": false,
             "explode": false,
             "style": "form"
+          },
+          {
+            "in": "query",
+            "name": "living_only",
+            "description": "Exclude death events and include non-death personal events only for living people; personal marriage events are excluded. Include non-death family events only when both spouses are known and living.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "primary_participants_only",
+            "description": "Exclude secondary participant roles.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            },
+            "required": false
           },
           {
             "in": "query",
@@ -15946,20 +18315,90 @@
               "maximum": 9
             },
             "required": false
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "description": "Saved Gramps Event filter name.",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "rules",
+            "description": "Gramps Event filter rules as JSON.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "person_filter",
+            "description": "Saved Gramps Person filter name.",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "person_rules",
+            "description": "Gramps Person filter rules as JSON.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16384
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "locale",
+            "description": "Language code used for calendar names and event text.",
+            "schema": {
+              "type": "string",
+              "default": null,
+              "minLength": 1,
+              "maxLength": 5,
+              "nullable": true
+            },
+            "required": false
           }
         ],
         "responses": {
           "422": {
             "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
           },
+          "304": {
+            "description": "Calendar unchanged"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/calendar": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
           "default": {
             "$ref": "#/components/responses/DEFAULT_ERROR"
           }
         },
-        "summary": "Return anniversaries in ICS format.",
+        "summary": "Return exact anniversaries recurring from last year onward.",
+        "description": "A yearless date uses the recurrence start year only as DTSTART and is\nomitted from the localized event description.",
         "tags": [
           "Anniversaries"
-        ]
+        ],
+        "operationId": "get_anniversaries_ics"
       }
     },
     "/api/users/": {
@@ -15976,6 +18415,52 @@
               "nullable": true
             },
             "required": false
+          },
+          {
+            "in": "query",
+            "name": "tree",
+            "description": "Filter to the users of a single tree by its tree ID. Filtering by a tree other than one's own requires site admin permissions.",
+            "schema": {
+              "type": "string",
+              "default": null,
+              "nullable": true
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "description": "Filter to users having any of these integer role IDs, e.g. `-2,-1` for unconfirmed and disabled accounts.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            },
+            "required": false,
+            "explode": false,
+            "style": "form"
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "description": "Page number of the result subset to return. If omitted, all results are returned.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": false
+          },
+          {
+            "in": "query",
+            "name": "pagesize",
+            "description": "Number of users per page when pagination is active.",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1
+            },
+            "required": false
           }
         ],
         "responses": {
@@ -15989,7 +18474,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Schema"
+                    "$ref": "#/components/schemas/User"
                   }
                 }
               }
@@ -16002,7 +18487,8 @@
         "summary": "Get users' details.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "get_users"
       },
       "post": {
         "responses": {
@@ -16013,7 +18499,8 @@
         "summary": "Add one or more users.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_users"
       }
     },
     "/api/users/{user_name}/": {
@@ -16024,7 +18511,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Schema"
+                  "$ref": "#/components/schemas/User"
                 }
               }
             }
@@ -16036,7 +18523,8 @@
         "summary": "Get a user's details.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "get_user"
       },
       "post": {
         "responses": {
@@ -16059,7 +18547,8 @@
         },
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_user"
       },
       "put": {
         "responses": {
@@ -16081,9 +18570,11 @@
           }
         },
         "summary": "Update a user's details.",
+        "description": "With `password`, sets another user's password without their old one,\nfor example a service account's, and ends all of their sessions. The\nresponse never carries the password.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "put_user"
       },
       "delete": {
         "responses": {
@@ -16094,7 +18585,8 @@
         "summary": "Delete a user.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "delete_user"
       },
       "parameters": [
         {
@@ -16107,6 +18599,86 @@
           }
         }
       ]
+    },
+    "/api/users/-/push-subscriptions/": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSubscriptionConfig"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Get the VAPID public key without exposing subscription endpoints.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "get_user_push_subscriptions"
+      },
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionBody"
+              }
+            }
+          }
+        },
+        "summary": "Create or update the current browser's Web Push subscription.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "post_user_push_subscriptions"
+      },
+      "delete": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionDelete"
+              }
+            }
+          }
+        },
+        "summary": "Delete the current browser's Web Push subscription.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "delete_user_push_subscriptions"
+      }
     },
     "/api/users/-/access-tokens/{scope}/": {
       "get": {
@@ -16128,7 +18700,8 @@
         "summary": "Get persistent token status for current user and scope.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "get_user_access_token"
       },
       "post": {
         "responses": {
@@ -16149,7 +18722,8 @@
         "summary": "Create or rotate persistent token for current user and scope.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_user_access_token"
       },
       "delete": {
         "responses": {
@@ -16170,12 +18744,172 @@
         "summary": "Revoke persistent token for current user and scope.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "delete_user_access_token"
       },
       "parameters": [
         {
           "in": "path",
           "name": "scope",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/api/users/-/access-tokens/{scope}/tokens/": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccessTokenInfo"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "List the current user's tokens for the scope, oldest first.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "get_user_access_token_list"
+      },
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessTokenInfoCreate"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessTokenLabel"
+              }
+            }
+          }
+        },
+        "summary": "Create a new labelled token for the current user and scope.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "post_user_access_token_list"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "scope",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "/api/users/-/access-tokens/{scope}/tokens/{token_id}/": {
+      "delete": {
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Revoke one of the current user's tokens for the scope.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "delete_user_access_token_item"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "scope",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "in": "path",
+          "name": "token_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ]
+    },
+    "/api/users/{user_name}/merge/": {
+      "post": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMerge"
+              }
+            }
+          }
+        },
+        "summary": "Merge another user into this one and delete the other user.",
+        "description": "The OIDC accounts, persistent access tokens, push subscriptions, tasks\nand edit history of the other user move to this one, which keeps its\nown name, password, e-mail address and role. Site admins only.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "post_user_merge"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "user_name",
           "required": true,
           "schema": {
             "type": "string",
@@ -16207,7 +18941,8 @@
         "summary": "Register a new user.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_register"
       },
       "parameters": [
         {
@@ -16220,6 +18955,45 @@
           }
         }
       ]
+    },
+    "/api/register/config/": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tree",
+            "description": "Tree ID the user would register for.",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationConfig"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "Get whether new users can register.",
+        "description": "Gives the same answer as a registration attempt would: an unknown\ntree is reported as disabled rather than as an error, so that the\nendpoint does not reveal which trees exist.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "get_register_config"
+      }
     },
     "/api/users/{user_name}/create_owner/": {
       "post": {
@@ -16244,7 +19018,8 @@
         "summary": "Create a user with admin permissions.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_user_create_owner"
       },
       "parameters": [
         {
@@ -16268,7 +19043,8 @@
         "summary": "Show email confirmation dialog.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "get_confirm_email"
       }
     },
     "/api/users/{user_name}/password/change": {
@@ -16276,6 +19052,16 @@
         "responses": {
           "422": {
             "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserChangePasswordResponse"
+                }
+              }
+            }
           },
           "default": {
             "$ref": "#/components/responses/DEFAULT_ERROR"
@@ -16292,9 +19078,11 @@
           }
         },
         "summary": "Post new password.",
+        "description": "A new password ends every existing session of the user. When users\nchange their own password, the response carries a new access and\nrefresh token so that this session continues; otherwise it is empty.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_change_password"
       },
       "parameters": [
         {
@@ -16318,7 +19106,8 @@
         "summary": "Reset password form.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "get_reset_password"
       },
       "post": {
         "responses": {
@@ -16342,7 +19131,8 @@
         "summary": "Post new password.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_reset_password"
       }
     },
     "/api/users/{user_name}/password/reset/trigger/": {
@@ -16355,7 +19145,8 @@
         "summary": "Post username to initiate the password reset.",
         "tags": [
           "Users"
-        ]
+        ],
+        "operationId": "post_trigger_reset_password"
       },
       "parameters": [
         {
@@ -16369,9 +19160,90 @@
         }
       ]
     },
+    "/api/users/-/oidc-accounts/": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserOIDCAccount"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "summary": "List the current user's OIDC accounts.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "get_user_oidc_accounts"
+      }
+    },
+    "/api/users/-/oidc-accounts/{account_id}/": {
+      "delete": {
+        "responses": {
+          "422": {
+            "$ref": "#/components/responses/UNPROCESSABLE_CONTENT"
+          },
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "$ref": "#/components/responses/DEFAULT_ERROR"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserOIDCUnlink"
+              }
+            }
+          }
+        },
+        "summary": "Unlink one of the current user's OIDC accounts.",
+        "description": "Unlinking the last one needs the user's current password, so that they\ncan still log in, and is refused if local authentication is disabled.",
+        "tags": [
+          "Users"
+        ],
+        "operationId": "delete_user_oidc_account"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "account_id",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      ]
+    },
     "/api/search/": {
       "get": {
         "parameters": [
+          {
+            "in": "query",
+            "name": "date_format",
+            "description": "Gramps date format index. If omitted, the server's default date format is used. 0 is ISO YYYY-MM-DD; higher values select locale-specific formats.",
+            "schema": {
+              "type": "integer",
+              "default": null,
+              "minimum": 0,
+              "nullable": true
+            },
+            "required": false
+          },
           {
             "in": "query",
             "name": "locale",
@@ -16398,7 +19270,7 @@
           {
             "in": "query",
             "name": "semantic",
-            "description": "If true, use semantic (vector) search rather than full-text search.",
+            "description": "Ignored. Semantic search was removed in version 3.25.0; the parameter is accepted for backward compatibility.",
             "schema": {
               "type": "boolean",
               "default": false
@@ -16549,7 +19421,8 @@
         "summary": "Get search result.",
         "tags": [
           "Search"
-        ]
+        ],
+        "operationId": "get_search"
       }
     },
     "/api/search/index/": {
@@ -16568,7 +19441,7 @@
           {
             "in": "query",
             "name": "semantic",
-            "description": "If true, use semantic (vector) search rather than full-text search.",
+            "description": "Ignored. Semantic search was removed in version 3.25.0; the parameter is accepted for backward compatibility.",
             "schema": {
               "type": "boolean",
               "default": false
@@ -16587,7 +19460,8 @@
         "summary": "Trigger a reindex.",
         "tags": [
           "Search"
-        ]
+        ],
+        "operationId": "post_search_index"
       }
     },
     "/api/trees/{tree_id}/verify": {
@@ -16788,7 +19662,8 @@
         "summary": "Run genealogical data verification checks against the database.",
         "tags": [
           "Trees"
-        ]
+        ],
+        "operationId": "post_verify"
       },
       "parameters": [
         {
@@ -16857,7 +19732,8 @@
         "summary": "Create a chat response.",
         "tags": [
           "Chat"
-        ]
+        ],
+        "operationId": "post_chat"
       }
     },
     "/api/config/": {
@@ -16870,7 +19746,8 @@
         "summary": "Get all config settings.",
         "tags": [
           "Config"
-        ]
+        ],
+        "operationId": "get_configs"
       }
     },
     "/api/config/{key}/": {
@@ -16883,7 +19760,8 @@
         "summary": "Get a config setting.",
         "tags": [
           "Config"
-        ]
+        ],
+        "operationId": "get_config"
       },
       "put": {
         "responses": {
@@ -16907,7 +19785,8 @@
         "summary": "Update a config setting.",
         "tags": [
           "Config"
-        ]
+        ],
+        "operationId": "put_config"
       },
       "delete": {
         "responses": {
@@ -16918,7 +19797,8 @@
         "summary": "Delete a config setting.",
         "tags": [
           "Config"
-        ]
+        ],
+        "operationId": "delete_config"
       },
       "parameters": [
         {
@@ -16938,7 +19818,7 @@
           {
             "in": "query",
             "name": "include_state",
-            "description": "Fetch live state from Celery backend for each task. Adds one backend call per task.",
+            "description": "Include the task state in Celery's spelling (see 'status' for the lifecycle status).",
             "schema": {
               "type": "boolean",
               "default": false
@@ -16981,7 +19861,8 @@
         "description": "Any authenticated user can see their own tasks. Users with the\nViewOtherUser permission (Owner+) can see all tasks for the tree.",
         "tags": [
           "Tasks"
-        ]
+        ],
+        "operationId": "get_tasks"
       }
     },
     "/api/tasks/{task_id}": {
@@ -17004,7 +19885,8 @@
         "summary": "Get info about a task.",
         "tags": [
           "Tasks"
-        ]
+        ],
+        "operationId": "get_task"
       },
       "parameters": [
         {
@@ -17052,7 +19934,8 @@
         "summary": "Download a file.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "get_media_file"
       },
       "put": {
         "parameters": [
@@ -17078,7 +19961,8 @@
         "summary": "Upload a file and update the media object.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "put_media_file"
       },
       "parameters": [
         {
@@ -17102,7 +19986,8 @@
         "summary": "Get detected face regions.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "get_media_face_detection"
       },
       "parameters": [
         {
@@ -17151,7 +20036,8 @@
         "summary": "Execute OCR on a file.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "post_media_ocr"
       },
       "parameters": [
         {
@@ -17173,9 +20059,11 @@
           }
         },
         "summary": "Create an archive of media files.",
+        "description": "If an archive of the same media exists and can still be downloaded for\na while, it is returned instead. Only creating a new archive counts\ntowards the rate limit.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "post_media_archive"
       }
     },
     "/api/media/archive/{filename}": {
@@ -17188,7 +20076,8 @@
         "summary": "Download an archive of media files.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "get_media_archive_filename"
       },
       "parameters": [
         {
@@ -17212,7 +20101,8 @@
         "summary": "Upload an archive of media files.",
         "tags": [
           "Media"
-        ]
+        ],
+        "operationId": "post_media_archive_upload_zip"
       }
     },
     "/api/media/{handle}/tile/{z}/{x}/{y}": {
@@ -17225,7 +20115,8 @@
         "summary": "Get a map tile for a georeferenced media image.",
         "tags": [
           "api"
-        ]
+        ],
+        "operationId": "get_media_tile"
       },
       "parameters": [
         {
@@ -17276,7 +20167,8 @@
         "summary": "Get a file's thumbnail.",
         "tags": [
           "api"
-        ]
+        ],
+        "operationId": "get_media_thumbnail"
       },
       "parameters": [
         {
@@ -17309,7 +20201,8 @@
         "summary": "Get the thumbnail of a cropped file.",
         "tags": [
           "api"
-        ]
+        ],
+        "operationId": "get_media_cropped"
       },
       "parameters": [
         {
@@ -17369,7 +20262,8 @@
         "summary": "Get the thumbnail of a cropped file.",
         "tags": [
           "api"
-        ]
+        ],
+        "operationId": "get_media_cropped_thumbnail"
       },
       "parameters": [
         {

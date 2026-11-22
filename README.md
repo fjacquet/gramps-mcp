@@ -61,6 +61,21 @@ than an error.
 Next: [connect your MCP client](https://fjacquet.github.io/gramps-mcp/getting-started/mcp-clients/),
 or run [without Docker](https://fjacquet.github.io/gramps-mcp/getting-started/installation/).
 
+## Tested server versions
+
+The test suite runs against a local Gramps Web stack and passes on
+gramps-webapi 3.25.2 (image tag `26.11.2`, the default) and 3.26.0 (tag
+`26.11.3`). Pick the version with `GRAMPSWEB_TAG`, then seed the tree:
+
+```bash
+GRAMPSWEB_TAG=26.11.3 docker compose -f docker-compose.test.yml up -d --force-recreate
+uv run python scripts/seed_test_tree.py
+uv run pytest
+```
+
+Searches use GOQL through `rules=MatchesQuery`, which both versions accept.
+The `gql` request parameter was removed in 3.26.0.
+
 ## Documentation
 
 Everything below lives on the [documentation site](https://fjacquet.github.io/gramps-mcp/):

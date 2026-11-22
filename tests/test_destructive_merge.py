@@ -67,8 +67,8 @@ class TestMergeOffline:
             new_callable=AsyncMock,
         ) as call:
             call.side_effect = [
-                [{"handle": "same"}],
-                [{"handle": "same"}],
+                [{"handle": "same", "gramps_id": "S0001"}],
+                [{"handle": "same", "gramps_id": "S0002"}],
             ]
             result = await merge_type_tool(
                 {

@@ -31,6 +31,7 @@ from pydantic import BaseModel
 
 from .auth import AuthManager
 from .config import get_api_base_url, get_settings
+from .goql import build_rules
 from .merge import merge_put_data
 from .models.api_calls import ApiCalls
 from .models.api_mapping import validate_api_call_params
@@ -301,6 +302,24 @@ class GrampsWebAPIClient:
         else:
             summary = f"Request failed with status {status_code}"
 
+        # Reason: a rejected expression is almost always the pre-3.26 dialect
+        # (`=`, `~`, `class = x`), and the server's own text does not say so.
+        # 3.25.2 words the rejection "Rule MatchesQuery could not be evaluated".
+        if status_code == 422 and (
+            "invalid_query" in error.response.text
+            or "unknown field" in error.response.text
+            or "MatchesQuery" in error.response.text
+        ):
+            # Reason: build_rules serialises an empty expression as `[""]`.
+            if '[""]' in error.request.url.params.get("rules", ""):
+                summary += " The gql expression is empty; omit it or pass GOQL."
+            else:
+                summary += (
+                    " The gql expression is not valid GOQL; read the"
+                    " gql://documentation resource (the old `=` and `~` operators"
+                    ' are gone: use `==` and `"x" in field`).'
+                )
+
         detail = self._extract_error_detail(error)
         if detail:
             return f"{summary} {detail}"
@@ -426,6 +445,10 @@ class GrampsWebAPIClient:
                 json_data = params_dict
             else:
                 request_params = params_dict
+                # Reason: gramps-webapi 3.26 removed the gql query parameter
+                # (HTTP 422); MatchesQuery rules carry the same expression.
+                if "gql" in request_params:
+                    request_params["rules"] = build_rules(request_params.pop("gql"))
 
         # For PUT operations, preserve existing data by merging with changes
         if api_call.method == "PUT" and json_data:

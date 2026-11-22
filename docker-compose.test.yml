@@ -8,12 +8,17 @@
 #   docker compose -f docker-compose.test.yml down -v
 # resets the test tree and destroys nothing else.
 #
+# Server version: GRAMPSWEB_TAG picks the image. 26.11.2 (default) is
+# gramps-webapi 3.25.2, 26.11.3 is 3.26.0; the suite passes on both. Switch with
+#   GRAMPSWEB_TAG=26.11.3 docker compose -f docker-compose.test.yml up -d --force-recreate
+# then re-seed.
+#
 # Start it, then seed it:
 #   docker compose -f docker-compose.test.yml up -d
 #   uv run python scripts/seed_test_tree.py
 services:
   grampsweb: &grampsweb
-    image: ghcr.io/gramps-project/grampsweb:latest
+    image: ghcr.io/gramps-project/grampsweb:${GRAMPSWEB_TAG:-26.11.2}
     container_name: grampsweb_test
     restart: unless-stopped
     ports:
