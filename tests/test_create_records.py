@@ -161,7 +161,7 @@ class TestCreatePlaceTool:
                     {
                         "type": "Web Home",
                         "path": "https://www.boston.gov",
-                        "description": "Official city website",
+                        "desc": "Official city website",
                     }
                 ],
             }

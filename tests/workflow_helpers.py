@@ -198,7 +198,7 @@ async def create_or_find_place(
                 {
                     "type": "Web Home",
                     "path": f"https://en.wikipedia.org/wiki/{name.replace(' ', '_')}",
-                    "description": f"Wikipedia article about {name}",
+                    "desc": f"Wikipedia article about {name}",
                 }
             ],
         }
@@ -369,7 +369,7 @@ async def create_or_find_person_with_attributes(
                             "https://findagrave.com/memorial/"
                             f"{given_name.lower()}-{surname.lower()}"
                         ),
-                        "description": f"Find A Grave memorial for {full_name}",
+                        "desc": f"Find A Grave memorial for {full_name}",
                     }
                 ],
                 "event_ref_list": [{"ref": event_handle, "role": event_role}],

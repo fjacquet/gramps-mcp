@@ -224,19 +224,6 @@ async def format_family(client, tree_id: str, handle: str) -> str:
             if note_ids:
                 result += f"Attached notes: {', '.join(note_ids)}\n"
 
-        # URLs
-        urls = family_data.get("urls", [])
-        if urls:
-            for url in urls:
-                if isinstance(url, dict):
-                    url_path = url.get("path", "")
-                    url_desc = url.get("description", "")
-                    if url_path:
-                        if url_desc:
-                            result += f"{url_path} - {url_desc}\n"
-                        else:
-                            result += f"{url_path}\n"
-
         return result + "\n"
 
     except Exception as e:

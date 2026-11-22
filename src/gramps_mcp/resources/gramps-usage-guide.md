@@ -159,7 +159,7 @@ Now create the life event that was documented in that citation:
 - **Gender** (required): Female, Male, or Unknown
 - **Notes** (optional): If present, use `create_note` tool first, then link to person
 - **Media** (optional): If present, use `create_media` tool first, then link to person
-- **URLs** (optional): Web links with type, path, and description
+- **URLs** (optional): Web links with `type`, `path` and `desc` (the description key is `desc`, not `description`)
 - **Birth/Death info**: Should be added as separate birth/death events, NOT directly to person
 
 #### For Each Person Involved:
@@ -196,7 +196,6 @@ Now create the life event that was documented in that citation:
 - **Children handles** (optional): List of handles of child persons
 - **Notes** (optional): If present, use `create_note` tool first, then link to family
 - **Media** (optional): If present, use `create_media` tool first, then link to family
-- **URLs** (optional): Web links with type, path, and description
 - **Family events**: Marriage, divorce events are added to the family unit
 - **All relationships must be supported by sourced events**
 
@@ -349,7 +348,7 @@ error names the colliding handles so you can retry with `source_handle`.
 - **Enclosed by** (required): Handle of the higher-level place that contains this place
   - Example hierarchy: Church → City → County → State → Country
   - Continue until you reach Country type (top level)
-- **URLs** (optional): Web links with type, path, and description
+- **URLs** (optional): Web links with `type`, `path` and `desc` (the description key is `desc`, not `description`)
 
 **Place Process:**
 - **First**: Search for an existing place with
