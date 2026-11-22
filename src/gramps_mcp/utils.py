@@ -173,7 +173,7 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | N
     # in search_details.py (see its `escaped = ...` comment around lines
     # 140-147). Safe here only because both callers - relationship_tools.py
     # _resolve_person/_resolve_family - gate gramps_id against the anchored
-    # GRAMPS_ID_PATTERN (^[A-Z]+[0-9]+$) before reaching this function. A
+    # GRAMPS_ID_PATTERN ([A-Z]+[0-9]+, fullmatch) before reaching this function. A
     # future caller that skips that gate would reopen GQL filter injection
     # (e.g. a crafted value closing the quoted literal early).
     result = await client.make_api_call(
@@ -232,7 +232,7 @@ async def resolve_family_handle(client, tree_id: str, gramps_id: str) -> str | N
     # in search_details.py (see its `escaped = ...` comment around lines
     # 140-147). Safe here only because both callers - relationship_tools.py
     # _resolve_person/_resolve_family - gate gramps_id against the anchored
-    # GRAMPS_ID_PATTERN (^[A-Z]+[0-9]+$) before reaching this function. A
+    # GRAMPS_ID_PATTERN ([A-Z]+[0-9]+, fullmatch) before reaching this function. A
     # future caller that skips that gate would reopen GQL filter injection
     # (e.g. a crafted value closing the quoted literal early).
     result = await client.make_api_call(

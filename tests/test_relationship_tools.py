@@ -9,6 +9,7 @@ import pytest
 
 from src.gramps_mcp.models.parameters.analysis_params import TimelineQueryParams
 from src.gramps_mcp.tools.relationship_tools import (
+    GRAMPS_ID_PATTERN,
     check_living_tool,
     get_relationship_tool,
     get_timeline_tool,
@@ -140,3 +141,9 @@ class TestGetTimelineTool:
         result = await get_timeline_tool(params.model_dump())
         text = result[0].text
         assert "error" not in text.lower()
+
+
+def test_gramps_id_pattern_rejects_a_trailing_newline():
+    """`$` would accept "I0001\n"; the gate must not."""
+    assert GRAMPS_ID_PATTERN.fullmatch("I0001")
+    assert not GRAMPS_ID_PATTERN.fullmatch("I0001\n")

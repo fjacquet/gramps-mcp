@@ -310,11 +310,15 @@ class GrampsWebAPIClient:
             or "unknown field" in error.response.text
             or "MatchesQuery" in error.response.text
         ):
-            summary += (
-                " The gql expression is not valid GOQL; read the"
-                " gql://documentation resource (the old `=` and `~` operators"
-                ' are gone: use `==` and `"x" in field`).'
-            )
+            # Reason: build_rules serialises an empty expression as `[""]`.
+            if '[""]' in error.request.url.params.get("rules", ""):
+                summary += " The gql expression is empty; omit it or pass GOQL."
+            else:
+                summary += (
+                    " The gql expression is not valid GOQL; read the"
+                    " gql://documentation resource (the old `=` and `~` operators"
+                    ' are gone: use `==` and `"x" in field`).'
+                )
 
         detail = self._extract_error_detail(error)
         if detail:

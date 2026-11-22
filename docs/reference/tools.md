@@ -21,7 +21,7 @@ Read-only. Nothing here writes to the tree.
 
 | Tool | What it does |
 |---|---|
-| `find_type` | Searches any entity type using Gramps Query Language (GQL). Read the `gql://` documentation resource first - the syntax is not guessable. |
+| `find_type` | Searches any entity type using GOQL (Gramps Object Query Language). Read the `gql://` documentation resource first - the syntax is not guessable. |
 | `find_anything` | Text search across all record types. Matches literal text within records; it does not evaluate logical combinations of terms. |
 | `get_type` | Gets full details for a person or family by handle or `gramps_id`. |
 

@@ -730,8 +730,7 @@ confirm what actually happened.
 - `force=true` deletes anyway and severs those references, the same
   behaviour the Gramps Web UI has when it deletes a referenced record. Use it
   deliberately, having read what it says it will sever.
-- Recoverable with `undo_change`, subject to the `force` requirement
-  described there.
+- Recoverable with `undo_change`.
 
 ### `merge_type` - merge two records of the same type
 
@@ -758,7 +757,7 @@ titanic_handle=... or titanic_gramps_id=..., confirm=False)`.
   parent first with `create_family(father_handle=...)`.
 - There is no backlink guard here - both records are legitimately referenced
   right up to the merge, so `confirm` is the only checkpoint. Recoverable
-  with `undo_change`, subject to the `force` requirement described there.
+  with `undo_change`.
 
 ### `detach_reference` - remove one element from one list
 

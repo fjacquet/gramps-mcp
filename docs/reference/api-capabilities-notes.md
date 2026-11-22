@@ -21,7 +21,8 @@ The API exposes more than this server uses: 96 of 193 operations.
   - **The notes GQL bug is fixed upstream** (issue #28). On
     gramps-webapi 3.21.1 with gramps 6.0.8, all four reproductions from that
     issue return HTTP 200: `gramps_id="N0216"`, `class = note and private`,
-    `text.string ~ "Nidau"` and the people control. `find_type` on notes works.
+    `text.string ~ "Nidau"` and the people control (these old-dialect
+    expressions date from 3.21.1; gramps-webapi 3.26 rejects them, see the GOQL syntax). `find_type` on notes works.
     Verify against the running server before assuming otherwise - the failure
     was a server-side defect, so it comes and goes with the deployment, not
     with this repo.

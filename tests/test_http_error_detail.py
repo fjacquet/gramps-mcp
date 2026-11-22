@@ -9,6 +9,7 @@ import httpx
 import pytest
 
 from src.gramps_mcp.client import MAX_ERROR_DETAIL, GrampsWebAPIClient
+from src.gramps_mcp.goql import build_rules
 
 # Reason: imported (not hardcoded) so this test breaks loudly if the source
 # constant changes without the test being updated to match.
@@ -180,3 +181,28 @@ class TestUploadMediaNonJsonSuccessBody:
         assert result["raw_content"].endswith("...")
         expected = "y" * MAX_DETAIL + "..."
         assert result["raw_content"] == expected
+
+
+class TestGoqlHint:
+    """The old-operators hint must not be shown for an empty expression."""
+
+    @staticmethod
+    def _gql_error(expr: str) -> httpx.HTTPStatusError:
+        request = httpx.Request(
+            "GET", "http://example.org/api/people/", params={"rules": build_rules(expr)}
+        )
+        response = httpx.Response(
+            422, request=request, json={"error": {"type": "invalid_query"}}
+        )
+        return httpx.HTTPStatusError("error", request=request, response=response)
+
+    def test_empty_expression_gets_its_own_message(self):
+        formatted = GrampsWebAPIClient()._format_http_error(self._gql_error(""))
+
+        assert "empty" in formatted
+        assert "old `=`" not in formatted
+
+    def test_bad_expression_keeps_the_old_operator_hint(self):
+        formatted = GrampsWebAPIClient()._format_http_error(self._gql_error("a = b"))
+
+        assert "old `=`" in formatted
