@@ -17,3 +17,4 @@ def test_build_rules_keeps_unicode():
     """Non-ASCII characters survive the round trip."""
     out = build_rules('surname == "Müller"')
     assert json.loads(out)["rules"][0]["values"][0] == 'surname == "Müller"'
+    assert "Müller" in out

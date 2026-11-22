@@ -31,6 +31,7 @@ from pydantic import BaseModel
 
 from .auth import AuthManager
 from .config import get_api_base_url, get_settings
+from .goql import build_rules
 from .merge import merge_put_data
 from .models.api_calls import ApiCalls
 from .models.api_mapping import validate_api_call_params
@@ -426,6 +427,10 @@ class GrampsWebAPIClient:
                 json_data = params_dict
             else:
                 request_params = params_dict
+                # Reason: gramps-webapi 3.26 removed the gql query parameter
+                # (HTTP 422); MatchesQuery rules carry the same expression.
+                if "gql" in request_params:
+                    request_params["rules"] = build_rules(request_params.pop("gql"))
 
         # For PUT operations, preserve existing data by merging with changes
         if api_call.method == "PUT" and json_data:
