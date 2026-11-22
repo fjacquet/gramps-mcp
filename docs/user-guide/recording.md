@@ -110,7 +110,7 @@ the event's real place with text that resolved to nothing. Find the place
 first:
 
 ```
-find_type(type="place", gql='class = place and name.value = "Verrens-Arvey"')
+find_type(type="place", gql='name.value == "Verrens-Arvey"')
 create_place(name={"value": "Verrens-Arvey"}, place_type="Town",
              placeref_list=[{"ref": "<parent place handle>"}])
 ```
