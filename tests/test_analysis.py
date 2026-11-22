@@ -225,8 +225,32 @@ class TestGetRecentChangesTool:
     pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
-    async def test_get_recent_changes_real_api(self):
+    async def test_get_recent_changes_real_api(self, gramps_client, tree_id):
         """Test get_recent_changes_tool with real API."""
+        from src.gramps_mcp.models.api_calls import ApiCalls
+        from src.gramps_mcp.models.parameters.people_params import PersonData
+        from tests.conftest import create_entity, delete_entity
+        from tests.constants import PREFIX
+
+        # Reason: the newest transactions depend on test order; make one
+        # whose gramps_id is known so the assertion cannot be vacuous.
+        handle = await create_entity(
+            gramps_client,
+            tree_id,
+            ApiCalls.POST_PEOPLE,
+            PersonData(
+                primary_name={
+                    "first_name": PREFIX,
+                    "surname_list": [{"surname": "Recent"}],
+                },
+                gender=1,
+            ),
+            "person",
+        )
+        person = await gramps_client.make_api_call(
+            api_call=ApiCalls.GET_PERSON, tree_id=tree_id, handle=handle
+        )
+        new_id = person["gramps_id"]
 
         result = await get_recent_changes_tool({"page": 1, "pagesize": 10})
 
@@ -249,14 +273,11 @@ class TestGetRecentChangesTool:
             f"Expected 1-10 transactions but got {transaction_count}"
         )
 
-        # Should show gramps_id instead of handle
-        if "Objects changed:" in text:
-            # Gramps IDs follow pattern: Letter + 4 digits (e.g., I0001, F0002, O0506)
-            import re
+        # Should show gramps_id instead of handle, and no bare-number class
+        assert f"Person: {new_id}" in text, text
+        assert not re.search(r"^\s+- \d+:", text, re.M), text
 
-            assert re.search(r"[A-Z]\d{4}", text), (
-                "Should show gramps IDs (letter + 4 digits)"
-            )
+        await delete_entity(gramps_client, tree_id, ApiCalls.DELETE_PERSON, handle)
 
 
 class TestGetTreeInfoTool:

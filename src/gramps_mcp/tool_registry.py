@@ -336,7 +336,7 @@ TOOL_REGISTRY: dict[str, dict[str, Any]] = {
             "recovery path for a delete or merge that went the wrong way. "
             "On gramps-webapi 3.25.x force=true is required to undo a "
             "deletion (a server bug misreports the object as changed); "
-            "3.26.0 and later need no force. See the force parameter's "
+            "fixed in 3.26.0 (tested on 3.26.0). See the force parameter's "
             "description for the risk"
         ),
         "schema": UndoChangeParams,

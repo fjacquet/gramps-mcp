@@ -253,7 +253,7 @@ Now create the life event that was documented in that citation:
      (John Smith, born ~1850, Boston area)
    → If matches found: Ask user to confirm identity
    → If same person: create_person with handle (update existing person) AND add event with role "groom"
-   → If new person: create_person without handle (create new person with given name, surname, gender, optional notes/media) AND add event with role "groom"
+   → If new person: create_person without handle (create new person with given name, surname, gender, optional notes/media/URLs) AND add event with role "groom"
    
    → If person has notes: create_note first, get note handle  
    → If person has media: create_media first, get media handle
@@ -270,7 +270,7 @@ Now create the life event that was documented in that citation:
      first to check for existing family
    → If family exists and complete: use existing family
    → If family exists but missing info: create_family with handle (update family) AND add family events
-   → If family doesn't exist: create_family without handle (create with father/mother/children handles, optional notes/media/URLs) AND add family events
+   → If family doesn't exist: create_family without handle (create with father/mother/children handles, optional notes/media) AND add family events
    
    → Family events (marriage, divorce) are added to the family, not individual people
    → Individual events (birth, death) are added to people
@@ -807,7 +807,7 @@ ref_handle=...)`.
 - `transaction_id` comes from `recent_changes`.
 - Undoing reverses every object change that transaction made.
 - **On gramps-webapi 3.25.x, `force=true` is required to undo a deletion;
-  3.26.0 and later restore the record without it.** Try a plain undo first:
+  fixed in 3.26.0 (tested on 3.26.0), where a plain undo restores the record.** Try a plain undo first:
   a refusal naming `force` means the older server. The 3.25.x requirement is
   an upstream Gramps Web defect, not a gramps-mcp choice: the server records the
   deleted side of a delete/add change as `{}` rather than `None`, and its

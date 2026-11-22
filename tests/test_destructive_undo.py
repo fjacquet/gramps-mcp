@@ -92,9 +92,8 @@ class TestUndoLive:
         records {} (gramps_webapi/undodb.py Change._to_dict()). The server
         then refuses a plain undo with a false "Object has changed" conflict,
         and only force=true restores the record. gramps-webapi 3.26.0 no
-        longer refuses. This test accepts either, but pins the invariants: a
-        refusal must name force and leave the note deleted, and the note must
-        be back after the undo that succeeds.
+        longer refuses. The server version is read from /api/metadata and each
+        version's behaviour is asserted; the note must be back afterwards.
         """
         from src.gramps_mcp.models.api_calls import ApiCalls
         from src.gramps_mcp.models.parameters.note_params import NoteSaveParams
@@ -151,10 +150,20 @@ class TestUndoLive:
             "read - refusing to undo an unrelated transaction."
         )
 
+        # Reason: read the server version so each version's behaviour is
+        # asserted explicitly; a server silently changing fails here.
+        from src.gramps_mcp.config import get_settings
+
+        meta = await gramps_client.auth_manager.client.get(
+            f"{str(get_settings().gramps_api_url).rstrip('/')}/api/metadata/",
+            headers=await gramps_client._get_headers(),
+        )
+        version = meta.json()["gramps_webapi"]["version"]
+
         plain = await undo_change_tool({"transaction_id": transaction_id})
-        if "Error" in plain[0].text:
-            # 3.25.2: the false conflict. The refusal must be real, not
-            # cosmetic: the note is still gone.
+        if version.startswith("3.25."):
+            # The false conflict: refused, note still gone, force restores.
+            assert "Error" in plain[0].text, version
             assert "force" in plain[0].text.lower()
             with pytest.raises(Exception):
                 await gramps_client.make_api_call(
@@ -165,7 +174,8 @@ class TestUndoLive:
             )
             assert "undone" in forced[0].text
         else:
-            # 3.26.0: the plain undo succeeds.
+            # Tested on 3.26.0: the plain undo succeeds.
+            assert version.startswith("3.26."), f"untested server {version}"
             assert "undone" in plain[0].text
 
         # Reason: the Gramps Web resource docstring for this endpoint says

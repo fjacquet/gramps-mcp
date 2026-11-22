@@ -200,7 +200,7 @@ class UndoChangeParams(StrictModel):
             "delete/add change is recorded as {} instead of None, which "
             "makes that check misfire and refuse every non-forced "
             "delete-undo with a false 'Object has changed' conflict. "
-            "Fixed in 3.26.0, where a plain undo works. Risk: if "
+            "Fixed in 3.26.0 (tested on 3.26.0). Risk: if "
             "the object genuinely was changed after the original "
             "transaction, forcing the undo discards that later change "
             "without warning."
