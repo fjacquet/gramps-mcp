@@ -168,7 +168,7 @@ async def create_or_find_place(
     find_result = await find_type_tool(
         {
             "type": "place",
-            "gql": f'class = place and name.value = "{name}"',
+            "gql": f'name.value == "{name}"',
             "max_results": 5,
         }
     )
@@ -282,16 +282,14 @@ async def create_or_find_person_with_attributes(
     # primary_name.first_name returns only people and is unaffected by
     # however much other tree noise accumulates.
     #
-    # Note: GQL cannot traverse primary_name.surname_list.surname - the API
-    # answers "422 list indices must be integers or slices, not str" for a
-    # list-of-dict field addressed that way - so match on first_name only,
+    # Note: first_name already carries PREFIX and the given name, so match on it only,
     # which already carries PREFIX and the given name, then disambiguate on
     # the full name (including surname) below via person_line_pattern, same
     # as before.
     find_result = await find_type_tool(
         {
             "type": "person",
-            "gql": f'primary_name.first_name="{prefixed_first_name}"',
+            "gql": f'primary_name.first_name == "{prefixed_first_name}"',
             "max_results": 5,
         }
     )

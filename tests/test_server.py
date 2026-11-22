@@ -222,7 +222,7 @@ class TestMCPProtocolCompliance:
                     {
                         "arguments": {
                             "type": "person",
-                            "gql": 'primary_name.first_name ~ "John"',
+                            "gql": '"Jean" in primary_name.first_name',
                             "max_results": 20,
                         }
                     },
@@ -235,12 +235,11 @@ class TestMCPProtocolCompliance:
                 response_text = result.content[0].text
                 print(f"MCP find_type response: {response_text}")
 
-                # Check if the search found results or indicates no matches found
-                assert (
-                    "Found" in response_text
-                    or "no people found" in response_text.lower()
-                    or "not found" in response_text.lower()
-                )
+                # Reason: the seeded tree holds 274 first names containing
+                # "Jean"; "No people found" or an error would hide a broken
+                # GOQL translation, which is what this test exists to catch.
+                assert response_text.startswith("Found")
+                assert "Jean" in response_text
 
     @pytest.mark.asyncio
     async def test_mcp_invalid_tool_call(self):
@@ -287,7 +286,7 @@ class TestToolIntegrationRealAPI:
                     {
                         "arguments": {
                             "type": "person",
-                            "gql": 'primary_name.surname_list.any.surname ~ "Smith"',
+                            "gql": 'any(s.surname == "Méléo" for s in primary_name.surname_list)',
                             "max_results": 20,
                         }
                     },
@@ -298,8 +297,9 @@ class TestToolIntegrationRealAPI:
                 assert isinstance(result.content[0], TextContent)
                 response_text = result.content[0].text
 
-                # Should be valid JSON or formatted text
-                assert len(response_text.strip()) > 0
+                # Reason: the seeded tree has exactly two people with this surname.
+                assert response_text.startswith("Found 2 people")
+                assert "Méléo" in response_text
 
     @pytest.mark.asyncio
     async def test_search_all_objects(self):
@@ -336,20 +336,21 @@ class TestErrorHandling:
                 # Initialize session
                 await session.initialize()
 
-                # Call find_person which now uses configured tree
+                # Call find_type, which uses the configured tree
                 result = await session.call_tool(
-                    "find_person",
+                    "find_type",
                     {
                         "arguments": {
-                            "gql": 'primary_name.first_name ~ "test"',
-                            "pagesize": 1,
+                            "type": "person",
+                            "gql": '"Jean" in primary_name.first_name',
+                            "max_results": 1,
                         }
                     },
                 )
 
-                # Should handle gracefully without crashing
                 assert len(result.content) >= 1
                 assert isinstance(result.content[0], TextContent)
+                assert result.content[0].text.startswith("Found")
 
     @pytest.mark.asyncio
     async def test_get_type_details_invalid_handle(self):

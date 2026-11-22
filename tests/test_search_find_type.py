@@ -237,16 +237,8 @@ class TestFindNoteTool:
     pytestmark = pytest.mark.integration
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(
-        reason="Note GQL search not supported by Gramps Web API despite documentation"
-    )
     async def test_find_note(self):
-        """Test notes search with GQL.
-
-        NOTE: Skipped because the Gramps Web API notes endpoint
-        does not properly support GQL queries, contrary to the documentation.
-        The API returns "Server error" when attempting note searches with GQL.
-        """
+        """Test notes search with a GOQL expression."""
         result = await find_type_tool(
             {"type": "note", "gql": 'gramps_id == "N0001"', "max_results": 3}
         )
@@ -260,6 +252,8 @@ class TestFindNoteTool:
         assert "error" not in result[0].text.lower(), (
             f"Error found in response: {result[0].text}"
         )
+        assert "Found 1 note" in result[0].text
+        assert "N0001" in result[0].text
         assert "Found" in result[0].text or "No notes found" in result[0].text
 
         # Assert max_results is respected - count actual result entries

@@ -146,7 +146,7 @@ class TestCompleteWorkflow:
         find_result = await find_type_tool(
             {
                 "type": "repository",
-                "gql": 'class = repository and name = "St. Mary\'s Catholic Church, Boston"',
+                "gql": 'name == "St. Mary\'s Catholic Church, Boston"',
                 "max_results": 5,
             }
         )
@@ -204,7 +204,7 @@ class TestCompleteWorkflow:
         find_result = await find_type_tool(
             {
                 "type": "source",
-                "gql": 'class = source and title = "Marriage Register 1875-1880"',
+                "gql": 'title == "Marriage Register 1875-1880"',
                 "max_results": 5,
             }
         )
@@ -257,7 +257,7 @@ class TestCompleteWorkflow:
             {
                 "type": "citation",
                 "gql": (
-                    'class = citation and page = "Page 67, Entry 15, '
+                    'page == "Page 67, Entry 15, '
                     'Marriage of John Smith and Mary Jones, June 15, 1878"'
                 ),
                 "max_results": 5,
@@ -359,7 +359,7 @@ class TestCompleteWorkflow:
             {
                 "type": "event",
                 "gql": (
-                    'class = event and description = "Marriage ceremony '
+                    'description == "Marriage ceremony '
                     "performed by Rev. Patrick O'Sullivan\""
                 ),
                 "max_results": 5,
@@ -451,8 +451,8 @@ class TestCompleteWorkflow:
             {
                 "type": "family",
                 "gql": (
-                    "class = family and father_handle = "
-                    f'"{workflow_data["john_handle"]}" and mother_handle = '
+                    "father_handle == "
+                    f'"{workflow_data["john_handle"]}" and mother_handle == '
                     f'"{workflow_data["mary_handle"]}"'
                 ),
                 "max_results": 5,
