@@ -9,15 +9,15 @@ The API exposes more than this server uses: 96 of 193 operations.
   invents no endpoint; `AuthManager`'s `POST /token/` (`auth.py:128`) is the
   only call that bypasses the enum. Five unused capabilities are worth knowing
   before writing a workaround:
-  - **`POST /api/transactions`** commits a batch atomically. The bulk-lot advice
-    above predates this knowledge: a one-off script issuing hundreds of `PUT`s
+  - **`POST /api/transactions`** commits a batch atomically. The usual bulk-lot
+    advice predates this knowledge: a one-off script issuing hundreds of `PUT`s
     is still the tested path, but this endpoint is why "hundreds of calls" need
     not be the only shape.
   - **`POST /api/<type>/query`** exists for every record type, but it does
     **not** take a `gql` or `query` field - both are rejected with HTTP 422,
     `"Unknown field"`. Read its schema in `docs/reference/openapi.json` before
     reaching for it. An earlier version of this note suggested it as a
-    workaround for the notes bug below; that was written without trying it.
+    workaround for the notes GQL bug (issue #28); that was written without trying it.
   - **The notes GQL bug is fixed upstream** (issue #28). On
     gramps-webapi 3.21.1 with gramps 6.0.8, all four reproductions from that
     issue return HTTP 200: `gramps_id="N0216"`, `class = note and private`,
@@ -25,8 +25,8 @@ The API exposes more than this server uses: 96 of 193 operations.
     Verify against the running server before assuming otherwise - the failure
     was a server-side defect, so it comes and goes with the deployment, not
     with this repo.
-  - **`GET /api/exporters/<id>/file`** is the export the backup note below calls
-    missing from the client. It is missing from `ApiCalls`, not from the API.
+  - **`GET /api/exporters/<id>/file`** is the export that backing up the live tree
+    relies on, which the client lacks. It is missing from `ApiCalls`, not from the API.
   - **`POST /api/trees/<id>/verify` and `/repair`** run Check and Repair over
     the API. Worth reaching for before repairing dead handles by hand - though
     Check and Repair is itself what materialises some of them.

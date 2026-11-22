@@ -240,7 +240,7 @@ across the whole batch in one pass rather than one MCP call per record.
   person's own `media_list`.
 - **Uploading a media file needs no `docker cp` over REST.**
   `client.upload_media_file(bytes, mime)` POSTs to `media/` and the server
-  computes the checksum. The `docker cp` note above applies only to the MCP
+  computes the checksum. The `docker cp` note in CLAUDE.md applies only to the MCP
   tools' `media_path`, which resolves inside the container.
 - **`ApiCalls` is plural for collections, singular for one record**: `POST_PEOPLE`,
   `POST_FAMILIES`, `POST_EVENTS`, `POST_CITATIONS`, `POST_SOURCES`, `POST_NOTES`,
@@ -277,4 +277,4 @@ across the whole batch in one pass rather than one MCP call per record.
 - **GEDCOM export is extension `ged`, not `gedcom`.** `GET
   /api/exporters/ged/file` (not `.../exporters/gedcom/...`, which 404s).
   `GET /api/exporters/` lists every valid extension if in doubt.
-- **The API exposes more than this server uses** (96 of 193 operations; `POST /api/transactions`, `/query`, exporters, `/verify`, `/repair`, `DELETE`). Details: `docs/reference/api-capabilities-notes.md`.
+- **The API exposes more than this server uses** (96 of 193 operations; `POST /api/transactions`, `/query`, exporters, `/verify`, `/repair`, `DELETE`). Details: `docs/reference/api-capabilities-notes.md`; full operation map in `docs/reference/gramps-web-api.md` (regenerate with `uv run python scripts/gen_api_reference.py` after replacing `openapi.json`).

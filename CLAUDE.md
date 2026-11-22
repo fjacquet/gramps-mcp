@@ -81,6 +81,7 @@
   `uv run pytest -m "not integration"` (657 tests) passes with the stack
   down, which is what CI runs - `.github/workflows/ci.yml` names the
   `tests/` directory and the marker filter, no allowlist.
+- **Never write to Gramps with a raw `PUT`**: it bypasses `merge.py` and drops every field the payload omits. Use `make_api_call(ApiCalls.PUT_*)` or the MCP tools.
 - **Raw REST and API-shape gotchas** (no `/api` suffix, token rate limit, raw `PUT` forbidden, POST/PUT return lists, parameter models requiring fields, `create_event` place handle, media on persons, bulk lots, backups, GEDCOM extension, `tree_stats`, third-party hosts): see the `gramps-rest-recovery` skill. Load it before any raw REST call or `make_api_call` script.
 - **The MCP server runs in Docker**, container `gramps-mcp-gramps-mcp-1` on the
   published image `ghcr.io/fjacquet/gramps-mcp:latest`, exposed on

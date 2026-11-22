@@ -681,9 +681,6 @@ MCP call.
 
 ## Tool gotchas moved from CLAUDE.md
 
-- See the `genealogiste` skill (`.claude/skills/genealogiste/`) for the full
-  research/data-entry workflow (sourcing chain, media attachment, match vs.
-  hypothesis handling, homonym hygiene).
 - **Occupations are events, never attributes.** On 2026-09-01 the tree was
   converged: all 28 `attribute_list` entries of type `Occupation` became
   `Occupation` events, leaving 145 events and zero such attributes. An event
