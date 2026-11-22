@@ -84,16 +84,14 @@ class TestUndoOffline:
 class TestUndoLive:
     async def test_undo_reverses_a_deletion(self, gramps_client, tree_id):
         """
-        Undo of a deletion restores the record on every supported server.
+        A plain undo of a deletion restores the record, no force needed.
 
-        gramps-webapi 3.25.2 has a defect: gramps_webapi/api/tasks.py's
-        old_unchanged() treats a missing object as "unchanged" only when the
-        recorded prior state is literally None, but a delete transaction
-        records {} (gramps_webapi/undodb.py Change._to_dict()). The server
-        then refuses a plain undo with a false "Object has changed" conflict,
-        and only force=true restores the record. gramps-webapi 3.26.0 no
-        longer refuses. The server version is read from /api/metadata and each
-        version's behaviour is asserted; the note must be back afterwards.
+        gramps-webapi 3.21.1 refused it with a false "Object has changed"
+        conflict (old_unchanged() in gramps_webapi/api/tasks.py saw {} where
+        it expected None) and only force=true restored the record. Both
+        3.25.2 and 3.26.0 restore it without force. The server version is read
+        from /api/metadata so a different server fails here instead of
+        passing silently.
         """
         from src.gramps_mcp.models.api_calls import ApiCalls
         from src.gramps_mcp.models.parameters.note_params import NoteSaveParams
@@ -161,22 +159,8 @@ class TestUndoLive:
         version = meta.json()["gramps_webapi"]["version"]
 
         plain = await undo_change_tool({"transaction_id": transaction_id})
-        if version.startswith("3.25."):
-            # The false conflict: refused, note still gone, force restores.
-            assert "Error" in plain[0].text, version
-            assert "force" in plain[0].text.lower()
-            with pytest.raises(Exception):
-                await gramps_client.make_api_call(
-                    api_call=ApiCalls.GET_NOTE, tree_id=tree_id, handle=handle
-                )
-            forced = await undo_change_tool(
-                {"transaction_id": transaction_id, "force": True}
-            )
-            assert "undone" in forced[0].text
-        else:
-            # Tested on 3.26.0: the plain undo succeeds.
-            assert version.startswith("3.26."), f"untested server {version}"
-            assert "undone" in plain[0].text
+        assert version.startswith(("3.25.", "3.26.")), f"untested server {version}"
+        assert "undone" in plain[0].text, plain[0].text
 
         # Reason: the Gramps Web resource docstring for this endpoint says
         # "Undo a transaction using background processing", so the record

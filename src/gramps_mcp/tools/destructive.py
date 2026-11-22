@@ -431,8 +431,8 @@ async def undo_change_tool(client, arguments: dict) -> list[TextContent]:
 
         # Reason: "Undo a transaction using background processing" is the
         # endpoint's own docstring - the POST above only confirms the task
-        # was queued, not that the undo succeeded. On 3.25.x, without force, a known
-        # Gramps Web bug (see UndoChangeParams.force's description) makes
+        # was queued, not that the undo succeeded. On older servers (3.21.1), without
+        # force, a known Gramps Web bug (see UndoChangeParams.force's description) makes
         # every delete-undo fail silently in the background, so this tool
         # must poll the task to a terminal state before claiming success.
         task = response.get("task") if isinstance(response, dict) else None

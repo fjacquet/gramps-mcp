@@ -806,9 +806,10 @@ ref_handle=...)`.
 
 - `transaction_id` comes from `recent_changes`.
 - Undoing reverses every object change that transaction made.
-- **On gramps-webapi 3.25.x, `force=true` is required to undo a deletion;
-  fixed in 3.26.0 (tested on 3.26.0), where a plain undo restores the record.** Try a plain undo first:
-  a refusal naming `force` means the older server. The 3.25.x requirement is
+- **On older gramps-webapi (seen on 3.21.1), `force=true` was required to
+  undo a deletion; 3.25.2 and 3.26.0 (the tested versions) restore the record
+  with a plain undo.** Try a plain undo first: a refusal naming `force` means
+  an older server. The older-server requirement is
   an upstream Gramps Web defect, not a gramps-mcp choice: the server records the
   deleted side of a delete/add change as `{}` rather than `None`, and its
   own conflict check treats `{}` as "the object has changed", so it refuses

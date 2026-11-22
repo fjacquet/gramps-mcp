@@ -195,12 +195,12 @@ class UndoChangeParams(StrictModel):
         False,
         description=(
             "Bypass the server's check that the affected object has not "
-            "changed since the transaction being undone. Required on "
-            "gramps-webapi 3.25.x to undo a deletion: the emptied side of a "
+            "changed since the transaction being undone. Required on older "
+            "gramps-webapi (seen on 3.21.1) to undo a deletion: the emptied side of a "
             "delete/add change is recorded as {} instead of None, which "
             "makes that check misfire and refuse every non-forced "
             "delete-undo with a false 'Object has changed' conflict. "
-            "Fixed in 3.26.0 (tested on 3.26.0). Risk: if "
+            "Not needed on 3.25.2 or 3.26.0. Risk: if "
             "the object genuinely was changed after the original "
             "transaction, forcing the undo discards that later change "
             "without warning."
