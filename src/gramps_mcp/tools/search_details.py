@@ -145,7 +145,7 @@ async def _resolve_gramps_id(client, entity_type: str, gramps_id: str) -> str | 
         api_call=api_call, params=params, tree_id=tree_id
     )
 
-    if not results:
+    if not results or results[0].get("gramps_id") != gramps_id:
         return None
 
     handle = results[0].get("handle")

@@ -112,7 +112,7 @@ class TestGqlInjection:
             GrampsWebAPIClient, "_make_request", new_callable=AsyncMock
         ) as request:
             request.side_effect = [
-                [{"handle": "h1"}],
+                [{"handle": "h1", "gramps_id": "I0001"}],
                 {"handle": "h1", "gramps_id": "I0001", "backlinks": {}},
                 {},
             ]
@@ -121,6 +121,29 @@ class TestGqlInjection:
         assert "Deleted" in result[0].text
         sent = request.call_args_list[0].kwargs["params"]
         assert _expression(sent) == 'gramps_id == "I0001"'
+
+
+class TestResolveChecksReturnedId:
+    async def test_a_record_with_another_gramps_id_is_not_resolved(self):
+        """A server that ignores the filter must not hand back an arbitrary record."""
+        with patch.object(
+            GrampsWebAPIClient, "_make_request", new_callable=AsyncMock
+        ) as request:
+            request.return_value = [{"handle": "h9", "gramps_id": "I0009"}]
+            with pytest.raises(ValueError, match="No person found"):
+                await resolve_target_handle(
+                    GrampsWebAPIClient(), "tree", "person", None, "I0001"
+                )
+
+    async def test_a_record_with_the_requested_gramps_id_is_resolved(self):
+        with patch.object(
+            GrampsWebAPIClient, "_make_request", new_callable=AsyncMock
+        ) as request:
+            request.return_value = [{"handle": "h1", "gramps_id": "I0001"}]
+            handle = await resolve_target_handle(
+                GrampsWebAPIClient(), "tree", "person", None, "I0001"
+            )
+        assert handle == "h1"
 
 
 class TestTagGrampsIdRefusal:

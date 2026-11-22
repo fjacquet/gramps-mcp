@@ -94,7 +94,7 @@ async def resolve_person_handle(client, tree_id: str, gramps_id: str) -> str | N
         params={"gql": f'gramps_id == "{escaped}"', "pagesize": 1, "page": 1},
         tree_id=tree_id,
     )
-    if not people:
+    if not people or people[0].get("gramps_id") != gramps_id:
         return None
     return people[0].get("handle")
 
