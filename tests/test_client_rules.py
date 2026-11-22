@@ -38,4 +38,7 @@ async def test_unicode_expression() -> None:
         ApiCalls.GET_PEOPLE,
         {"gql": 'primary_name.surname_list[0].surname == "Méléo"', "pagesize": 5},
     )
-    assert len(result) >= 1
+    assert result
+    assert all(
+        p["primary_name"]["surname_list"][0]["surname"] == "Méléo" for p in result
+    )
