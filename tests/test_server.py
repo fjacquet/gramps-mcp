@@ -286,7 +286,10 @@ class TestToolIntegrationRealAPI:
                     {
                         "arguments": {
                             "type": "person",
-                            "gql": 'any(s.surname == "Méléo" for s in primary_name.surname_list)',
+                            "gql": (
+                                'any(s.surname == "Méléo" '
+                                "for s in primary_name.surname_list)"
+                            ),
                             "max_results": 20,
                         }
                     },

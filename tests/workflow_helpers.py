@@ -282,8 +282,8 @@ async def create_or_find_person_with_attributes(
     # primary_name.first_name returns only people and is unaffected by
     # however much other tree noise accumulates.
     #
-    # Note: first_name already carries PREFIX and the given name, so match on it only,
-    # which already carries PREFIX and the given name, then disambiguate on
+    # Note: first_name already carries PREFIX and the given name, so match on
+    # it only, then disambiguate on
     # the full name (including surname) below via person_line_pattern, same
     # as before.
     find_result = await find_type_tool(

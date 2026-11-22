@@ -41,10 +41,15 @@ async def test_get_person_tool():
     """Test get_type_tool provides comprehensive person data with timeline."""
 
     # Use specific person I0001 - first find the handle
-    search_result = await find_type_tool({"type": "person", "gql": 'gramps_id="I0001"'})
+    search_result = await find_type_tool(
+        {"type": "person", "gql": 'gramps_id == "I0001"'}
+    )
 
     # Extract handle from search results
     search_text = search_result[0].text
+    # Reason: the `if` below silently skips everything when the search fails
+    # or finds nothing; this makes a broken lookup fail the test instead.
+    assert search_text.startswith("Found") and "I0001" in search_text, search_text
     if "Found" in search_text and "Found 0" not in search_text:
         lines = search_text.split("\n")
         for line in lines:
@@ -131,10 +136,13 @@ async def test_get_family_tool():
     """Test get_type_tool provides comprehensive family data with timeline."""
 
     # Use specific family F0001 - first find the handle
-    search_result = await find_type_tool({"type": "family", "gql": 'gramps_id="F0001"'})
+    search_result = await find_type_tool(
+        {"type": "family", "gql": 'gramps_id == "F0001"'}
+    )
 
     # Extract handle from search results
     search_text = search_result[0].text
+    assert search_text.startswith("Found") and "F0001" in search_text, search_text
     if "Found" in search_text and "Found 0" not in search_text:
         lines = search_text.split("\n")
         for line in lines:

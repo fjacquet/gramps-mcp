@@ -254,13 +254,11 @@ class TestFindNoteTool:
         )
         assert "Found 1 note" in result[0].text
         assert "N0001" in result[0].text
-        assert "Found" in result[0].text or "No notes found" in result[0].text
 
         # Assert max_results is respected - count actual result entries
-        if "Found" in result[0].text and "No notes found" not in result[0].text:
-            # Count the number of "• **" entries which indicate individual results
-            result_count = result[0].text.count("• **")
-            assert result_count <= 3, f"Expected max 3 results, got {result_count}"
+        # Count the number of "• **" entries which indicate individual results
+        result_count = result[0].text.count("• **")
+        assert result_count <= 3, f"Expected max 3 results, got {result_count}"
 
 
 class TestFindTypeGoql:
